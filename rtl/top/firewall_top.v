@@ -4,13 +4,18 @@ module firewall_top (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        start_init,
+    input  wire        w5500_int_n,
     input  wire        spi_miso,
+    output wire        w5500_reset_n,
     output wire        spi_sclk,
     output wire        spi_mosi,
     output wire        spi_cs_n,
     output wire [31:0] rx_count,
     output wire [31:0] allow_count,
     output wire [31:0] drop_count,
+    output wire        init_done,
+    output wire        init_error,
+    output wire        rx_packet_seen,
     output wire [3:0]  adapter_debug_state
 );
     wire        frame_valid;
@@ -19,9 +24,6 @@ module firewall_top (
     wire        frame_eop;
     wire [0:0]  frame_src_port;
     wire        frame_ready;
-    wire        init_busy;
-    wire        init_done;
-    wire        init_error;
     wire        last_action_allow;
     wire [3:0]  last_matched_rule_id;
 
@@ -29,13 +31,16 @@ module firewall_top (
         .clk(clk),
         .rst_n(rst_n),
         .start_init(start_init),
+        .w5500_reset_n(w5500_reset_n),
+        .w5500_int_n(w5500_int_n),
         .spi_sclk(spi_sclk),
         .spi_mosi(spi_mosi),
         .spi_miso(spi_miso),
         .spi_cs_n(spi_cs_n),
-        .init_busy(init_busy),
+        .init_busy(),
         .init_done(init_done),
         .init_error(init_error),
+        .rx_packet_seen(rx_packet_seen),
         .frame_valid(frame_valid),
         .frame_data(frame_data),
         .frame_sop(frame_sop),

@@ -41,3 +41,17 @@
 - Reason: Packages, stronger typing, and reusable helpers make the benches easier to extend without taking synthesis risk in the datapath and adapter RTL.
 - Alternatives considered: Keeping the entire repo in Verilog-2001 only, or moving the synthesizable RTL fully to SystemVerilog.
 - Impact: Faster verification development with low FPGA-flow risk.
+
+## D-007
+- Date: 2026-04-09
+- Decision: Freeze the first hardware target around DE1-SoC plus W5500 using `SPI + RESET + INT`.
+- Reason: It gives the project a concrete board/module contract before hardware arrives and keeps the adapter work focused.
+- Alternatives considered: Staying controller-agnostic longer or targeting a different SPI Ethernet controller.
+- Impact: The adapter, docs, and top-level wiring can now converge on a single bring-up path.
+
+## D-008
+- Date: 2026-04-09
+- Decision: Use W5500 socket 0 in MACRAW mode for the MVP receive path.
+- Reason: It preserves raw Ethernet frames for the parser and firewall core while avoiding transmit-side complexity early.
+- Alternatives considered: Using higher-level socket modes or adding forwarding before receive inspection was stable.
+- Impact: The adapter can feed the existing internal frame interface without changing parser or firewall architecture.

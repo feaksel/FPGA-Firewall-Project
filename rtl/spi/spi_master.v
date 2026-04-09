@@ -8,6 +8,7 @@ module spi_master #(
     input  wire       clk,
     input  wire       rst_n,
     input  wire       start,
+    input  wire       hold_cs,
     input  wire [7:0] tx_data,
     output reg  [7:0] rx_data,
     output reg        busy,
@@ -70,7 +71,7 @@ module spi_master #(
                         if (CPHA == 0) begin
                             if (bit_idx == 3'd0) begin
                                 busy    <= 1'b0;
-                                cs_n    <= 1'b1;
+                                cs_n    <= !hold_cs;
                                 done    <= 1'b1;
                                 rx_data <= shreg_rx;
                             end else begin
@@ -81,7 +82,7 @@ module spi_master #(
                             shreg_rx[bit_idx] <= miso;
                             if (bit_idx == 3'd0) begin
                                 busy    <= 1'b0;
-                                cs_n    <= 1'b1;
+                                cs_n    <= !hold_cs;
                                 done    <= 1'b1;
                                 rx_data <= {shreg_rx[7:1], miso};
                             end else begin

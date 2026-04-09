@@ -4,6 +4,7 @@ module spi_master_tb;
     reg clk;
     reg rst_n;
     reg start;
+    reg hold_cs;
     reg [7:0] tx_data;
     wire [7:0] rx_data;
     wire busy;
@@ -25,6 +26,7 @@ module spi_master_tb;
         .clk(clk),
         .rst_n(rst_n),
         .start(start),
+        .hold_cs(hold_cs),
         .tx_data(tx_data),
         .rx_data(rx_data),
         .busy(busy),
@@ -66,6 +68,7 @@ module spi_master_tb;
     initial begin
         rst_n    = 1'b0;
         start    = 1'b0;
+        hold_cs  = 1'b0;
         tx_data  = 8'h3C;
         miso     = 1'b0;
         slave_tx = 8'hA5;

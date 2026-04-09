@@ -1,11 +1,11 @@
 # Next Steps
 
 ## Immediate path
-1. Run the dedicated testbenches in this order: source, parser, rules, buffer, firewall core, SPI, adapter
-2. Confirm parser fields line up with the packet vectors in `tb/packets/`
-3. Expand `rule_engine.v` from parameterized rules into a BRAM-backed table when the baseline is stable
-4. Replace the adapter shell transaction bytes with the chosen Ethernet controller's real register map
-5. Decide whether buffering should stay single-packet for MVP or become a small packet FIFO
+1. Run `scripts/run_xsim_suite.ps1` and keep the full pre-hardware bench set passing
+2. Validate the W5500 MACRAW adapter path with `adapter_firewall_integration_tb`
+3. Freeze the DE1-SoC GPIO wiring in `docs/de1_soc_w5500_hardware.md`
+4. Decide whether buffering should stay single-packet for MVP or become a small packet FIFO
+5. Expand `rule_engine.v` from parameterized rules into a BRAM-backed table when the baseline is stable
 
 ## Once hardware arrives
 1. Verify SPI wiring and reset

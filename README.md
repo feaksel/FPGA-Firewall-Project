@@ -51,8 +51,18 @@ The starter implementation already includes:
 - a parser that handles Ethernet II + IPv4 + TCP/UDP without IPv4 options,
 - a four-rule parameterized rule engine with first-match priority,
 - a single-packet buffer that stores frame bytes and can replay them,
-- a controller adapter shell with an init FSM and SPI transaction scaffolding,
+- a W5500-oriented adapter with a MACRAW-mode RX simulation path,
+- a DE1-SoC board wrapper for first hardware bring-up,
 - dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
+
+## Hardware target
+
+The current hardware plan is frozen around:
+- Intel DE1-SoC
+- W5500 over `SPI + RESET + INT`
+- one-port RX inspection before any forwarding work
+
+See [de1_soc_w5500_hardware.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/de1_soc_w5500_hardware.md) for the board-facing contract.
 
 ## Language policy
 

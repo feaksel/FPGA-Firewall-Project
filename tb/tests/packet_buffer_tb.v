@@ -20,6 +20,7 @@ module packet_buffer_tb;
     wire pkt_done;
     wire pkt_available;
     wire overflow_error;
+    reg saw_pkt_done;
 
     reg [7:0] sample_mem [0:4];
     integer idx;
@@ -62,6 +63,13 @@ module packet_buffer_tb;
         forever #5 clk = ~clk;
     end
 
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            saw_pkt_done <= 1'b0;
+        else if (pkt_done)
+            saw_pkt_done <= 1'b1;
+    end
+
     initial begin
         rst_n       = 1'b0;
         in_valid    = 1'b0;
@@ -72,6 +80,7 @@ module packet_buffer_tb;
         rd_start    = 1'b0;
         out_ready   = 1'b1;
         out_count   = 0;
+        saw_pkt_done= 1'b0;
 
         #25;
         rst_n = 1'b1;
@@ -91,9 +100,9 @@ module packet_buffer_tb;
 
         wait(pkt_done);
         @(negedge clk);
-        if (!pkt_done || !pkt_available || pkt_len != 16'd5 || overflow_error) begin
+        if (!saw_pkt_done || !pkt_available || pkt_len != 16'd5 || overflow_error) begin
             $display("FAIL: buffer write path pkt_done=%0d pkt_available=%0d pkt_len=%0d overflow_error=%0d",
-                     pkt_done, pkt_available, pkt_len, overflow_error);
+                     saw_pkt_done, pkt_available, pkt_len, overflow_error);
             $finish;
         end
 

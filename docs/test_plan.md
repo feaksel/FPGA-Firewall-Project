@@ -50,12 +50,12 @@ Move on when:
 
 ## Milestone 6: Controller Adapter Shell
 Pass criteria:
-- init FSM compiles
+- W5500-oriented init FSM compiles
 - read/write transaction sequence defined
-- RX/TX states documented
+- MACRAW RX path documented and simulated
 
 Move on when:
-- adapter shell reviewed and `eth_controller_adapter_tb` exists
+- `eth_controller_adapter_tb` passes and `adapter_firewall_integration_tb` passes
 
 ## Milestone 7: One-Port Hardware Bring-Up
 Pass criteria:

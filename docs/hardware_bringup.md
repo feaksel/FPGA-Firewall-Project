@@ -1,12 +1,14 @@
 # Hardware Bring-Up Checklist
 
 ## Before board/module arrives
-- [ ] `parser_tb` passes
-- [ ] `rule_engine_tb` passes
-- [ ] `firewall_core_tb` passes
-- [ ] `spi_master_tb` passes
-- [ ] controller adapter shell exists
-- [ ] debug counters available at top-level
+- [x] `parser_tb` passes
+- [x] `rule_engine_tb` passes
+- [x] `firewall_core_tb` passes
+- [x] `spi_master_tb` passes
+- [x] controller adapter shell exists
+- [x] debug counters available at top-level
+- [x] `packet_buffer_tb` passes
+- [x] `eth_controller_adapter_tb` passes
 
 ## Day 1 with hardware
 - [ ] verify power and pin mapping

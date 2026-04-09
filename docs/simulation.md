@@ -8,11 +8,13 @@
 5. `firewall_core_tb`
 6. `spi_master_tb`
 7. `eth_controller_adapter_tb`
+8. `adapter_firewall_integration_tb`
 
 ## Tooling
 
 The repo includes `scripts/run_iverilog.ps1` for Windows PowerShell environments.
 The repo also includes `scripts/run_xsim.ps1` and `scripts/run_questa.ps1` for machines with Vivado or Questa installed.
+For the current project flow, `scripts/run_xsim_suite.ps1` runs the full pre-hardware bench set in order.
 
 Expected include path:
 - `rtl/common`
@@ -48,3 +50,4 @@ Each file is a byte-per-line hex memory file intended for `$readmemh`.
 - packet buffer preserves byte order and SOP/EOP positions
 - firewall core increments counters exactly once per packet
 - SPI master returns the expected response byte from the testbench slave model
+- the W5500 adapter reaches MACRAW-ready state and streams a frame into the internal firewall interface

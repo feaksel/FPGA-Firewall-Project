@@ -76,5 +76,18 @@ The top-level integration must expose:
 - `allow_count`
 - `drop_count`
 - `adapter_debug_state`
+- `init_done`
+- `init_error`
+- `rx_packet_seen`
 
 These counters are intended for debug and bring-up before optional forwarding is added.
+
+## Board-facing hardware signals
+
+For the DE1-SoC + W5500 path, the external interface must include:
+- `w5500_reset_n`
+- `w5500_int_n`
+- `spi_sclk`
+- `spi_mosi`
+- `spi_miso`
+- `spi_cs_n`

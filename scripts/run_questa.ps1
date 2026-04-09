@@ -32,7 +32,9 @@ $Sources = @(
     "rtl/firewall/firewall_core.v",
     "rtl/eth_if/ethernet_controller_adapter.v",
     "rtl/top/firewall_top.v",
+    "rtl/top/de1_soc_w5500_top.v",
     "tb/models/fake_eth_source.v",
+    "tb/models/w5500_macraw_model.sv",
     $TestFile
 )
 

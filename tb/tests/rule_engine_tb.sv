@@ -14,6 +14,9 @@ module rule_engine_tb;
     logic decision_valid;
     logic action_allow;
     logic [3:0] matched_rule_id;
+    logic saw_decision_valid;
+    logic captured_action_allow;
+    logic [3:0] captured_rule_id;
 
     rule_engine dut (
         .clk(clk),
@@ -53,12 +56,25 @@ module rule_engine_tb;
         input logic       expected_allow,
         input logic [3:0] expected_rule
     );
-        wait(decision_valid);
+        wait(saw_decision_valid);
         @(negedge clk);
-        expect_bit({label, ".decision_valid"}, decision_valid, 1'b1);
-        expect_bit({label, ".action_allow"}, action_allow, expected_allow);
-        expect_u4({label, ".matched_rule_id"}, matched_rule_id, expected_rule);
+        expect_bit({label, ".decision_valid"}, saw_decision_valid, 1'b1);
+        expect_bit({label, ".action_allow"}, captured_action_allow, expected_allow);
+        expect_u4({label, ".matched_rule_id"}, captured_rule_id, expected_rule);
+        saw_decision_valid = 1'b0;
     endtask
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            saw_decision_valid   <= 1'b0;
+            captured_action_allow<= 1'b0;
+            captured_rule_id     <= 4'hF;
+        end else if (decision_valid) begin
+            saw_decision_valid    <= 1'b1;
+            captured_action_allow <= action_allow;
+            captured_rule_id      <= matched_rule_id;
+        end
+    end
 
     initial begin
         clk = 1'b0;
@@ -73,6 +89,7 @@ module rule_engine_tb;
         dst_ip     = 32'd0;
         src_port   = 16'd0;
         dst_port   = 16'd0;
+        saw_decision_valid = 1'b0;
 
         #20;
         rst_n = 1'b1;
