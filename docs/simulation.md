@@ -35,7 +35,7 @@ Recommended order on this machine:
 
 ## Packet vectors
 
-Current starter vectors:
+Current packet vectors:
 - `tb/packets/udp_allow.mem`
 - `tb/packets/tcp_drop.mem`
 - `tb/packets/udp_subnet.mem`

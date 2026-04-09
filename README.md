@@ -1,6 +1,6 @@
-# FPGA Firewall Project Bootstrap
+# FPGA Firewall Project
 
-This repository is structured so the team can:
+This repository is organized so the team can:
 1. build and verify the firewall core before hardware arrives,
 2. isolate hardware-risky parts behind a clean adapter interface,
 3. track bugs, design decisions, and milestone status clearly.
@@ -44,9 +44,9 @@ Build in this order:
 - real bytes mapped into internal frame interface
 - firewall core reused without architecture changes
 
-## Simulation baseline in this repo
+## Repository status
 
-The starter implementation already includes:
+The current implementation includes:
 - packet vectors for UDP allow and TCP drop smoke tests,
 - a parser that handles Ethernet II + IPv4 + TCP/UDP without IPv4 options,
 - a four-rule parameterized rule engine with first-match priority,
@@ -54,6 +54,29 @@ The starter implementation already includes:
 - a W5500-oriented adapter with a MACRAW-mode RX simulation path,
 - a DE1-SoC board wrapper for first hardware bring-up,
 - dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
+
+## Current verification status
+
+The XSim regression suite currently passes for:
+- `fake_eth_source_tb`
+- `parser_tb`
+- `rule_engine_tb`
+- `packet_buffer_tb`
+- `firewall_core_tb`
+- `spi_master_tb`
+- `eth_controller_adapter_tb`
+- `adapter_firewall_integration_tb`
+
+Run the full suite with:
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1`
+
+Run a single testbench with:
+- `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim.ps1 <testbench_name>`
+
+Simulation artifacts are written to designated build folders instead of the repo root:
+- `build/xsim/<testbench>/`
+- `build/iverilog/<testbench>/`
+- `build/questa/<testbench>/`
 
 ## Hardware target
 
@@ -63,6 +86,7 @@ The current hardware plan is frozen around:
 - one-port RX inspection before any forwarding work
 
 See [de1_soc_w5500_hardware.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/de1_soc_w5500_hardware.md) for the board-facing contract.
+See [hands_on_plan.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/hands_on_plan.md) for the step-by-step buy, wire, compile, program, and bring-up flow.
 
 ## Language policy
 
