@@ -1,5 +1,7 @@
 `include "defs.vh"
 
+`timescale 1ns/1ps
+
 module rule_engine (
     input  wire        clk,
     input  wire        rst_n,

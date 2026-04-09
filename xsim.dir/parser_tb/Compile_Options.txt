@@ -1,0 +1,1 @@
+"work.parser_tb" -s "parser_tb" --debug "typical" 

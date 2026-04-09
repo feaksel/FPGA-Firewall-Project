@@ -1,0 +1,16 @@
+0.7
+2020.2
+May 22 2025
+00:13:55
+C:/Users/furka/Projects/ELE432_ethernet/rtl/buffer/packet_buffer.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/parser/eth_ipv4_parser.v,,packet_buffer,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/common/defs.vh,1775652772,verilog,,,,,,,,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/debug_counters.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/spi/spi_master.v,,debug_counters,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/ethernet_controller_adapter.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/top/firewall_top.v,,ethernet_controller_adapter,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_core.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/ethernet_controller_adapter.v,,firewall_core,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/parser/eth_ipv4_parser.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/rules/rule_engine.v,C:/Users/furka/Projects/ELE432_ethernet/rtl/common/defs.vh,eth_ipv4_parser,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/rules/rule_engine.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_core.v,C:/Users/furka/Projects/ELE432_ethernet/rtl/common/defs.vh,rule_engine,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/spi/spi_master.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/rtl/buffer/packet_buffer.v,,spi_master,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/rtl/top/firewall_top.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/tb/models/fake_eth_source.v,,firewall_top,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/tb/common/fw_tb_pkg.sv,1775666810,systemVerilog,C:/Users/furka/Projects/ELE432_ethernet/tb/tests/parser_tb.sv,C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/debug_counters.v,,fw_tb_pkg,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/tb/models/fake_eth_source.v,1775661971,systemVerilog,,C:/Users/furka/Projects/ELE432_ethernet/tb/tests/parser_tb.sv,,fake_eth_source,,,rtl/common;tb/common,,,,,
+C:/Users/furka/Projects/ELE432_ethernet/tb/tests/parser_tb.sv,1775666889,systemVerilog,,,,parser_tb,,,rtl/common;tb/common,,,,,

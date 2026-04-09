@@ -1,5 +1,7 @@
 `include "defs.vh"
 
+`timescale 1ns/1ps
+
 module eth_ipv4_parser (
     input  wire        clk,
     input  wire        rst_n,

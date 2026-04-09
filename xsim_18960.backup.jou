@@ -1,0 +1,25 @@
+#-----------------------------------------------------------
+# xsim v2025.1 (64-bit)
+# SW Build 6140274 on Thu May 22 00:12:29 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Wed Apr  8 19:47:18 2026
+# Process ID         : 18960
+# Current directory  : C:/Users/furka/Projects/ELE432_ethernet
+# Command line       : xsim.exe -mode tcl -source {xsim.dir/parser_tb/xsim_script.tcl}
+# Log file           : C:/Users/furka/Projects/ELE432_ethernet/xsim.log
+# Journal file       : C:/Users/furka/Projects/ELE432_ethernet\xsim.jou
+# Running On         : DESKTOP-O6TP24I
+# Platform           : Windows Server 2016 or Windows 10
+# Operating System   : 19045
+# Processor Detail   : Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+# CPU Frequency      : 2592 MHz
+# CPU Physical cores : 6
+# CPU Logical cores  : 12
+# Host memory        : 34190 MB
+# Swap memory        : 23622 MB
+# Total Virtual      : 57812 MB
+# Available Virtual  : 25660 MB
+#-----------------------------------------------------------
+source xsim.dir/parser_tb/xsim_script.tcl
+run -all

@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module firewall_core (
     input  wire        clk,
     input  wire        rst_n,

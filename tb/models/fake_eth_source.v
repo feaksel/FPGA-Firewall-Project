@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module fake_eth_source #(
     parameter MEMORY_FILE = "tb/packets/udp_allow.mem",
     parameter PACKET_LENGTH = 38,

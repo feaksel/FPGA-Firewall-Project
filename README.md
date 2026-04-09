@@ -54,6 +54,13 @@ The starter implementation already includes:
 - a controller adapter shell with an init FSM and SPI transaction scaffolding,
 - dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
 
+## Language policy
+
+Use a mixed-language approach:
+- synthesizable RTL should stay conservative and Vivado-friendly,
+- SystemVerilog is encouraged for testbenches, packages, assertions, and reusable verification helpers,
+- any synthesizable SystemVerilog should stay within a simple subset that maps cleanly to the FPGA flow.
+
 ## Rules for contributors
 
 Every significant change must update:

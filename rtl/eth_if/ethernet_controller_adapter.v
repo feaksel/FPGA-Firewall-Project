@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module ethernet_controller_adapter #(
     parameter STARTUP_WAIT_CYCLES = 16,
     parameter SPI_CLK_DIV         = 4

@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module packet_buffer #(
     parameter MAX_PKT_BYTES = 2048
 ) (

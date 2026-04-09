@@ -18,4 +18,5 @@
 - [ ] Make `packet_buffer_tb` pass
 - [ ] Make `spi_master_tb` pass
 - [ ] Integrate parser + rules into `firewall_core_tb`
+- [ ] Migrate the remaining benches to shared SystemVerilog helpers where it improves reuse
 - [ ] Freeze the actual Ethernet controller choice for the adapter implementation

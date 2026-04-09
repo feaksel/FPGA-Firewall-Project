@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module debug_counters (
     input  wire        clk,
     input  wire        rst_n,

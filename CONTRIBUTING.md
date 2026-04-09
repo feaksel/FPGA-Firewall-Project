@@ -19,7 +19,8 @@ After changing code:
 
 ## Coding constraints
 - Use plain Verilog-2001 compatible style
-- Avoid SystemVerilog-only syntax
+- Testbenches may use SystemVerilog features when they improve clarity
+- Keep synthesizable RTL in plain Verilog or a conservative synthesizable SystemVerilog subset
 - Keep module boundaries clean
 - No hidden magic constants without comments
 - Keep interfaces stable

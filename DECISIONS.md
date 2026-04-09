@@ -34,3 +34,10 @@
 - Reason: Lets simulation cover exact match, subnet match, range match, and default-drop behavior early.
 - Alternatives considered: Keeping the original single-rule smoke-test engine.
 - Impact: Better test coverage before hardware arrives while staying simple enough for BRAM-backed expansion later.
+
+## D-006
+- Date: 2026-04-08
+- Decision: Use SystemVerilog for verification infrastructure while keeping synthesizable RTL conservative.
+- Reason: Packages, stronger typing, and reusable helpers make the benches easier to extend without taking synthesis risk in the datapath and adapter RTL.
+- Alternatives considered: Keeping the entire repo in Verilog-2001 only, or moving the synthesizable RTL fully to SystemVerilog.
+- Impact: Faster verification development with low FPGA-flow risk.
