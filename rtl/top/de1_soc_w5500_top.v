@@ -32,8 +32,9 @@ module de1_soc_w5500_top (
     assign GPIO_0[1] = spi_mosi;
     assign GPIO_0[2] = spi_cs_n;
     assign GPIO_0[3] = w5500_reset_n;
-
-    assign GPIO_0[35:6] = 30'h3fffffff;
+    assign GPIO_0[4] = 1'bz;
+    assign GPIO_0[5] = 1'bz;
+    assign GPIO_0[35:6] = {30{1'bz}};
 
     assign LEDR[0] = init_done;
     assign LEDR[1] = init_error;

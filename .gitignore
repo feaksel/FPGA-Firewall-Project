@@ -1,0 +1,15 @@
+# Generated build outputs
+build/
+
+# Simulator artifacts
+xsim.dir/
+*.jou
+*.log
+*.pb
+*.wdb
+dfx_runtime.txt
+
+# Quartus generated databases and helper dumps
+quartus/db/
+quartus/incremental_db/
+quartus/c5_pin_model_dump.txt

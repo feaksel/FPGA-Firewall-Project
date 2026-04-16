@@ -13,7 +13,7 @@
 ## Tooling
 
 The repo includes `scripts/run_iverilog.ps1` for Windows PowerShell environments.
-The repo also includes `scripts/run_xsim.ps1` and `scripts/run_questa.ps1` for machines with Vivado or Questa installed.
+The repo also includes `scripts/run_xsim.ps1`, `scripts/run_questa.ps1`, and `scripts/run_questa_gui.ps1` for machines with Vivado or Questa installed.
 For the current project flow, `scripts/run_xsim_suite.ps1` runs the full pre-hardware bench set in order.
 
 Expected include path:
@@ -31,7 +31,52 @@ This keeps the FPGA path simple while making the benches easier to extend.
 Recommended order on this machine:
 - use `run_xsim.ps1` first because Vivado 2025.1 is installed,
 - use `run_questa.ps1` when you want an alternate simulator check,
+- use `run_questa_gui.ps1` when you want the Questa waveform GUI with the testbench loaded,
 - keep `run_iverilog.ps1` available for lightweight environments that already have Icarus installed.
+
+## Command cheat sheet
+
+Run one testbench in XSim:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim.ps1 parser_tb
+```
+
+Run the full XSim regression suite:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1
+```
+
+Run one testbench in Questa console mode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_questa.ps1 parser_tb
+```
+
+Open one testbench in Questa GUI:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_questa_gui.ps1 parser_tb
+```
+
+Open one testbench in Questa GUI and run it immediately:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_questa_gui.ps1 parser_tb -RunAll
+```
+
+Compile one testbench for Questa GUI without launching the window:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_questa_gui.ps1 parser_tb -NoLaunch
+```
+
+Run one testbench in Icarus Verilog:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_iverilog.ps1 parser_tb
+```
 
 ## Packet vectors
 

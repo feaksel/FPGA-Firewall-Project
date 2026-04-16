@@ -1,7 +1,13 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Testbench
+    [string]$Testbench,
+
+    [switch]$RunAll,
+
+    [switch]$NoLaunch
 )
+
+$ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $BuildDir = Join-Path $RepoRoot "build\questa\$Testbench"
@@ -67,8 +73,27 @@ try {
         exit $LASTEXITCODE
     }
 
-    & $Vsim "-c" $Testbench "-do" "run -all; quit -f"
-    exit $LASTEXITCODE
+    if ($NoLaunch) {
+        exit 0
+    }
+
+    $DoCommands = @(
+        "view wave",
+        "add wave -r sim:/*"
+    )
+
+    if ($RunAll) {
+        $DoCommands += "run -all"
+        $DoCommands += "wave zoom full"
+    }
+
+    $DoScript = [string]::Join("; ", $DoCommands)
+    $DoFile = Join-Path $BuildDir "launch_$Testbench.do"
+    Set-Content -LiteralPath $DoFile -Value $DoScript -Encoding ASCII
+
+    Start-Process -FilePath $Vsim `
+        -WorkingDirectory $BuildDir `
+        -ArgumentList @($Testbench, "-do", $DoFile)
 }
 finally {
     Pop-Location

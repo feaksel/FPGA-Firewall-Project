@@ -17,3 +17,6 @@
 - Added a reusable W5500 SPI/RX simulation model and adapter-to-firewall integration bench
 - Added a DE1-SoC board wrapper and froze the first GPIO wiring contract in docs
 - Added an XSim suite runner and a Scapy-based deterministic packet sender scaffold for physical testing
+
+## 2026-04-16
+- Added `docs/project_overview.md` as a newcomer-friendly project guide covering goals, architecture, stages, testing flow, deployment, hardware, and key files
