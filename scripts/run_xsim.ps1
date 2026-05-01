@@ -28,6 +28,7 @@ if (Test-Path $SvTestFile) {
 $Sources = @(
     (Join-Path $RepoRoot "tb/common/fw_tb_pkg.sv"),
     (Join-Path $RepoRoot "rtl/debug/debug_counters.v"),
+    (Join-Path $RepoRoot "rtl/debug/seven_seg_hex.v"),
     (Join-Path $RepoRoot "rtl/spi/spi_master.v"),
     (Join-Path $RepoRoot "rtl/buffer/packet_buffer.v"),
     (Join-Path $RepoRoot "rtl/buffer/frame_rx_fifo.v"),

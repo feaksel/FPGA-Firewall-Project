@@ -280,6 +280,31 @@ Stage 4 success:
 - `tcp_drop` behaves like a dropped packet
 - `tcp_allow_ssh` follows the expected rule behavior
 
+## 14a. Current observed hardware status
+
+As of 2026-05-01, the project has reached the following hardware state:
+
+- DE1-SoC programming over JTAG works.
+- W5500 `VERSIONR` register read works on the physical module.
+- W5500 MACRAW initialization completes and reaches RX polling.
+- `LEDR[0]` indicates `init_done`.
+- `LEDR[1]` remains inactive during stable receive operation.
+- `LEDR[2]` indicates that at least one packet has been seen.
+- Deterministic Scapy packets from the PC were captured in Wireshark on the `Ethernet` interface:
+  - `udp_allow`
+  - `tcp_drop`
+  - `tcp_allow_ssh`
+- The FPGA receive/debug LEDs respond to traffic.
+
+Important fixes discovered during bring-up:
+- W5500 hardware reset delays must be much longer than simulation delays.
+- The adapter wait counter must be wide enough for millisecond-scale board delays.
+- W5500 SPI read/write control bytes must follow `RWB=0` for reads and `RWB=1` for writes.
+- Real Ethernet RX can include background Windows multicast/broadcast traffic, so LEDs may move even when the deterministic sender is idle.
+
+Current limitation:
+- `LEDR[7]`, `LEDR[8]`, and `LEDR[9]` show only the low bit of RX/allow/drop counters. They are useful for activity, but not enough for clean per-packet allow/drop validation.
+
 ## 15. Recommended debug order if something fails
 
 If the design does not compile:
@@ -316,12 +341,12 @@ If SPI init works but packets are not seen:
 
 ## 16. Recommended next repo task
 
-The next practical repo task before hardware arrives is to add a Quartus project layer for DE1-SoC:
-- `.qpf`
-- `.qsf`
-- `.sdc`
+The next practical repo task after the first hardware receive pass is to improve observability:
+- expose fuller RX/allow/drop counters through a debug readout, UART, SignalTap, or a clearer LED mode,
+- make a repeatable hardware smoke-test recipe for programming, sending deterministic packets, and checking expected counter movement,
+- re-run the full simulation suite after the hardware-discovered W5500 SPI control-byte correction.
 
-That will make the first board compile much faster and reduce bring-up mistakes around pin assignments and clock constraints.
+Do not begin forwarding until one-port allow/drop behavior is repeatable and documented.
 
 ## Sources
 

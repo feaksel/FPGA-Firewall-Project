@@ -23,6 +23,8 @@ module adapter_firewall_integration_tb;
     logic [31:0] allow_count;
     logic [31:0] drop_count;
     logic rx_fifo_overflow;
+    logic last_action_allow;
+    logic [3:0] last_matched_rule_id;
 
     firewall_top #(
         .USE_RX_FIFO(1),
@@ -51,7 +53,9 @@ module adapter_firewall_integration_tb;
         .init_error(init_error),
         .rx_packet_seen(rx_packet_seen),
         .adapter_debug_state(debug_state),
-        .rx_fifo_overflow(rx_fifo_overflow)
+        .rx_fifo_overflow(rx_fifo_overflow),
+        .last_action_allow(last_action_allow),
+        .last_matched_rule_id(last_matched_rule_id)
     );
 
     w5500_macraw_model #(
@@ -96,6 +100,8 @@ module adapter_firewall_integration_tb;
         expect_u32("integration.rx_count", rx_count, 32'd1);
         expect_u32("integration.allow_count", allow_count, 32'd1);
         expect_u32("integration.drop_count", drop_count, 32'd0);
+        expect_bit("integration.last_action_allow", last_action_allow, 1'b1);
+        expect_u4("integration.last_matched_rule_id", last_matched_rule_id, 4'd0);
         expect_bit("integration.rx_fifo_overflow", rx_fifo_overflow, 1'b0);
         expect_bit("integration.saw_version_read", saw_version_read, 1'b1);
         expect_bit("integration.saw_open_cmd", saw_open_cmd, 1'b1);

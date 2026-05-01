@@ -29,7 +29,7 @@ This is important because hardware projects fail easily when too many things are
 
 ## What the system does today
 
-At the current stage, the design is mainly a packet inspection and decision pipeline.
+At the current stage, the design is a one-port packet receive and inspection pipeline that has now been exercised on the physical DE1-SoC + W5500 hardware.
 
 In plain language, the flow is:
 
@@ -42,7 +42,7 @@ In plain language, the flow is:
 7. The firewall core records whether the packet was allowed or dropped.
 8. Debug counters and LEDs show what happened.
 
-Right now, the system is focused on receive-side inspection. It is not yet a full inline two-port forwarding firewall. That later extension is planned only after the receive path is stable.
+Right now, the system is focused on receive-side inspection. It is not yet a full inline two-port forwarding firewall. That later extension is planned only after the receive path and allow/drop validation are repeatable on hardware.
 
 ## Why the project is organized in stages
 
@@ -125,6 +125,7 @@ Used to run tests and hardware build steps:
 Most used scripts:
 - [scripts/run_xsim_suite.ps1](/c:/Users/furka/Projects/ELE432_ethernet/scripts/run_xsim_suite.ps1)
 - [scripts/run_xsim.ps1](/c:/Users/furka/Projects/ELE432_ethernet/scripts/run_xsim.ps1)
+- [scripts/traffic_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/traffic_dashboard.py)
 - [scripts/run_questa.ps1](/c:/Users/furka/Projects/ELE432_ethernet/scripts/run_questa.ps1)
 - [scripts/create_quartus_project.ps1](/c:/Users/furka/Projects/ELE432_ethernet/scripts/create_quartus_project.ps1)
 - [scripts/send_test_packets.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/send_test_packets.py)
@@ -366,12 +367,18 @@ What gets tested next:
 Move forward when:
 - the board receives real traffic and the firewall counters respond as expected
 
+Current status as of 2026-05-01:
+- W5500 reset, SPI register access, and MACRAW initialization work on real hardware.
+- The adapter reaches RX polling on the DE1-SoC with `init_done` active.
+- Deterministic Scapy packets sent by the PC were captured in Wireshark and observed by the FPGA receive path.
+- Single-bit LED counters show activity, but a clearer debug method is still needed to prove every packet profile maps to the expected allow/drop counter result.
+
 ### Stage 8: Optional forwarding work
 
 Goal:
 - extend the project from receive-side inspection into a more complete forwarding design
 
-This stage is intentionally delayed until the receive path is stable.
+This stage is intentionally delayed until the receive path is stable and allow/drop counter correlation is documented.
 
 Likely work here:
 - second-port handling
@@ -593,12 +600,17 @@ Already established:
 - DE1-SoC top-level wrapper
 - Quartus project layer
 
+Already established on hardware:
+- real-board wiring validation for the first GPIO_0_D0 through GPIO_0_D5 W5500 connection,
+- real W5500 `VERSIONR` register access,
+- W5500 MACRAW initialization,
+- real packet receive activity from PC traffic,
+- Wireshark confirmation of deterministic Scapy packets.
+
 Still considered active bring-up work:
-- real-board wiring validation
-- real W5500 register access on hardware
-- real packet receive validation
-- counter correlation against PC traffic
-- later forwarding work
+- clean allow/drop counter correlation against deterministic PC traffic,
+- better debug visibility than single-bit counter LEDs,
+- later forwarding work.
 
 ## The most important project habits
 
@@ -617,7 +629,7 @@ To keep this project understandable and healthy, the team should keep following 
 2. The core idea is to reuse the same firewall logic in simulation and on hardware.
 3. The project flows from packet source -> parser -> rule engine -> firewall core -> hardware adapter.
 4. We only move forward when the current stage is proven by tests or bring-up evidence.
-5. Real success for the current phase is simple: initialize the W5500, receive real packets, and see correct allow/drop behavior.
+5. Real success for the current phase is now narrower: receive real packets is working; the next proof point is clean, repeatable allow/drop correlation for each deterministic packet type.
 
 ## Recommended reading order for a new teammate
 

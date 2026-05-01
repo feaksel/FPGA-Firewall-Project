@@ -62,3 +62,17 @@
 - Reason: It adds controlled backpressure handling without changing the parser/rule/firewall interfaces and makes the integrated receive path closer to the real hardware behavior.
 - Alternatives considered: Keeping the adapter directly connected to the firewall core until hardware arrives, or repurposing the standalone packet buffer for live RX.
 - Impact: The live receive path is more robust before board bring-up, while transmit/forwarding complexity remains deferred.
+
+## D-010
+- Date: 2026-05-01
+- Decision: Keep the hardware W5500 bring-up image polling-based and receive/inspect-only after first live packet success.
+- Reason: The board now proves W5500 SPI access, MACRAW initialization, and real packet reception; forwarding would add a second major hardware risk before allow/drop correlation is clean.
+- Alternatives considered: Moving directly to a second Ethernet port or transmit path after first RX activity.
+- Impact: The next milestone is better observability and repeatable allow/drop validation, not forwarding.
+
+## D-011
+- Date: 2026-05-01
+- Decision: Treat malformed or oversized W5500 RX frames as discardable receive events instead of fatal adapter initialization errors.
+- Reason: Real Ethernet links include background multicast/broadcast traffic and startup frames; one odd frame should not permanently stop the receive path.
+- Alternatives considered: Keeping the previous fail-fast behavior for every invalid hardware RX length.
+- Impact: Hardware receive remains live and can continue polling after discarding a bad frame.

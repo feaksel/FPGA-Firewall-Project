@@ -25,3 +25,21 @@
 - Hardened the DE1-SoC top-level with synchronized reset release and synchronized board-control sampling for the live hardware path
 - Removed the Quartus SPI truncation warnings and the `KEY[0]` global-clock warning from the current build flow
 - Validated the updated pre-hardware flow with full XSim regression, a Questa smoke check, and a fresh Quartus compile that emits `build/quartus/de1_soc_w5500.sof`
+
+## 2026-05-01
+- Programmed the DE1-SoC over JTAG with the W5500 receive-inspection image and completed the first live hardware bring-up pass
+- Increased W5500 reset/release timing for real hardware and widened the adapter wait counter so millisecond-scale reset delays work correctly
+- Corrected W5500 SPI control-byte definitions so read commands use `RWB=0` and write commands use `RWB=1`
+- Updated the W5500 simulation model to match the corrected SPI read/write control-byte behavior
+- Increased the hardware RX frame limit to 2048 bytes for realistic Ethernet frames
+- Changed malformed or oversized W5500 RX frames to be discarded/committed instead of permanently forcing `init_error`
+- Restored the clean board LED contract after temporary diagnostic bring-up overlays:
+  - `LEDR[0]` = `init_done`
+  - `LEDR[1]` = `init_error`
+  - `LEDR[2]` = `rx_packet_seen`
+  - `LEDR[6:3]` = adapter state
+  - `LEDR[7:9]` = RX/allow/drop counter low bits
+- Confirmed PC-to-W5500 traffic with Wireshark and Scapy:
+  - 3 `udp_allow` packets
+  - 3 `tcp_drop` packets
+  - 3 `tcp_allow_ssh` packets

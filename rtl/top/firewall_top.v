@@ -27,7 +27,9 @@ module firewall_top #(
     output wire        init_error,
     output wire        rx_packet_seen,
     output wire [3:0]  adapter_debug_state,
-    output wire        rx_fifo_overflow
+    output wire        rx_fifo_overflow,
+    output wire        last_action_allow,
+    output wire [3:0]  last_matched_rule_id
 );
     wire        adapter_frame_valid;
     wire [7:0]  adapter_frame_data;
@@ -41,8 +43,6 @@ module firewall_top #(
     wire        core_frame_eop;
     wire [0:0]  core_frame_src_port;
     wire        core_frame_ready;
-    wire        last_action_allow;
-    wire [3:0]  last_matched_rule_id;
     wire        fifo_overflow_int;
 
     ethernet_controller_adapter u_adapter (

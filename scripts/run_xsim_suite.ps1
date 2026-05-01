@@ -4,6 +4,7 @@ $tests = @(
     "rule_engine_tb",
     "packet_buffer_tb",
     "frame_rx_fifo_tb",
+    "seven_seg_hex_tb",
     "firewall_core_tb",
     "spi_master_tb",
     "eth_controller_adapter_tb",

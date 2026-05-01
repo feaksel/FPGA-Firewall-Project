@@ -11,25 +11,42 @@
 - [x] `eth_controller_adapter_tb` passes
 
 ## Day 1 with hardware
-- [ ] verify power and pin mapping
-- [ ] verify reset wiring
-- [ ] verify SPI clock polarity and phase assumptions
-- [ ] verify controller reset sequence
-- [ ] read one known register
+- [x] verify power and pin mapping
+- [x] verify reset wiring
+- [x] verify SPI clock polarity and phase assumptions
+- [x] verify controller reset sequence
+- [x] read one known register
 - [ ] read multiple known registers consistently
 
 ## Day 2 with hardware
-- [ ] complete init sequence
-- [ ] verify RX status, interrupt, or polling path
-- [ ] detect packet arrival
-- [ ] read packet length
+- [x] complete init sequence
+- [x] verify RX status, interrupt, or polling path
+- [x] detect packet arrival
+- [x] read packet length
 - [ ] dump first packet bytes over debug or UART if available
 
 ## Day 3+
-- [ ] feed real packet bytes into existing firewall core
-- [ ] compare parsed fields against Wireshark capture
+- [x] feed real packet bytes into existing firewall core
+- [x] compare parsed fields against Wireshark capture
 - [ ] verify allow/drop counts
 - [ ] only then start second-port forwarding
+
+## 2026-05-01 hardware status
+
+Current verified state:
+- DE1-SoC JTAG/SRAM programming works through USB-Blaster.
+- W5500 reset, SPI register access, and MACRAW initialization work on the physical module.
+- `VERSIONR` register access is confirmed after correcting the W5500 SPI control byte definitions.
+- The adapter reaches RX polling with `init_done` high and `init_error` low.
+- The PC-side Scapy sender produced deterministic packets that appeared in Wireshark:
+  - `udp_allow`
+  - `tcp_drop`
+  - `tcp_allow_ssh`
+- Board LEDs show receive/counter activity while Ethernet traffic is present.
+
+Current limitation:
+- Allow/drop behavior is visible only through single-bit counter LEDs, so per-packet profile correlation still needs a cleaner debug method.
+- The design remains receive/inspect only; forwarding must wait until allow/drop validation is repeatable.
 
 ## Red flags
 Stop and document before proceeding if:

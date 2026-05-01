@@ -77,7 +77,8 @@ The current implementation includes:
 
 The current project phase is:
 - simulation-complete for the main MVP pipeline,
-- hardware-bring-up-ready for the first DE1-SoC + W5500 receive path,
+- one-port hardware bring-up has reached live RX inspection on `DE1-SoC + W5500`,
+- W5500 SPI register access, MACRAW initialization, RX polling, and PC-generated packet reception have been demonstrated on hardware,
 - not yet in the optional forwarding stage.
 
 ## Current verification status
@@ -109,6 +110,21 @@ The Quartus flow has also been validated on this machine:
 - compile with `& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --flow compile de1_soc_w5500 -c de1_soc_w5500`
 - use `build/quartus/de1_soc_w5500.sof` for JTAG/SRAM programming
 - review `build/quartus/de1_soc_w5500.pin`, `.fit.rpt`, and `.sta.rpt` as the primary hardware handoff artifacts
+
+Current hardware evidence:
+- the DE1-SoC programs successfully over USB-Blaster/JTAG,
+- the W5500 responds to the `VERSIONR` register read after reset,
+- the adapter reaches RX polling with `init_done` active and `init_error` inactive,
+- Wireshark confirmed deterministic Scapy packets on the PC Ethernet interface:
+  - `udp_allow`
+  - `tcp_drop`
+  - `tcp_allow_ssh`
+- board LEDs show receive/allow/drop counter activity while traffic is present.
+
+Remaining hardware work:
+- correlate each deterministic packet profile with the expected allow/drop counter behavior more cleanly,
+- improve debug visibility beyond single-bit LED counter outputs,
+- keep forwarding out of scope until one-port receive inspection is repeatable.
 
 ## Hardware target
 
