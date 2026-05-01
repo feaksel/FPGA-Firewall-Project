@@ -4,7 +4,8 @@
 
 - FPGA board: Terasic DE1-SoC
 - Ethernet module target: W5500
-- MVP wiring: `SPI + RESET + INT`
+- Current proven wiring: one W5500 on `GPIO_0`
+- Next inline wiring: second W5500 on `GPIO_1`
 - Clock source: `CLOCK_50`
 
 ## Top-level module
@@ -16,7 +17,7 @@ Control assumptions:
 - `SW[0]` = start initialization
 - `SW[3:1]` = 7-segment display debug page
 
-## GPIO_0 wiring contract
+## W5500 A / GPIO_0 wiring contract
 
 Freeze this logical mapping for the first hardware pass:
 
@@ -26,6 +27,64 @@ Freeze this logical mapping for the first hardware pass:
 - `GPIO_0[3]` = W5500 `RESET_n`
 - `GPIO_0[4]` = W5500 `MISO`
 - `GPIO_0[5]` = W5500 `INT_n`
+
+Physical header labels:
+- `GPIO_0_D0` -> W5500 A `SCLK`
+- `GPIO_0_D1` -> W5500 A `MOSI`
+- `GPIO_0_D2` -> W5500 A `CS_n`
+- `GPIO_0_D3` -> W5500 A `RESET_n`
+- `GPIO_0_D4` <- W5500 A `MISO`
+- `GPIO_0_D5` <- W5500 A `INT_n`
+
+## W5500 B / GPIO_1 wiring contract
+
+Wire the second module with the same logical order on `GPIO_1`:
+
+- `GPIO_1[0]` = W5500 B `SCLK`
+- `GPIO_1[1]` = W5500 B `MOSI`
+- `GPIO_1[2]` = W5500 B `CS_n`
+- `GPIO_1[3]` = W5500 B `RESET_n`
+- `GPIO_1[4]` = W5500 B `MISO`
+- `GPIO_1[5]` = W5500 B `INT_n`
+
+Physical header labels:
+- `GPIO_1_D0` -> W5500 B `SCLK`
+- `GPIO_1_D1` -> W5500 B `MOSI`
+- `GPIO_1_D2` -> W5500 B `CS_n`
+- `GPIO_1_D3` -> W5500 B `RESET_n`
+- `GPIO_1_D4` <- W5500 B `MISO`
+- `GPIO_1_D5` <- W5500 B `INT_n`
+
+Quartus pins now reserved for `GPIO_1[0..5]`:
+- `GPIO_1[0]` = `AB17`
+- `GPIO_1[1]` = `AA21`
+- `GPIO_1[2]` = `AB21`
+- `GPIO_1[3]` = `AC23`
+- `GPIO_1[4]` = `AD24`
+- `GPIO_1[5]` = `AE23`
+
+## UART telemetry wiring
+
+The debug image now drives a transmit-only UART telemetry line:
+
+- `GPIO_0[6]` / `GPIO_0_D6` = FPGA `UART_TX`
+
+Wire this to a 3.3 V USB-UART adapter:
+- FPGA `GPIO_0_D6` -> USB-UART `RX`
+- FPGA/DE1-SoC ground -> USB-UART `GND`
+
+Default serial format:
+- `115200` baud
+- `8N1`
+- transmit-only from FPGA
+
+Telemetry line format is compact ASCII:
+
+```text
+RX=00000000 AL=00000000 DR=00000000 RFDA.
+```
+
+Where `RX`, `AL`, and `DR` are receive/allow/drop counters, `R` is the last rule nibble, `A`/`D` is the last action, and the final character is `E` when the TX/error flag is asserted or `.` when clear.
 
 ## LED debug contract
 
@@ -58,15 +117,10 @@ Status nibble on page `000` is `{rx_fifo_overflow, init_error, init_done, rx_pac
 - Keep the first hardware pass polling-based even though `INT_n` is wired.
 - Verify the GPIO bank voltage and module voltage compatibility before connecting the W5500 board.
 - Start with a minimal image that proves reset, SPI pin activity, and LED debug visibility before relying on live traffic.
-- On the DE1-SoC GPIO header, the intended physical mapping is `GPIO_0_D0` through `GPIO_0_D5`:
-  - `GPIO_0_D0` -> W5500 `SCLK`
-  - `GPIO_0_D1` -> W5500 `MOSI`
-  - `GPIO_0_D2` -> W5500 `CS_n`
-  - `GPIO_0_D3` -> W5500 `RESET_n`
-  - `GPIO_0_D4` <- W5500 `MISO`
-  - `GPIO_0_D5` <- W5500 `INT_n`
 - Real hardware needs millisecond-scale W5500 reset/release delays; simulation-sized waits are not enough.
 - W5500 SPI control bytes use `RWB=0` for reads and `RWB=1` for writes.
+- Do not connect W5500 B until the image you are programming is meant to drive `GPIO_1`; the current one-port debug image leaves `GPIO_1[5:0]` high impedance.
+- `GPIO_0_D6` is no longer high impedance; it idles high as UART TX.
 
 ## Current hardware evidence
 

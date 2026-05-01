@@ -24,6 +24,7 @@ set_global_assignment -name NUM_PARALLEL_PROCESSORS 6
 set_global_assignment -name VERILOG_FILE "../rtl/top/de1_soc_w5500_top.v"
 set_global_assignment -name VERILOG_FILE "../rtl/top/firewall_top.v"
 set_global_assignment -name VERILOG_FILE "../rtl/eth_if/ethernet_controller_adapter.v"
+set_global_assignment -name VERILOG_FILE "../rtl/eth_if/w5500_tx_engine.v"
 set_global_assignment -name VERILOG_FILE "../rtl/firewall/firewall_core.v"
 set_global_assignment -name VERILOG_FILE "../rtl/parser/eth_ipv4_parser.v"
 set_global_assignment -name VERILOG_FILE "../rtl/rules/rule_engine.v"
@@ -32,6 +33,8 @@ set_global_assignment -name VERILOG_FILE "../rtl/buffer/packet_buffer.v"
 set_global_assignment -name VERILOG_FILE "../rtl/buffer/frame_rx_fifo.v"
 set_global_assignment -name VERILOG_FILE "../rtl/debug/debug_counters.v"
 set_global_assignment -name VERILOG_FILE "../rtl/debug/seven_seg_hex.v"
+set_global_assignment -name VERILOG_FILE "../rtl/debug/uart_tx.v"
+set_global_assignment -name VERILOG_FILE "../rtl/debug/firewall_telemetry_uart.v"
 set_global_assignment -name VERILOG_FILE "../rtl/common/defs.vh"
 
 set_global_assignment -name SEARCH_PATH "../rtl/common"
@@ -221,6 +224,19 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_0[32]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_0[33]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_0[34]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_0[35]
+
+set_location_assignment PIN_AB17 -to GPIO_1[0]
+set_location_assignment PIN_AA21 -to GPIO_1[1]
+set_location_assignment PIN_AB21 -to GPIO_1[2]
+set_location_assignment PIN_AC23 -to GPIO_1[3]
+set_location_assignment PIN_AD24 -to GPIO_1[4]
+set_location_assignment PIN_AE23 -to GPIO_1[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to GPIO_1[5]
 
 export_assignments
 project_close

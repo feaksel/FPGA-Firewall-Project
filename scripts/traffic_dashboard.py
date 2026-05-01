@@ -281,6 +281,34 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 }
 .legend .allow-key::before { background: var(--allow); }
 .legend .drop-key::before { background: var(--drop); }
+.real-demo { display: grid; gap: 14px; }
+.inline-strip { display: grid; grid-template-columns: 1fr 46px 1fr 46px 1fr 46px 1fr 46px 1fr; gap: 8px; align-items: center; }
+.inline-node {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 82px;
+  padding: 11px;
+  background: #fbfcfe;
+}
+.inline-node .label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.inline-node .value { font-size: 20px; font-weight: 750; margin-top: 8px; }
+.inline-link { height: 2px; background: #9eb3ca; position: relative; }
+.inline-link::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border-left: 8px solid #9eb3ca;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+.chunk-map { display: grid; grid-template-columns: repeat(32, minmax(7px, 1fr)); gap: 3px; }
+.chunk { height: 14px; border-radius: 3px; background: #dbe3ee; }
+.chunk.good { background: var(--allow); }
+.chunk.drop { background: var(--drop); }
+.chunk.wait { background: #c8d2df; }
+.demo-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 0.55fr); gap: 12px; }
+.command-box { font-family: Consolas, "Courier New", monospace; font-size: 12px; background: #101820; color: #e9f0f7; border-radius: 7px; padding: 10px; overflow-wrap: anywhere; }
 .manual-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr); gap: 16px; }
 .manual-shell { display: none; }
 .manual-shell.open { display: block; }
@@ -312,9 +340,10 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .warning { color: var(--warn); font-weight: 650; }
 @media (max-width: 860px) {
   .summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
-  .grid, .manual-grid, .flow-strip { grid-template-columns: 1fr; }
+  .grid, .manual-grid, .flow-strip, .inline-strip, .demo-grid { grid-template-columns: 1fr; }
   .flow-link { height: 28px; width: 3px; justify-self: center; background: linear-gradient(180deg, #cbd7e5, var(--accent)); }
   .flow-link::after { right: -5px; top: auto; bottom: -1px; border-top: 9px solid var(--accent); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 0; }
+  .inline-link { height: 22px; width: 2px; justify-self: center; }
   .mini-grid { grid-template-columns: 1fr; }
 }
 </style>
@@ -371,6 +400,30 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
     <div class="bar-chart" id="packetChart"></div>
     <div class="legend"><span class="allow-key">Allow-profile events</span><span class="drop-key">Drop-profile events</span><span>Other test events</span></div>
   </section>
+  <section class="panel real-demo">
+    <div class="panel-head">
+      <h2>Two-Port File Demo Preview</h2>
+      <span class="note">Live after W5500 B TX and UART telemetry are connected</span>
+    </div>
+    <div class="inline-strip">
+      <div class="inline-node"><div class="label">PC1 sender</div><div class="value">Chunks</div><div class="note">UDP dst 5001</div></div>
+      <div class="inline-link"></div>
+      <div class="inline-node"><div class="label">W5500 A</div><div class="value">Ingress</div><div class="note">MACRAW RX</div></div>
+      <div class="inline-link"></div>
+      <div class="inline-node"><div class="label">FPGA rules</div><div class="value">Allow/drop</div><div class="note">rule hits + counters</div></div>
+      <div class="inline-link"></div>
+      <div class="inline-node"><div class="label">W5500 B</div><div class="value">Egress</div><div class="note">MACRAW TX</div></div>
+      <div class="inline-link"></div>
+      <div class="inline-node"><div class="label">PC2 receiver</div><div class="value">SHA-256</div><div class="note">file pass/fail</div></div>
+    </div>
+    <div class="demo-grid">
+      <div>
+        <div class="chunk-map" id="chunkMap"></div>
+        <p class="note">The final dashboard fills this from receiver/UART telemetry: green means received allowed chunk, red means blocked decoy/error frame, gray means waiting.</p>
+      </div>
+      <div class="command-box">PC1: py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file demo.mp4<br>PC2: py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output received_demo.mp4</div>
+    </div>
+  </section>
   <section class="manual-shell" id="manualShell">
     <div class="manual-grid">
       <div class="panel">
@@ -411,6 +464,7 @@ const timelineEl = document.getElementById("timeline");
 const chartEl = document.getElementById("packetChart");
 const manualShell = document.getElementById("manualShell");
 const toggleManual = document.getElementById("toggleManual");
+const chunkMap = document.getElementById("chunkMap");
 const fields = {
   iface: document.getElementById("iface"),
   mac: document.getElementById("mac"),
@@ -503,6 +557,10 @@ toggleManual.addEventListener("click", () => {
   toggleManual.textContent = manualShell.classList.contains("open") ? "Hide manual" : "Show manual";
 });
 
+chunkMap.innerHTML = Array.from({length: 96}, (_, index) => {
+  const cls = index % 17 === 0 ? "drop" : (index < 36 ? "good" : "wait");
+  return `<div class="chunk ${cls}" title="demo chunk ${index}"></div>`;
+}).join("");
 refresh();
 setInterval(refresh, 500);
 </script>

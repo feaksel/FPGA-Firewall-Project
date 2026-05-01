@@ -43,3 +43,10 @@
   - 3 `udp_allow` packets
   - 3 `tcp_drop` packets
   - 3 `tcp_allow_ssh` packets
+- Added stream-level forwarding scaffolding with `firewall_forwarder` and a focused forwarding testbench
+- Added a standalone W5500 TX engine, TX simulation model, and TX engine testbench for the next inline-forwarding phase
+- Reserved the second W5500 wiring contract on `GPIO_1[0..5]` in the DE1-SoC top-level and Quartus assignment flow
+- Added transmit-only UART telemetry on `GPIO_0_D6` for FPGA counter/event readback
+- Added chunked file sender/receiver scripts for the final PC1-to-PC2 SHA-256 demo
+- Extended the browser dashboard with a two-port file-demo preview and updated docs/TODO/decisions for the real inline-firewall roadmap
+- Added README instructions for cloning the repo and running the PC1 sender / PC2 receiver setup

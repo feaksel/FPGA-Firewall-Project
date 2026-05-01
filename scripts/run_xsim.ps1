@@ -29,17 +29,22 @@ $Sources = @(
     (Join-Path $RepoRoot "tb/common/fw_tb_pkg.sv"),
     (Join-Path $RepoRoot "rtl/debug/debug_counters.v"),
     (Join-Path $RepoRoot "rtl/debug/seven_seg_hex.v"),
+    (Join-Path $RepoRoot "rtl/debug/uart_tx.v"),
+    (Join-Path $RepoRoot "rtl/debug/firewall_telemetry_uart.v"),
     (Join-Path $RepoRoot "rtl/spi/spi_master.v"),
     (Join-Path $RepoRoot "rtl/buffer/packet_buffer.v"),
     (Join-Path $RepoRoot "rtl/buffer/frame_rx_fifo.v"),
     (Join-Path $RepoRoot "rtl/parser/eth_ipv4_parser.v"),
     (Join-Path $RepoRoot "rtl/rules/rule_engine.v"),
     (Join-Path $RepoRoot "rtl/firewall/firewall_core.v"),
+    (Join-Path $RepoRoot "rtl/firewall/firewall_forwarder.v"),
     (Join-Path $RepoRoot "rtl/eth_if/ethernet_controller_adapter.v"),
+    (Join-Path $RepoRoot "rtl/eth_if/w5500_tx_engine.v"),
     (Join-Path $RepoRoot "rtl/top/firewall_top.v"),
     (Join-Path $RepoRoot "rtl/top/de1_soc_w5500_top.v"),
     (Join-Path $RepoRoot "tb/models/fake_eth_source.v"),
     (Join-Path $RepoRoot "tb/models/w5500_macraw_model.sv"),
+    (Join-Path $RepoRoot "tb/models/w5500_tx_model.sv"),
     $TestFile
 )
 

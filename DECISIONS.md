@@ -76,3 +76,17 @@
 - Reason: Real Ethernet links include background multicast/broadcast traffic and startup frames; one odd frame should not permanently stop the receive path.
 - Alternatives considered: Keeping the previous fail-fast behavior for every invalid hardware RX length.
 - Impact: Hardware receive remains live and can continue polling after discarding a bad frame.
+
+## D-012
+- Date: 2026-05-01
+- Decision: Make the final demo a one-way inline firewall with a chunked file-transfer proof before attempting bidirectional forwarding.
+- Reason: One-way PC1-to-PC2 forwarding is enough to prove real enforcement, loss/drop visibility, and a compelling final presentation while keeping the hardware state space manageable.
+- Alternatives considered: Jumping directly to bidirectional Ethernet forwarding or staying with one-port inspection only.
+- Impact: The next RTL work centers on W5500 B TX, a stream forwarder, UART telemetry, and file-demo scripts.
+
+## D-013
+- Date: 2026-05-01
+- Decision: Use chunked file/video transfer with SHA-256 verification rather than live video streaming.
+- Reason: Chunked transfer is robust over W5500-over-SPI and makes policy drops visible without corrupting required file data.
+- Alternatives considered: Live streaming, iperf-only throughput, or a synthetic packet counter demo.
+- Impact: The final presentation can show a real reconstructed artifact while honestly describing the firewall as packet-policy enforcement, not payload malware detection.

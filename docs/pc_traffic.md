@@ -71,18 +71,70 @@ The dashboard provides:
 - a missing/not-yet-captured count,
 - background-frame activity,
 - a recent event timeline.
-- an embedded board-display manual for `SW[3:1]`, `HEX3..HEX0`, rule IDs, and LED meanings.
+- a compact packet-flow visualization with recent event bars,
+- a toggleable board-display manual for `SW[3:1]`, `HEX3..HEX0`, rule IDs, LED meanings, and test flow.
 
 For the current one-port setup, the dashboard can only compare what the PC sent and captured on its own interface. It cannot directly read the FPGA's internal allow/drop counters yet. Use the board `HEX3..HEX0` pages as the FPGA-side truth.
 
-For a future two-port setup, the same dashboard concept should expand to show:
-- ingress-port packets,
-- FPGA firewall decisions,
-- egress-port packets,
-- dropped/lost/error packets,
-- throughput over time.
+The dashboard now also includes a two-port file-demo preview panel. It is a UX placeholder until the FPGA can transmit on W5500 B and stream UART telemetry.
 
-That future version needs either two PC Ethernet interfaces, two PCs, or a telemetry path from the FPGA such as UART, JTAG debug, HPS bridge, or Ethernet TX.
+## Phase E: Two-port file-transfer demo
+
+The real inline-firewall demo target is:
+
+```text
+PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
+```
+
+PC1 sends allowed file chunks on UDP destination port `5001`, mixed with policy-blocked decoy/error frames such as TCP destination port `23`. PC2 reconstructs only the forwarded allowed chunks and verifies SHA-256.
+
+Sender on PC1:
+
+```powershell
+py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
+```
+
+Receiver on PC2:
+
+```powershell
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4
+```
+
+The receiver script reports:
+- chunk progress,
+- missing chunks,
+- reconstructed file size,
+- expected and actual SHA-256,
+- final pass/fail.
+
+The video version is chunked file transfer, not live streaming. The intentionally dropped frames are decoy/error traffic, not required media chunks, so the received video should play if every allowed chunk arrives.
+
+## No-UART telemetry option
+
+A USB-UART adapter is useful later, but it is not required for the next two-PC demo.
+
+Without UART, use three evidence sources:
+- PC1 sender counters from [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py)
+- PC2 receiver counters, missing-chunk report, and SHA-256 result from [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py)
+- FPGA board `HEX3..HEX0` and `LEDR` counters for RX/allow/drop state
+
+Wireshark on PC2 is the backup proof:
+
+```text
+udp.port == 5001
+```
+
+Blocked decoys should be absent on PC2:
+
+```text
+tcp.port == 23
+```
+
+```text
+frame contains "FW-DECOY-DROP"
+```
+
+This is enough for the first real enforcement demo. UART remains a later convenience for making the browser dashboard read FPGA counters directly.
 
 ## Recommended sequence on bring-up day
 

@@ -38,6 +38,7 @@ module packet_buffer_tb;
         .in_src_port(in_src_port),
         .in_ready(in_ready),
         .rd_start(rd_start),
+        .discard(1'b0),
         .out_valid(out_valid),
         .out_data(out_data),
         .out_sop(out_sop),

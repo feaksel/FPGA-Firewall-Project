@@ -8,7 +8,8 @@
 - [x] M5: SPI master implementation
 - [x] M6: Ethernet controller adapter shell
 - [x] M7: One-port hardware bring-up
-- [ ] M8: Optional second-port forwarding
+- [ ] M8: Real one-way inline forwarding
+- [ ] M9: File/video transfer demo with telemetry dashboard
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -32,6 +33,20 @@
 - [x] Re-run the full simulation suite after the W5500 SPI control-byte correction
 - [x] Add a visual PC-side browser dashboard for deterministic traffic tests
 - [x] Add dashboard user-manual reference for HEX pages, switches, and test flow
+- [x] Make dashboard manual toggleable and add a compact packet-flow visualization
 - [ ] Validate the new HEX debug pages on the physical board with `udp_allow`, `tcp_drop`, and `tcp_allow_ssh`
-- [ ] Extend the browser dashboard for two-port tests once a second NIC/PC or FPGA telemetry path is available
-- [ ] Decide whether the next telemetry path should be UART, HPS bridge, JTAG debug, or Ethernet TX
+- [x] Add the first stream-level forwarding wrapper for allow/drop forwarding tests
+- [x] Reserve the second W5500 logical wiring on `GPIO_1[0..5]`
+- [x] Add a standalone W5500 TX engine and simulation model for TX-buffer/SEND coverage
+- [x] Add a transmit-only UART telemetry module on `GPIO_0_D6`
+- [x] Add PC-side chunked file sender/receiver scripts for the final demo concept
+- [x] Extend the dashboard with a two-port file-demo preview panel
+- [ ] Make `firewall_forwarder_tb` pass reliably under XSim
+- [ ] Make `w5500_tx_engine_tb` pass under XSim
+- [ ] Integrate W5500 A RX -> rules -> W5500 B TX in a single hardware top
+- [ ] Use PC2 receiver/Wireshark plus board HEX pages as the first no-UART two-port telemetry path
+- [ ] Add a PC/dashboard UART reader later as an optional live FPGA counter source
+- [ ] Validate W5500 B alone on hardware: reset, `VERSIONR`, MACRAW init
+- [ ] Prove a fixed test frame transmitted from FPGA to PC2
+- [ ] Prove one allowed PC1-to-PC2 forwarded packet and one dropped packet
+- [ ] Run the final file/video transfer and verify PC2 SHA-256 match

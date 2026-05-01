@@ -609,8 +609,29 @@ Already established on hardware:
 
 Still considered active bring-up work:
 - clean allow/drop counter correlation against deterministic PC traffic,
-- better debug visibility than single-bit counter LEDs,
-- later forwarding work.
+- `firewall_forwarder` simulation closure,
+- standalone W5500 TX engine simulation closure,
+- a shared hardware controller path that can initialize and transmit on W5500 B,
+- UART telemetry for dashboard-visible FPGA counters.
+
+## Real inline firewall target
+
+The final project target is now a one-way inline firewall first:
+
+```text
+PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
+```
+
+The first real demo is a chunked file transfer. PC1 sends allowed file chunks on UDP destination port `5001` and intentionally interleaves blocked decoy/error traffic. The FPGA forwards only allowed chunks. PC2 reconstructs the file and verifies SHA-256.
+
+New implementation pieces for this phase:
+- [rtl/firewall/firewall_forwarder.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v): stream-level allow/drop forwarder around the parser, rule engine, and packet buffer.
+- [rtl/eth_if/w5500_tx_engine.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_tx_engine.v): standalone W5500 TX-buffer writer/SEND engine.
+- [rtl/debug/firewall_telemetry_uart.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/debug/firewall_telemetry_uart.v): transmit-only ASCII counter telemetry on `GPIO_0_D6`.
+- [scripts/file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py): PC1 chunk sender with decoy traffic.
+- [scripts/file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): PC2 chunk receiver and SHA-256 verifier.
+
+The current one-port dashboard remains useful for bring-up, and now includes a visual preview of the planned two-port file demo. The dashboard still needs UART or another FPGA telemetry path before it can show true live FPGA decision counters.
 
 ## The most important project habits
 

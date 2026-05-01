@@ -14,6 +14,7 @@ module packet_buffer #(
     output wire        in_ready,
 
     input  wire        rd_start,
+    input  wire        discard,
     output reg         out_valid,
     output reg [7:0]   out_data,
     output reg         out_sop,
@@ -75,7 +76,11 @@ module packet_buffer #(
                 overflow_error <= 1'b1;
             end
 
-            if (rd_start && pkt_available && !rd_active) begin
+            if (discard && pkt_available && !rd_active) begin
+                pkt_available <= 1'b0;
+                pkt_len       <= 16'd0;
+                rd_ptr        <= 16'd0;
+            end else if (rd_start && pkt_available && !rd_active) begin
                 rd_active    <= 1'b1;
                 rd_ptr       <= 16'd0;
                 out_valid    <= 1'b1;

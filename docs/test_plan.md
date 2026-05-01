@@ -77,11 +77,25 @@ Pass criteria:
 Move on when:
 - packet bytes visible in a debug path
 
-## Milestone 8: Optional Second-Port Forwarding
+## Milestone 8: Real One-Way Inline Forwarding
 Pass criteria:
-- second controller init works
-- allowed packet transmitted out second side
-- drop path remains correct
+- `firewall_forwarder_tb` proves allowed packets replay and dropped packets do not
+- `w5500_tx_engine_tb` proves TX buffer writes, `S0_TX_WR` update, and `SEND`
+- W5500 B reset/init works on hardware
+- one fixed test frame is transmitted from FPGA to PC2
+- one allowed PC1-to-PC2 packet appears on PC2
+- one blocked packet is absent on PC2
 
 Move on when:
-- demo works with simple traffic
+- one-way `PC1 -> W5500 A -> FPGA -> W5500 B -> PC2` forwarding is repeatable
+
+## Milestone 9: File/Video Demo
+
+Pass criteria:
+- PC1 sends chunked file/video traffic on UDP destination port `5001`
+- decoy/error frames are interleaved and blocked
+- PC2 reconstructs the file with matching SHA-256
+- UART/dashboard counters agree with observed PC2 packets
+
+Move on when:
+- the final presentation can show forwarded, dropped, lost/error, throughput, chunk-map, and checksum status clearly

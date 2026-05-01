@@ -9,7 +9,8 @@ module de1_soc_w5500_top (
     output wire [6:0]  HEX1,
     output wire [6:0]  HEX2,
     output wire [6:0]  HEX3,
-    inout  wire [35:0] GPIO_0
+    inout  wire [35:0] GPIO_0,
+    inout  wire [5:0]  GPIO_1
 );
     wire rst_n;
     wire start_init;
@@ -19,6 +20,7 @@ module de1_soc_w5500_top (
     wire spi_mosi;
     wire spi_miso;
     wire spi_cs_n;
+    wire uart_tx;
     wire [31:0] rx_count;
     wire [31:0] allow_count;
     wire [31:0] drop_count;
@@ -68,7 +70,10 @@ module de1_soc_w5500_top (
     assign GPIO_0[3] = w5500_reset_n;
     assign GPIO_0[4] = 1'bz;
     assign GPIO_0[5] = 1'bz;
-    assign GPIO_0[35:6] = {30{1'bz}};
+    assign GPIO_0[6] = uart_tx;
+    assign GPIO_0[35:7] = {29{1'bz}};
+
+    assign GPIO_1[5:0] = {6{1'bz}};
 
     assign LEDR[0] = init_done;
     assign LEDR[1] = init_error;
@@ -144,6 +149,21 @@ module de1_soc_w5500_top (
         .value(hex3_value),
         .blank(hex_blank),
         .segments_n(HEX3)
+    );
+
+    firewall_telemetry_uart #(
+        .CLKS_PER_BIT(434),
+        .REPORT_INTERVAL_CYCLES(25_000_000)
+    ) u_firewall_telemetry_uart (
+        .clk(CLOCK_50),
+        .rst_n(rst_n),
+        .rx_count(rx_count),
+        .allow_count(allow_count),
+        .drop_count(drop_count),
+        .last_rule_id(last_matched_rule_id),
+        .last_action_allow(last_action_allow),
+        .tx_error(1'b0),
+        .uart_tx(uart_tx)
     );
 
     firewall_top #(

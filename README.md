@@ -123,15 +123,111 @@ Current hardware evidence:
 
 Remaining hardware work:
 - correlate each deterministic packet profile with the expected allow/drop counter behavior more cleanly,
-- improve debug visibility beyond single-bit LED counter outputs,
-- keep forwarding out of scope until one-port receive inspection is repeatable.
+- close the new stream-level forwarding and W5500 TX simulations,
+- add a shared W5500 B hardware path for transmit,
+- add UART telemetry for dashboard-visible FPGA counters,
+- run the final two-port file/video chunk demo.
 
 ## Hardware target
 
 The current hardware plan is frozen around:
 - Terasic DE1-SoC
 - W5500 over `SPI + RESET + INT`
-- one-port RX inspection before any forwarding work
+- one proven W5500 RX path on `GPIO_0`
+- a staged second W5500 path on `GPIO_1[0..5]`
+- one-way inline forwarding before bidirectional forwarding
+
+Final demo target:
+
+```text
+PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
+```
+
+The planned proof is a chunked file transfer. Allowed chunks use UDP destination port `5001`; blocked decoy/error traffic is intentionally interleaved and should not appear on PC2. PC2 verifies the reconstructed file with SHA-256.
+
+## Two-PC demo setup
+
+This is the handoff checklist for the final inline demo once the FPGA image supports W5500 B transmit.
+
+### Both PCs
+
+Install:
+- Git
+- Python 3.9 or newer
+- Npcap with WinPcap-compatible mode enabled
+- Wireshark
+
+Clone and enter the repo:
+
+```powershell
+git clone <repo-url>
+cd ELE432_ethernet
+```
+
+Install Python dependency:
+
+```powershell
+py -3.9 -m pip install scapy
+```
+
+Find the Ethernet interface name:
+
+```powershell
+py -3.9 -c "from scapy.all import get_if_list; print('\n'.join(get_if_list()))"
+```
+
+Use the interface name that matches the wired Ethernet adapter. In the examples below it is `"Ethernet"`.
+
+### PC1: sender side
+
+Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
+
+Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
+
+```powershell
+py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
+```
+
+What PC1 does:
+- splits the file into numbered chunks,
+- sends real file chunks as UDP destination port `5001`,
+- interleaves blocked decoy/error traffic,
+- prints the file SHA-256 and sent counts.
+
+### PC2: receiver side
+
+Connect W5500 B, the FPGA egress module, to PC2 Ethernet.
+
+Start the receiver before PC1 starts sending:
+
+```powershell
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4
+```
+
+What PC2 does:
+- listens for forwarded UDP port `5001` chunks,
+- reconstructs the file,
+- reports missing chunks,
+- verifies SHA-256,
+- prints `PASS` when the reconstructed file matches PC1's original file.
+
+Optional Wireshark checks on PC2:
+
+```text
+udp.port == 5001
+```
+
+Blocked traffic should not show up on PC2:
+
+```text
+tcp.port == 23
+```
+
+```text
+frame contains "FW-DECOY-DROP"
+```
+
+For the no-UART version of the demo, PC1 sender output, PC2 receiver output, PC2 Wireshark, and the DE1-SoC HEX/LED counters are the proof sources.
 
 For the full newcomer-friendly explanation, see [project_overview.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/project_overview.md).
 See [de1_soc_w5500_hardware.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/de1_soc_w5500_hardware.md) for the board-facing contract.

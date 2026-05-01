@@ -60,8 +60,8 @@ module rule_engine (
     parameter RULE3_PROTOCOL     = `PROTO_UDP;
     parameter RULE3_SRC_PORT_MIN = 16'd0;
     parameter RULE3_SRC_PORT_MAX = 16'd65535;
-    parameter RULE3_DST_PORT_MIN = 16'd0;
-    parameter RULE3_DST_PORT_MAX = 16'd65535;
+    parameter RULE3_DST_PORT_MIN = 16'd5001;
+    parameter RULE3_DST_PORT_MAX = 16'd5001;
     parameter RULE3_ACTION       = `ACTION_ALLOW;
 
     wire rule0_hit;
