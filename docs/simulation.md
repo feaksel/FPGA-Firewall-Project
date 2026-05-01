@@ -5,16 +5,18 @@
 2. `parser_tb`
 3. `rule_engine_tb`
 4. `packet_buffer_tb`
-5. `firewall_core_tb`
-6. `spi_master_tb`
-7. `eth_controller_adapter_tb`
-8. `adapter_firewall_integration_tb`
+5. `frame_rx_fifo_tb`
+6. `firewall_core_tb`
+7. `spi_master_tb`
+8. `eth_controller_adapter_tb`
+9. `adapter_firewall_integration_tb`
 
 ## Tooling
 
 The repo includes `scripts/run_iverilog.ps1` for Windows PowerShell environments.
 The repo also includes `scripts/run_xsim.ps1`, `scripts/run_questa.ps1`, and `scripts/run_questa_gui.ps1` for machines with Vivado or Questa installed.
 For the current project flow, `scripts/run_xsim_suite.ps1` runs the full pre-hardware bench set in order.
+That suite is currently the preferred pre-hardware regression gate on this machine.
 
 Expected include path:
 - `rtl/common`
@@ -93,6 +95,14 @@ Each file is a byte-per-line hex memory file intended for `$readmemh`.
 - parser extracts protocol, IPs, and ports at the expected byte positions
 - rule engine honors first-match priority
 - packet buffer preserves byte order and SOP/EOP positions
+- RX FIFO preserves byte order and packet markers while backpressure is applied
 - firewall core increments counters exactly once per packet
 - SPI master returns the expected response byte from the testbench slave model
 - the W5500 adapter reaches MACRAW-ready state and streams a frame into the internal firewall interface
+
+## Current signoff snapshot
+
+Validated on this machine:
+- full `run_xsim_suite.ps1` regression passes,
+- `run_questa.ps1 adapter_firewall_integration_tb` passes as an alternate-simulator smoke check,
+- the integrated adapter bench now runs with the RX FIFO enabled through `firewall_top`.

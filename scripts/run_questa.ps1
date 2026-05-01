@@ -29,6 +29,7 @@ $Sources = @(
     "rtl/debug/debug_counters.v",
     "rtl/spi/spi_master.v",
     "rtl/buffer/packet_buffer.v",
+    "rtl/buffer/frame_rx_fifo.v",
     "rtl/parser/eth_ipv4_parser.v",
     "rtl/rules/rule_engine.v",
     "rtl/firewall/firewall_core.v",

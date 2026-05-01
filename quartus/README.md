@@ -16,6 +16,7 @@ Current project scope:
 - targets `de1_soc_w5500_top`
 - sets the device to `5CSEMA5F31C6`
 - includes the synthesizable `rtl/` files
+- includes the RX FIFO path used between the adapter and firewall core
 - writes Quartus outputs under `build/quartus`
 
 Useful commands from the repo root:
@@ -30,3 +31,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_questa_gui.ps1 parser_tb
 Important:
 - this project layer now includes a first DE1-SoC pin-assignment pass for `CLOCK_50`, `KEY`, `SW`, `LEDR`, and `GPIO_0`
 - review the assignments against your exact board revision before hardware bring-up
+
+Validated outputs after a successful compile:
+- `build/quartus/de1_soc_w5500.sof`
+- `build/quartus/de1_soc_w5500.pin`
+- `build/quartus/de1_soc_w5500.fit.rpt`
+- `build/quartus/de1_soc_w5500.sta.rpt`
+
+Current accepted warning policy for pre-hardware signoff:
+- okay: unused switch/key warnings, GPIO header structural warnings, Quartus Lite license warnings
+- not okay: SPI truncation warnings, `KEY[0]` being treated as a clock, failing timing, or a missing `.sof`

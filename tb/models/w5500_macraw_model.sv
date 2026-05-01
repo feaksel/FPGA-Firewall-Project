@@ -27,11 +27,11 @@ module w5500_macraw_model #(
     localparam [15:0] S0_RX_RD_MSB      = 16'h0028;
     localparam [15:0] S0_RX_RD_LSB      = 16'h0029;
 
-    localparam [7:0] CTRL_COMMON_WRITE  = 8'h00;
-    localparam [7:0] CTRL_COMMON_READ   = 8'h04;
-    localparam [7:0] CTRL_S0_REG_WRITE  = 8'h08;
-    localparam [7:0] CTRL_S0_REG_READ   = 8'h0C;
-    localparam [7:0] CTRL_S0_RXBUF_READ = 8'h1C;
+    localparam [7:0] CTRL_COMMON_READ   = 8'h00;
+    localparam [7:0] CTRL_COMMON_WRITE  = 8'h04;
+    localparam [7:0] CTRL_S0_REG_READ   = 8'h08;
+    localparam [7:0] CTRL_S0_REG_WRITE  = 8'h0C;
+    localparam [7:0] CTRL_S0_RXBUF_READ = 8'h18;
 
     localparam [7:0] W5500_VERSION      = 8'h04;
     localparam [7:0] S0_CR_OPEN         = 8'h01;

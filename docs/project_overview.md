@@ -34,12 +34,13 @@ At the current stage, the design is mainly a packet inspection and decision pipe
 In plain language, the flow is:
 
 1. A packet arrives from either a simulation source or a real Ethernet controller.
-2. The packet bytes are presented on a shared internal frame interface.
-3. The parser reads the Ethernet and IPv4 headers.
-4. The parser extracts fields such as protocol, source IP, destination IP, source port, and destination port.
-5. The rule engine compares those fields to the configured firewall rules.
-6. The firewall core records whether the packet was allowed or dropped.
-7. Debug counters and LEDs show what happened.
+2. The packet can pass through a small RX FIFO so the receive side can tolerate backpressure cleanly.
+3. The packet bytes are presented on a shared internal frame interface.
+4. The parser reads the Ethernet and IPv4 headers.
+5. The parser extracts fields such as protocol, source IP, destination IP, source port, and destination port.
+6. The rule engine compares those fields to the configured firewall rules.
+7. The firewall core records whether the packet was allowed or dropped.
+8. Debug counters and LEDs show what happened.
 
 Right now, the system is focused on receive-side inspection. It is not yet a full inline two-port forwarding firewall. That later extension is planned only after the receive path is stable.
 
@@ -161,6 +162,15 @@ Important signals are:
 - `frame_src_port`
 
 This interface is the bridge that allows simulation and hardware paths to feed the same firewall logic.
+
+### 2a. RX FIFO
+
+The current integrated receive path includes a small single-clock RX FIFO between the adapter and the firewall core.
+
+Its purpose is to:
+- absorb temporary backpressure,
+- keep the adapter/firewall boundary stable,
+- and let the team test a more realistic integration path before hardware arrives.
 
 ### 3. Parser
 
@@ -577,6 +587,7 @@ Already established:
 - parser path
 - rule engine path
 - firewall integration
+- RX FIFO integration path
 - SPI master behavior
 - W5500 adapter simulation path
 - DE1-SoC top-level wrapper

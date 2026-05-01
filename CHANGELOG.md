@@ -20,3 +20,8 @@
 
 ## 2026-04-16
 - Added `docs/project_overview.md` as a newcomer-friendly project guide covering goals, architecture, stages, testing flow, deployment, hardware, and key files
+- Updated `README.md` to reference the overview guide and give new teammates a clearer documentation entry path
+- Added an RX-side frame FIFO between the Ethernet adapter and firewall core, plus a dedicated FIFO testbench and FIFO-enabled integration coverage
+- Hardened the DE1-SoC top-level with synchronized reset release and synchronized board-control sampling for the live hardware path
+- Removed the Quartus SPI truncation warnings and the `KEY[0]` global-clock warning from the current build flow
+- Validated the updated pre-hardware flow with full XSim regression, a Questa smoke check, and a fresh Quartus compile that emits `build/quartus/de1_soc_w5500.sof`

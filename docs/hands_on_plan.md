@@ -83,6 +83,7 @@ Current expected passing benches:
 - `parser_tb`
 - `rule_engine_tb`
 - `packet_buffer_tb`
+- `frame_rx_fifo_tb`
 - `firewall_core_tb`
 - `spi_master_tb`
 - `eth_controller_adapter_tb`
@@ -167,6 +168,12 @@ Compile the design in Quartus with:
 The first programming target should be a volatile SRAM/JTAG load:
 - generate a `.sof`
 - program it through JTAG
+
+Expected handoff artifacts after compile:
+- `build/quartus/de1_soc_w5500.sof`
+- `build/quartus/de1_soc_w5500.pin`
+- `build/quartus/de1_soc_w5500.fit.rpt`
+- `build/quartus/de1_soc_w5500.sta.rpt`
 
 Do not start with configuration flash programming. JTAG loading is faster and safer while the design is still changing.
 
@@ -291,6 +298,15 @@ If initialization fails:
 2. Check `RESET_n`.
 3. Check `CS_n`, `SCLK`, and `MOSI`.
 4. Check `MISO` direction and continuity.
+
+Current accepted pre-hardware warnings:
+- unused `KEY[1:3]` and `SW[1:9]`
+- GPIO header structural warnings caused by the bidirectional `GPIO_0` wrapper style
+- Quartus Lite subscription/license warnings
+
+Warnings that should not reappear unnoticed:
+- SPI truncation warnings
+- `KEY[0]` being treated as a clock/global-clock source
 
 If SPI init works but packets are not seen:
 1. Check the Ethernet cable and link LEDs on the module.

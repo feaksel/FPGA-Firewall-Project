@@ -29,6 +29,7 @@ set_global_assignment -name VERILOG_FILE "../rtl/parser/eth_ipv4_parser.v"
 set_global_assignment -name VERILOG_FILE "../rtl/rules/rule_engine.v"
 set_global_assignment -name VERILOG_FILE "../rtl/spi/spi_master.v"
 set_global_assignment -name VERILOG_FILE "../rtl/buffer/packet_buffer.v"
+set_global_assignment -name VERILOG_FILE "../rtl/buffer/frame_rx_fifo.v"
 set_global_assignment -name VERILOG_FILE "../rtl/debug/debug_counters.v"
 set_global_assignment -name VERILOG_FILE "../rtl/common/defs.vh"
 

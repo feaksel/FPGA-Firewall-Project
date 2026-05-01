@@ -23,13 +23,15 @@ module spi_master #(
     reg        phase;
     reg [7:0]  shreg_tx;
     reg [7:0]  shreg_rx;
+    localparam [0:0] CPOL_BIT = (CPOL != 0);
+    localparam [0:0] CPHA_BIT = (CPHA != 0);
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             rx_data  <= 8'd0;
             busy     <= 1'b0;
             done     <= 1'b0;
-            sclk     <= CPOL;
+            sclk     <= CPOL_BIT;
             mosi     <= 1'b0;
             cs_n     <= 1'b1;
             div_ctr  <= 16'd0;
@@ -41,7 +43,7 @@ module spi_master #(
             done <= 1'b0;
 
             if (!busy) begin
-                sclk <= CPOL;
+                sclk <= CPOL_BIT;
                 if (start) begin
                     busy     <= 1'b1;
                     cs_n     <= 1'b0;
@@ -57,18 +59,18 @@ module spi_master #(
                     div_ctr <= 16'd0;
 
                     if (phase == 1'b0) begin
-                        sclk  <= ~CPOL;
+                        sclk  <= ~CPOL_BIT;
                         phase <= 1'b1;
 
-                        if (CPHA == 0)
+                        if (CPHA_BIT == 1'b0)
                             shreg_rx[bit_idx] <= miso;
                         else
                             mosi <= shreg_tx[bit_idx];
                     end else begin
-                        sclk  <= CPOL;
+                        sclk  <= CPOL_BIT;
                         phase <= 1'b0;
 
-                        if (CPHA == 0) begin
+                        if (CPHA_BIT == 1'b0) begin
                             if (bit_idx == 3'd0) begin
                                 busy    <= 1'b0;
                                 cs_n    <= !hold_cs;

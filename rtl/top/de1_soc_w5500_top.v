@@ -22,10 +22,31 @@ module de1_soc_w5500_top (
     wire init_error;
     wire rx_packet_seen;
     wire [3:0] adapter_debug_state;
+    wire rx_fifo_overflow;
+    reg  [1:0] rst_sync;
+    reg  [1:0] start_init_sync;
+    reg  [1:0] w5500_int_sync;
 
-    assign rst_n      = KEY[0];
-    assign start_init = SW[0];
-    assign w5500_int_n = GPIO_0[5];
+    always @(posedge CLOCK_50 or negedge KEY[0]) begin
+        if (!KEY[0])
+            rst_sync <= 2'b00;
+        else
+            rst_sync <= {rst_sync[0], 1'b1};
+    end
+
+    always @(posedge CLOCK_50 or negedge rst_n) begin
+        if (!rst_n) begin
+            start_init_sync <= 2'b00;
+            w5500_int_sync  <= 2'b11;
+        end else begin
+            start_init_sync <= {start_init_sync[0], SW[0]};
+            w5500_int_sync  <= {w5500_int_sync[0], GPIO_0[5]};
+        end
+    end
+
+    assign rst_n       = rst_sync[1];
+    assign start_init  = start_init_sync[1];
+    assign w5500_int_n = w5500_int_sync[1];
     assign spi_miso    = GPIO_0[4];
 
     assign GPIO_0[0] = spi_sclk;
@@ -44,7 +65,14 @@ module de1_soc_w5500_top (
     assign LEDR[8] = allow_count[0];
     assign LEDR[9] = drop_count[0];
 
-    firewall_top u_firewall_top (
+    firewall_top #(
+        .STARTUP_WAIT_CYCLES(5_000_000),
+        .RESET_ASSERT_CYCLES(500_000),
+        .RESET_RELEASE_CYCLES(5_000_000),
+        .RX_POLL_WAIT_CYCLES(50_000),
+        .SPI_CLK_DIV(50),
+        .MAX_FRAME_BYTES(2048)
+    ) u_firewall_top (
         .clk(CLOCK_50),
         .rst_n(rst_n),
         .start_init(start_init),
@@ -60,6 +88,7 @@ module de1_soc_w5500_top (
         .init_done(init_done),
         .init_error(init_error),
         .rx_packet_seen(rx_packet_seen),
-        .adapter_debug_state(adapter_debug_state)
+        .adapter_debug_state(adapter_debug_state),
+        .rx_fifo_overflow(rx_fifo_overflow)
     );
 endmodule

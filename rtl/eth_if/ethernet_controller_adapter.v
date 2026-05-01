@@ -58,11 +58,11 @@ module ethernet_controller_adapter #(
     localparam [15:0] S0_RX_RD_MSB      = 16'h0028;
     localparam [15:0] S0_RX_RD_LSB      = 16'h0029;
 
-    localparam [7:0] CTRL_COMMON_WRITE  = 8'h00;
-    localparam [7:0] CTRL_COMMON_READ   = 8'h04;
-    localparam [7:0] CTRL_S0_REG_WRITE  = 8'h08;
-    localparam [7:0] CTRL_S0_REG_READ   = 8'h0C;
-    localparam [7:0] CTRL_S0_RXBUF_READ = 8'h1C;
+    localparam [7:0] CTRL_COMMON_READ   = 8'h00;
+    localparam [7:0] CTRL_COMMON_WRITE  = 8'h04;
+    localparam [7:0] CTRL_S0_REG_READ   = 8'h08;
+    localparam [7:0] CTRL_S0_REG_WRITE  = 8'h0C;
+    localparam [7:0] CTRL_S0_RXBUF_READ = 8'h18;
 
     localparam [7:0] W5500_VERSION      = 8'h04;
     localparam [7:0] S0_MR_MACRAW       = 8'h04;
@@ -73,7 +73,7 @@ module ethernet_controller_adapter #(
 
     reg [3:0]  state;
     reg [2:0]  state_step;
-    reg [15:0] wait_ctr;
+    reg [31:0] wait_ctr;
     reg [15:0] rx_poll_wait_ctr;
 
     reg        spi_start;
@@ -368,12 +368,13 @@ module ethernet_controller_adapter #(
                             state_step           <= 3'd0;
                             frame_index          <= 16'd0;
                             if (({frame_len_bytes[15:8], seq_rx[3]} != 16'd0) &&
-                                ({frame_len_bytes[15:8], seq_rx[3]} <= MAX_FRAME_BYTES)) begin
+                                ({frame_len_bytes[15:8], seq_rx[3]} <= MAX_FRAME_BYTES) &&
+                                ({frame_len_bytes[15:8], seq_rx[3]} <= (rx_size_bytes - 16'd2))) begin
                                 next_rx_read_ptr <= rx_read_ptr + {frame_len_bytes[15:8], seq_rx[3]} + 16'd2;
                                 state            <= ST_STREAM_FRAME;
                             end else begin
-                                init_error <= 1'b1;
-                                state      <= ST_ERROR;
+                                next_rx_read_ptr <= rx_read_ptr + rx_size_bytes;
+                                state            <= ST_COMMIT_RX;
                             end
                         end
                     end

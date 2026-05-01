@@ -55,3 +55,10 @@
 - Reason: It preserves raw Ethernet frames for the parser and firewall core while avoiding transmit-side complexity early.
 - Alternatives considered: Using higher-level socket modes or adding forwarding before receive inspection was stable.
 - Impact: The adapter can feed the existing internal frame interface without changing parser or firewall architecture.
+
+## D-009
+- Date: 2026-04-16
+- Decision: Insert a small RX FIFO between the W5500 adapter and the firewall core during pre-hardware hardening.
+- Reason: It adds controlled backpressure handling without changing the parser/rule/firewall interfaces and makes the integrated receive path closer to the real hardware behavior.
+- Alternatives considered: Keeping the adapter directly connected to the firewall core until hardware arrives, or repurposing the standalone packet buffer for live RX.
+- Impact: The live receive path is more robust before board bring-up, while transmit/forwarding complexity remains deferred.

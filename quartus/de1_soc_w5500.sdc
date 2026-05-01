@@ -1,1 +1,5 @@
 create_clock -name {CLOCK_50} -period 20.000 [get_ports {CLOCK_50}]
+set_false_path -from [get_ports {KEY[*]}]
+set_false_path -from [get_ports {SW[*]}]
+set_false_path -from [get_ports {GPIO_0[4]}]
+set_false_path -from [get_ports {GPIO_0[5]}]

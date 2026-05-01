@@ -53,9 +53,20 @@ Pass criteria:
 - W5500-oriented init FSM compiles
 - read/write transaction sequence defined
 - MACRAW RX path documented and simulated
+- RX FIFO path can absorb backpressure without changing firewall decisions
 
 Move on when:
 - `eth_controller_adapter_tb` passes and `adapter_firewall_integration_tb` passes
+
+## Milestone 6.5: RX FIFO Hardening
+Pass criteria:
+- FIFO preserves data, SOP, EOP, and source-port metadata
+- FIFO handles backpressure
+- FIFO reports overflow when the queue is intentionally overfilled
+
+Move on when:
+- `frame_rx_fifo_tb` passes
+- the integrated adapter-to-firewall bench still passes with FIFO enabled
 
 ## Milestone 7: One-Port Hardware Bring-Up
 Pass criteria:

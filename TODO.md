@@ -20,6 +20,7 @@
 - [x] Integrate parser + rules into `firewall_core_tb`
 - [x] Freeze the Ethernet controller choice for the adapter implementation
 - [x] Add adapter-level integration coverage with `adapter_firewall_integration_tb`
-- [ ] Freeze the Quartus project and pin assignment flow around `de1_soc_w5500_top`
-- [ ] Prepare the first minimal DE1-SoC hardware image and bring-up checklist
+- [x] Freeze the Quartus project and pin assignment flow around `de1_soc_w5500_top`
+- [x] Prepare the first minimal DE1-SoC hardware image and bring-up checklist
+- [x] Add and verify the RX FIFO hardening path between adapter and firewall core
 - [ ] Use the PC-side Scapy helper during physical test once the first RX path is alive

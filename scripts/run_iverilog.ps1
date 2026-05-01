@@ -31,6 +31,7 @@ $Common = @(
     (Join-Path $RepoRoot "rtl/debug/debug_counters.v"),
     (Join-Path $RepoRoot "rtl/spi/spi_master.v"),
     (Join-Path $RepoRoot "rtl/buffer/packet_buffer.v"),
+    (Join-Path $RepoRoot "rtl/buffer/frame_rx_fifo.v"),
     (Join-Path $RepoRoot "rtl/parser/eth_ipv4_parser.v"),
     (Join-Path $RepoRoot "rtl/rules/rule_engine.v"),
     (Join-Path $RepoRoot "rtl/firewall/firewall_core.v"),

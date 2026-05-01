@@ -57,6 +57,7 @@ Examples from this repo:
 - device: `5CSEMA5F31C6`
 - top-level entity: `de1_soc_w5500_top`
 - output directory: `../build/quartus`
+- board-ready image: `build/quartus/de1_soc_w5500.sof`
 
 This file is where most hardware-project setup lives.
 
@@ -144,6 +145,7 @@ The `.qsf` lists the synthesizable RTL files, including:
 - `rtl/rules/rule_engine.v`
 - `rtl/spi/spi_master.v`
 - `rtl/buffer/packet_buffer.v`
+- `rtl/buffer/frame_rx_fifo.v`
 - `rtl/debug/debug_counters.v`
 
 Notice what is not included:
@@ -217,6 +219,12 @@ If timing fails, the design may still compile, but it may not run reliably at th
 
 The build outputs are under:
 - `build/quartus/`
+
+Validated artifacts in the current flow:
+- `de1_soc_w5500.sof`
+- `de1_soc_w5500.pin`
+- `de1_soc_w5500.fit.rpt`
+- `de1_soc_w5500.sta.rpt`
 
 Important files there:
 
@@ -361,16 +369,21 @@ Quartus warns about that style, but it still compiled and fitted successfully.
 
 ### Incomplete constraints warning
 
-The design currently has a base clock constraint for `CLOCK_50`, but not every possible path has a detailed timing constraint yet.
+The design currently has a base clock constraint for `CLOCK_50`, plus false-path treatment for human and asynchronous board inputs.
+
+Quartus still reports that the design is not fully constrained, which is expected until the external W5500 timing model is turned into board-accurate input/output constraints.
 
 That is common in an early project phase.
 
-### Width-truncation warnings in `spi_master.v`
+### Accepted current warning classes
 
-Quartus warned about a few assignments in:
-- [spi_master.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/spi/spi_master.v)
+Current compile output is expected to include:
+- unused `KEY[1:3]` and `SW[1:9]`
+- GPIO header structural warnings from the `inout` board wrapper
+- Quartus Lite subscription/license warnings
+- inferred RAM notes from the RX FIFO memory implementation
 
-These are worth cleaning up later, but they did not stop compile or fitting.
+The SPI truncation warnings and the `KEY[0]` global-clock warning are no longer expected.
 
 ## What `db/` and `incremental_db/` are
 
