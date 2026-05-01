@@ -40,6 +40,7 @@
 - [x] Add a standalone W5500 TX engine and simulation model for TX-buffer/SEND coverage
 - [x] Add a transmit-only UART telemetry module on `GPIO_0_D6`
 - [x] Add PC-side chunked file sender/receiver scripts for the final demo concept
+- [x] Add continuous sine-wave sender and PC2 browser receiver dashboard
 - [x] Extend the dashboard with a two-port file-demo preview panel
 - [ ] Make `firewall_forwarder_tb` pass reliably under XSim
 - [ ] Make `w5500_tx_engine_tb` pass under XSim

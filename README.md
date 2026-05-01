@@ -182,6 +182,16 @@ Use the interface name that matches the wired Ethernet adapter. In the examples 
 
 Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
 
+For the continuous live demo, run:
+
+```powershell
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
+```
+
+This continuously sends:
+- allowed sine-wave packets on UDP destination port `5001`,
+- blocked decoy packets on TCP port `23` and UDP port `5002`.
+
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
 
 ```powershell
@@ -198,7 +208,28 @@ What PC1 does:
 
 Connect W5500 B, the FPGA egress module, to PC2 Ethernet.
 
-Start the receiver before PC1 starts sending:
+For the continuous live demo, start the browser receiver before PC1 starts sending:
+
+```powershell
+py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8090
+```
+
+The dashboard shows:
+- received sine waveform,
+- allowed packet count,
+- missing sequence count,
+- packets per second,
+- decoy leak count.
+
+The expected result is a moving sine wave with `Decoy leaks = 0`.
+
+For the file/video checksum demo, start the receiver before PC1 starts sending:
 
 ```powershell
 py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4

@@ -50,3 +50,4 @@
 - Added chunked file sender/receiver scripts for the final PC1-to-PC2 SHA-256 demo
 - Extended the browser dashboard with a two-port file-demo preview and updated docs/TODO/decisions for the real inline-firewall roadmap
 - Added README instructions for cloning the repo and running the PC1 sender / PC2 receiver setup
+- Added a continuous sine-wave demo sender and PC2 browser dashboard for live allow/drop visualization

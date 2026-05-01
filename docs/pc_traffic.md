@@ -109,6 +109,47 @@ The receiver script reports:
 
 The video version is chunked file transfer, not live streaming. The intentionally dropped frames are decoy/error traffic, not required media chunks, so the received video should play if every allowed chunk arrives.
 
+## Phase F: Continuous sine-wave demo
+
+For the live presentation, use the continuous sine-wave demo before or beside the file-transfer proof.
+
+Topology:
+
+```text
+PC1 sine sender -> W5500 A -> FPGA allow/drop -> W5500 B -> PC2 browser dashboard
+```
+
+Start PC2 first:
+
+```powershell
+py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090
+```
+
+Open:
+
+```text
+http://127.0.0.1:8090
+```
+
+Start PC1:
+
+```powershell
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
+```
+
+Expected result:
+- PC2 shows a continuously moving sine wave,
+- allowed packet count increases,
+- packets/sec is nonzero,
+- missing sequence count stays low,
+- decoy leak count stays `0`.
+
+The sender continuously interleaves blocked decoys:
+- TCP destination port `23`
+- UDP destination port `5002`
+
+The allowed stream uses UDP destination port `5001`, matching the file-transfer allow rule.
+
 ## No-UART telemetry option
 
 A USB-UART adapter is useful later, but it is not required for the next two-PC demo.
