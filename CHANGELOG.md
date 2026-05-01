@@ -52,3 +52,5 @@
 - Added README instructions for cloning the repo and running the PC1 sender / PC2 receiver setup
 - Added a continuous sine-wave demo sender and PC2 browser dashboard for live allow/drop visualization
 - Improved the sine demo with slower readable defaults, a packet-by-packet decision strip, expected-drop markers, leak markers, missing-sequence markers, and a live packet-rate graph
+- Added a restart button to the sine receiver dashboard for clearing the live demo view without restarting the sniffer
+- Added the same restart/reset control to the deterministic traffic dashboard

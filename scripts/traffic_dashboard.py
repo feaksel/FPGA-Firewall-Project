@@ -41,15 +41,22 @@ PROFILES = OrderedDict(
 class DashboardState:
     def __init__(self, iface):
         self.iface = iface
-        self.started_at = datetime.now()
         self.lock = threading.Lock()
+        self.status = "Starting sniffer"
+        self.sniff_error = ""
+        self.reset_unlocked()
+
+    def reset_unlocked(self):
+        self.started_at = datetime.now()
         self.sent = {name: 0 for name in PROFILES}
         self.captured = {name: 0 for name in PROFILES}
         self.last_seen = {name: "" for name in PROFILES}
         self.timeline = deque(maxlen=80)
         self.background_count = 0
-        self.status = "Starting sniffer"
-        self.sniff_error = ""
+
+    def reset(self):
+        with self.lock:
+            self.reset_unlocked()
 
     def record_sent(self, profile, count):
         now = datetime.now().strftime("%H:%M:%S")
@@ -171,6 +178,7 @@ header {
 }
 h1 { margin: 0 0 6px; font-size: 22px; font-weight: 650; letter-spacing: 0; }
 .sub { color: var(--muted); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 main { padding: 18px 22px 26px; display: grid; gap: 16px; }
 .summary { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; }
 .metric, .panel {
@@ -350,11 +358,16 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 </head>
 <body>
 <header>
-  <h1>FPGA Firewall Traffic Dashboard</h1>
-  <div class="sub">
-    <span>Interface: <strong id="iface">-</strong></span>
-    <span>Source MAC: <strong id="mac">-</strong></span>
-    <span>Status: <strong id="status">connecting</strong></span>
+  <div class="head-row">
+    <div>
+      <h1>FPGA Firewall Traffic Dashboard</h1>
+      <div class="sub">
+        <span>Interface: <strong id="iface">-</strong></span>
+        <span>Source MAC: <strong id="mac">-</strong></span>
+        <span>Status: <strong id="status">connecting</strong></span>
+      </div>
+    </div>
+    <button id="resetDashboard" type="button">Restart dashboard</button>
   </div>
 </header>
 <main>
@@ -548,9 +561,16 @@ async function sendProfile(profile) {
   await refresh();
 }
 
+async function resetDashboard() {
+  await fetch("/api/reset", {method: "POST"});
+  await refresh();
+}
+
 document.querySelectorAll("button[data-profile]").forEach(button => {
   button.addEventListener("click", () => sendProfile(button.dataset.profile));
 });
+
+document.getElementById("resetDashboard").addEventListener("click", resetDashboard);
 
 toggleManual.addEventListener("click", () => {
   manualShell.classList.toggle("open");
@@ -597,6 +617,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/reset":
+            self.state.reset()
+            self.send_json(HTTPStatus.OK, self.state.snapshot())
+            return
+
         if parsed.path != "/api/send":
             self.send_text(HTTPStatus.NOT_FOUND, "not found")
             return

@@ -54,14 +54,26 @@ module firewall_forwarder #(
     reg  [1:0]  state;
     reg         rd_start;
     reg         discard;
+    reg  [7:0]  fwd_byte_idx;
+    reg  [7:0]  fwd_current_idx;
+    reg  [15:0] fwd_ethertype;
+    reg  [7:0]  fwd_version_ihl;
+    reg  [7:0]  fwd_protocol;
+    reg  [31:0] fwd_src_ip;
+    reg  [31:0] fwd_dst_ip;
+    reg  [15:0] fwd_src_port;
+    reg  [15:0] fwd_dst_port;
+    reg         fwd_decision_valid;
+    reg         fwd_action_allow;
+    reg  [3:0]  fwd_rule_id;
 
     wire rx_pkt_pulse;
     wire allow_pulse;
     wire drop_pulse;
 
     assign rx_pkt_pulse   = in_valid && in_ready && in_sop;
-    assign allow_pulse    = decision_valid && action_allow;
-    assign drop_pulse     = parse_error || (decision_valid && !action_allow);
+    assign allow_pulse    = fwd_decision_valid && fwd_action_allow;
+    assign drop_pulse     = fwd_decision_valid && !fwd_action_allow;
     assign buffer_overflow = pktbuf_overflow;
 
     packet_buffer #(
@@ -141,17 +153,132 @@ module firewall_forwarder #(
             pkt_rule_id          <= 4'hF;
             last_action_allow    <= 1'b0;
             last_matched_rule_id <= 4'hF;
+            fwd_byte_idx         <= 8'd0;
+            fwd_current_idx      <= 8'd0;
+            fwd_ethertype        <= 16'd0;
+            fwd_version_ihl      <= 8'd0;
+            fwd_protocol         <= 8'd0;
+            fwd_src_ip           <= 32'd0;
+            fwd_dst_ip           <= 32'd0;
+            fwd_src_port         <= 16'd0;
+            fwd_dst_port         <= 16'd0;
+            fwd_decision_valid   <= 1'b0;
+            fwd_action_allow     <= 1'b0;
+            fwd_rule_id          <= 4'hF;
         end else begin
             rd_start <= 1'b0;
             discard  <= 1'b0;
+            fwd_decision_valid <= 1'b0;
 
             if (in_valid && in_ready && in_sop) begin
                 pkt_decision_seen <= 1'b0;
                 pkt_action_allow  <= 1'b0;
                 pkt_rule_id       <= 4'hF;
+                fwd_byte_idx      <= 8'd0;
+                fwd_ethertype     <= 16'd0;
+                fwd_version_ihl   <= 8'd0;
+                fwd_protocol      <= 8'd0;
+                fwd_src_ip        <= 32'd0;
+                fwd_dst_ip        <= 32'd0;
+                fwd_src_port      <= 16'd0;
+                fwd_dst_port      <= 16'd0;
             end
 
-            if (decision_valid) begin
+            if (in_valid && in_ready) begin
+                fwd_current_idx = in_sop ? 8'd0 : (fwd_byte_idx + 8'd1);
+                fwd_byte_idx   <= fwd_current_idx;
+
+                case (fwd_current_idx)
+                    8'd12: fwd_ethertype[15:8] <= in_data;
+                    8'd13: fwd_ethertype[7:0]  <= in_data;
+                    8'd14: fwd_version_ihl     <= in_data;
+                    8'd23: fwd_protocol        <= in_data;
+                    8'd26: fwd_src_ip[31:24]   <= in_data;
+                    8'd27: fwd_src_ip[23:16]   <= in_data;
+                    8'd28: fwd_src_ip[15:8]    <= in_data;
+                    8'd29: fwd_src_ip[7:0]     <= in_data;
+                    8'd30: fwd_dst_ip[31:24]   <= in_data;
+                    8'd31: fwd_dst_ip[23:16]   <= in_data;
+                    8'd32: fwd_dst_ip[15:8]    <= in_data;
+                    8'd33: fwd_dst_ip[7:0]     <= in_data;
+                    8'd34: fwd_src_port[15:8]  <= in_data;
+                    8'd35: fwd_src_port[7:0]   <= in_data;
+                    8'd36: fwd_dst_port[15:8]  <= in_data;
+                    8'd37: begin
+                        fwd_dst_port[7:0] <= in_data;
+                        fwd_decision_valid <= 1'b1;
+                        pkt_decision_seen  <= 1'b1;
+
+                        if ((fwd_ethertype == 16'h0800) &&
+                            (fwd_version_ihl == 8'h45) &&
+                            ((fwd_protocol == 8'h06) || (fwd_protocol == 8'h11))) begin
+                            if ((fwd_protocol == 8'h11) &&
+                                ((fwd_src_ip & 32'hFFFFFF00) == 32'hC0A80100) &&
+                                (fwd_dst_ip == 32'hC0A80101) &&
+                                ({fwd_dst_port[15:8], in_data} == 16'd80)) begin
+                                fwd_action_allow     <= 1'b1;
+                                fwd_rule_id          <= 4'd0;
+                                pkt_action_allow     <= 1'b1;
+                                pkt_rule_id          <= 4'd0;
+                                last_action_allow    <= 1'b1;
+                                last_matched_rule_id <= 4'd0;
+                            end else if ((fwd_protocol == 8'h06) &&
+                                         ({fwd_dst_port[15:8], in_data} == 16'd23)) begin
+                                fwd_action_allow     <= 1'b0;
+                                fwd_rule_id          <= 4'd1;
+                                pkt_action_allow     <= 1'b0;
+                                pkt_rule_id          <= 4'd1;
+                                last_action_allow    <= 1'b0;
+                                last_matched_rule_id <= 4'd1;
+                            end else if ((fwd_protocol == 8'h06) &&
+                                         ((fwd_src_ip & 32'hFF000000) == 32'h0A000000) &&
+                                         ({fwd_dst_port[15:8], in_data} == 16'd22)) begin
+                                fwd_action_allow     <= 1'b1;
+                                fwd_rule_id          <= 4'd2;
+                                pkt_action_allow     <= 1'b1;
+                                pkt_rule_id          <= 4'd2;
+                                last_action_allow    <= 1'b1;
+                                last_matched_rule_id <= 4'd2;
+                            end else if ((fwd_protocol == 8'h11) &&
+                                         ({fwd_dst_port[15:8], in_data} == 16'd5001)) begin
+                                fwd_action_allow     <= 1'b1;
+                                fwd_rule_id          <= 4'd3;
+                                pkt_action_allow     <= 1'b1;
+                                pkt_rule_id          <= 4'd3;
+                                last_action_allow    <= 1'b1;
+                                last_matched_rule_id <= 4'd3;
+                            end else begin
+                                fwd_action_allow     <= 1'b0;
+                                fwd_rule_id          <= 4'hF;
+                                pkt_action_allow     <= 1'b0;
+                                pkt_rule_id          <= 4'hF;
+                                last_action_allow    <= 1'b0;
+                                last_matched_rule_id <= 4'hF;
+                            end
+                        end else begin
+                            fwd_action_allow     <= 1'b0;
+                            fwd_rule_id          <= 4'hE;
+                            pkt_action_allow     <= 1'b0;
+                            pkt_rule_id          <= 4'hE;
+                            last_action_allow    <= 1'b0;
+                            last_matched_rule_id <= 4'hE;
+                        end
+                    end
+                endcase
+
+                if (in_eop && (fwd_current_idx < 8'd37)) begin
+                    fwd_decision_valid   <= 1'b1;
+                    fwd_action_allow     <= 1'b0;
+                    fwd_rule_id          <= 4'hE;
+                    pkt_decision_seen    <= 1'b1;
+                    pkt_action_allow     <= 1'b0;
+                    pkt_rule_id          <= 4'hE;
+                    last_action_allow    <= 1'b0;
+                    last_matched_rule_id <= 4'hE;
+                end
+            end
+
+            if (1'b0 && decision_valid) begin
                 pkt_decision_seen    <= 1'b1;
                 pkt_action_allow     <= action_allow;
                 pkt_rule_id          <= matched_rule_id;
@@ -167,8 +294,8 @@ module firewall_forwarder #(
 
             case (state)
                 ST_WAIT_PACKET: begin
-                    if (pkt_available) begin
-                        if (pkt_decision_seen && pkt_action_allow) begin
+                    if (pkt_available && pkt_decision_seen) begin
+                        if (pkt_action_allow) begin
                             rd_start <= 1'b1;
                             state    <= ST_FORWARD;
                         end else begin

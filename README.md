@@ -232,6 +232,10 @@ The dashboard shows:
 
 The expected result is a moving sine wave, green allowed packet marks, faded red expected-drop marks, and `Leaks = 0`.
 
+Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, event log, and rate graph without restarting the receiver process.
+
+If the button is not visible, stop and restart `sine_receiver_dashboard.py` once. The dashboard HTML is embedded in the Python process, so an already-running dashboard will keep serving the old page until the process restarts.
+
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
 ```powershell

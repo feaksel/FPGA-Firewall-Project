@@ -145,6 +145,10 @@ Expected result:
 - missing sequence count stays low,
 - leak count stays `0`.
 
+The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings.
+
+If the button is not visible, stop and restart the dashboard script once. The page is embedded in the running Python process, so browser refresh alone cannot load code changes made after the process started.
+
 The sender continuously interleaves blocked decoys:
 - TCP destination port `23`
 - UDP destination port `5002`

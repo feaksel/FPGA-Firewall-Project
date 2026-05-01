@@ -43,6 +43,9 @@ class SineState:
         self.file_port = file_port
         self.decoy_every = decoy_every
         self.lock = threading.Lock()
+        self.reset_unlocked()
+
+    def reset_unlocked(self):
         self.started_at = time.time()
         self.samples = deque(maxlen=1024)
         self.events = deque(maxlen=80)
@@ -60,6 +63,10 @@ class SineState:
         self.sniff_error = ""
         self.last_rate_time = time.time()
         self.last_rate_packets = 0
+
+    def reset(self):
+        with self.lock:
+            self.reset_unlocked()
 
     def record_packet(self, pkt):
         now = time.time()
@@ -172,6 +179,9 @@ body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--
 header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 18px 22px; }
 h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0; }
 .sub { color: var(--muted); font-size: 13px; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+button { border: 1px solid #b7c4d4; background: #fff; color: var(--ink); border-radius: 7px; min-height: 36px; padding: 0 12px; font-weight: 650; cursor: pointer; }
+button:hover { border-color: var(--blue); color: var(--blue); }
 main { padding: 18px 22px 28px; display: grid; gap: 14px; }
 .metrics { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; }
 .metric, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
@@ -229,8 +239,13 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
 </head>
 <body>
 <header>
-  <h1>FPGA Firewall Continuous Sine Demo</h1>
-  <div class="sub">PC1 sends an allowed sine stream plus blocked decoys. PC2 should see a clean live waveform and zero decoy leaks.</div>
+  <div class="head-row">
+    <div>
+      <h1>FPGA Firewall Continuous Sine Demo</h1>
+      <div class="sub">PC1 sends an allowed sine stream plus blocked decoys. PC2 should see a clean live waveform and zero decoy leaks.</div>
+    </div>
+    <button id="resetButton" type="button">Restart dashboard</button>
+  </div>
 </header>
 <main>
   <section class="flow">
@@ -380,6 +395,12 @@ async function refresh() {
   renderPacketStrip(data.packet_marks);
 }
 
+async function resetDashboard() {
+  await fetch("/api/reset", {method: "POST"});
+  await refresh();
+}
+
+document.getElementById("resetButton").addEventListener("click", resetDashboard);
 refresh();
 setInterval(refresh, 250);
 </script>
@@ -408,6 +429,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_text(HTTPStatus.OK, HTML, "text/html; charset=utf-8")
         elif parsed.path == "/api/state":
             self.send_text(HTTPStatus.OK, json.dumps(self.state.snapshot()), "application/json; charset=utf-8")
+        else:
+            self.send_text(HTTPStatus.NOT_FOUND, "not found", "text/plain; charset=utf-8")
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/reset":
+            self.state.reset()
+            self.send_text(HTTPStatus.OK, json.dumps({"ok": True}), "application/json; charset=utf-8")
         else:
             self.send_text(HTTPStatus.NOT_FOUND, "not found", "text/plain; charset=utf-8")
 
