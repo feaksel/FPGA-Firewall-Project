@@ -140,15 +140,29 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 Expected result:
 - PC2 shows a continuously moving sine wave,
 - allowed packet count increases,
+- the packet strip shows green allowed arrivals and faded red expected decoy drops,
 - packets/sec is nonzero,
 - missing sequence count stays low,
-- decoy leak count stays `0`.
+- leak count stays `0`.
 
 The sender continuously interleaves blocked decoys:
 - TCP destination port `23`
 - UDP destination port `5002`
 
 The allowed stream uses UDP destination port `5001`, matching the file-transfer allow rule.
+
+If the sine wave is too dense or too slow, tune PC1:
+
+```powershell
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 2 --packets-per-second 10
+```
+
+If the expected-drop markers do not line up, use the same `--decoy-every` value on both sides:
+
+```powershell
+py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --decoy-every 4
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --decoy-every 4
+```
 
 ## No-UART telemetry option
 

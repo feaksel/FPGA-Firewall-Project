@@ -51,3 +51,4 @@
 - Extended the browser dashboard with a two-port file-demo preview and updated docs/TODO/decisions for the real inline-firewall roadmap
 - Added README instructions for cloning the repo and running the PC1 sender / PC2 receiver setup
 - Added a continuous sine-wave demo sender and PC2 browser dashboard for live allow/drop visualization
+- Improved the sine demo with slower readable defaults, a packet-by-packet decision strip, expected-drop markers, leak markers, missing-sequence markers, and a live packet-rate graph

@@ -191,6 +191,7 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 This continuously sends:
 - allowed sine-wave packets on UDP destination port `5001`,
 - blocked decoy packets on TCP port `23` and UDP port `5002`.
+- a slow default waveform, so the receiver graph is readable during a live demo.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
 
@@ -222,12 +223,14 @@ http://127.0.0.1:8090
 
 The dashboard shows:
 - received sine waveform,
+- packet-by-packet decision strip,
 - allowed packet count,
+- expected drop count,
 - missing sequence count,
 - packets per second,
 - decoy leak count.
 
-The expected result is a moving sine wave with `Decoy leaks = 0`.
+The expected result is a moving sine wave, green allowed packet marks, faded red expected-drop marks, and `Leaks = 0`.
 
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
