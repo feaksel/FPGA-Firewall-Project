@@ -159,6 +159,18 @@ pkill -f sine_sender.py
 
 If you want to reset the continuous demo from sequence `0`, delete `.sine_sender_state.json` on PC1 or start the sender with `--fresh-run`.
 
+For a presentation where old sender processes may still be on the network, hard-lock the receiver and sender to one run ID:
+
+```powershell
+py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090 --lock-run-id 0x4321
+```
+
+```bash
+sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --packets-per-second 5 --samples-per-packet 16 --sine-hz 1
+```
+
+With `--lock-run-id`, the dashboard ignores every other stream, including old `FWSINE1` packets and accidental extra senders.
+
 The sender continuously interleaves blocked decoys:
 - TCP destination port `23`
 - UDP destination port `5002`

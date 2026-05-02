@@ -240,6 +240,16 @@ If the button is not visible, stop and restart `sine_receiver_dashboard.py` once
 
 Before a clean demo take, stop old sender processes on PC1 and start only one new sender. The sender saves `.sine_sender_state.json` by default, so restarting it continues the same run ID and sequence. Use `--fresh-run` only when you intentionally want a new demo run. The dashboard locks onto the first new-format `FWSINE2` run it sees and ignores legacy or different-run packets, but a single sender gives the cleanest waveform and packet strip. W5500 B TX now uses burst TX-buffer writes in RTL, so higher sender rates are more realistic, but increase `--packets-per-second` gradually while watching PC2 packet gaps and leaks.
 
+For a hard-locked presentation stream, use the same explicit run ID on both PCs:
+
+```powershell
+py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090 --lock-run-id 0x4321
+```
+
+```bash
+sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --packets-per-second 5 --samples-per-packet 16 --sine-hz 1
+```
+
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
 ```powershell

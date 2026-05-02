@@ -59,11 +59,13 @@ def parse_sine_payload(payload):
 
 
 class SineState:
-    def __init__(self, file_port, decoy_every, run_switch_idle_sec, accept_legacy):
+    def __init__(self, file_port, decoy_every, run_switch_idle_sec, accept_legacy, follow_new_runs, lock_run_id):
         self.file_port = file_port
         self.decoy_every = decoy_every
         self.run_switch_idle_sec = run_switch_idle_sec
         self.accept_legacy = accept_legacy
+        self.follow_new_runs = follow_new_runs
+        self.lock_run_id = lock_run_id
         self.lock = threading.Lock()
         self.reset_unlocked()
 
@@ -123,12 +125,27 @@ class SineState:
 
                 seq = parsed["seq"]
                 run_id = parsed["run_id"]
+                if self.lock_run_id is not None and run_id != self.lock_run_id:
+                    self.ignored_packets += 1
+                    self.packet_marks.append({"kind": "old", "seq": seq, "time": now})
+                    self.events.appendleft({
+                        "time": now,
+                        "kind": "OLD",
+                        "detail": f"ignored run 0x{run_id:08x}; locked to 0x{self.lock_run_id:08x}",
+                    })
+                    return
+
                 if self.run_id is None:
                     self.run_id = run_id
                     self.events.appendleft({"time": now, "kind": "SYNC", "detail": f"run 0x{run_id:08x}"})
                 elif run_id != self.run_id:
                     active_age = None if self.last_seen is None else now - self.last_seen
-                    can_switch = self.run_switch_idle_sec > 0 and active_age is not None and active_age >= self.run_switch_idle_sec
+                    can_switch = (
+                        self.follow_new_runs
+                        and self.run_switch_idle_sec > 0
+                        and active_age is not None
+                        and active_age >= self.run_switch_idle_sec
+                    )
                     if not can_switch:
                         self.ignored_packets += 1
                         self.packet_marks.append({"kind": "old", "seq": seq, "time": now})
@@ -531,12 +548,15 @@ def main():
     parser.add_argument("--file-port", type=int, default=DEFAULT_FILE_PORT)
     parser.add_argument("--decoy-every", type=int, default=4, help="Sender decoy cadence used to draw expected drop markers.")
     parser.add_argument("--run-switch-idle-sec", type=float, default=0.0, help="Switch to a different run ID only after this many idle seconds; 0 disables auto-switch.")
+    parser.add_argument("--follow-new-runs", action="store_true", help="Allow the dashboard to switch to another run ID after the idle timeout.")
+    parser.add_argument("--lock-run-id", type=lambda value: int(value, 0), default=None, help="Only accept this 32-bit run ID, for example 0x4321.")
     parser.add_argument("--accept-legacy", action="store_true", help="Accept older FWSINE1 packets that do not carry a run ID.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8090)
     args = parser.parse_args()
 
-    state = SineState(args.file_port, args.decoy_every, args.run_switch_idle_sec, args.accept_legacy)
+    lock_run_id = None if args.lock_run_id is None else (args.lock_run_id & 0xFFFFFFFF)
+    state = SineState(args.file_port, args.decoy_every, args.run_switch_idle_sec, args.accept_legacy, args.follow_new_runs, lock_run_id)
     Handler.state = state
     thread = threading.Thread(target=sniff_worker, args=(state, args.iface), daemon=True)
     thread.start()

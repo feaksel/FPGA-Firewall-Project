@@ -116,13 +116,14 @@ def main():
 
     interval = 1.0 / args.packets_per_second
     state_path = Path(args.state_file).expanduser() if args.state_file else None
-    saved_state = None if args.fresh_run or args.run_id is not None else load_state(state_path)
+    saved_state = None if args.fresh_run else load_state(state_path)
     run_id = args.run_id if args.run_id is not None else (
         saved_state["run_id"] if saved_state is not None else random.getrandbits(32)
     )
     run_id &= 0xFFFFFFFF
-    seq = saved_state["seq"] if saved_state is not None else 0
-    phase = saved_state["phase"] if saved_state is not None else 0.0
+    can_resume_state = saved_state is not None and saved_state["run_id"] == run_id
+    seq = saved_state["seq"] if can_resume_state else 0
+    phase = saved_state["phase"] if can_resume_state else 0.0
     print(f"Streaming sine wave on {args.iface}: {args.sine_hz} Hz, UDP dst port {args.port}")
     print(f"Allowed packets/sec={args.packets_per_second:g}, samples/packet={args.samples_per_packet}")
     print(f"Run ID=0x{run_id:08x}")
