@@ -51,7 +51,8 @@ def allowed_ssh(seq):
 def main():
     parser = argparse.ArgumentParser(description="Simple continuous FPGA firewall rule demo sender.")
     parser.add_argument("--iface", required=True, help="Mac Ethernet interface connected to W5500 A.")
-    parser.add_argument("--rate", type=float, default=2.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
+    parser.add_argument("--rate", type=float, default=5.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
+    parser.add_argument("--count", type=int, default=0, help="Number of cycles to send; 0 means run forever.")
     parser.add_argument("--list-ifaces", action="store_true", help="List Scapy interface names and exit.")
     parser.add_argument("--verbose-each", action="store_true", help="Print one line per send cycle instead of updating one status line.")
     parser.add_argument("--udp-allow", action="store_true", help="Also send the UDP/80 allow profile. SSH allow is the default primary profile.")
@@ -78,7 +79,8 @@ def main():
     print("Stop with Ctrl+C.")
 
     try:
-        for seq in itertools.count():
+        seq_iter = range(args.count) if args.count > 0 else itertools.count()
+        for seq in seq_iter:
             sendp(allowed_ssh(seq), iface=args.iface, verbose=False)
             sent_allow_ssh += 1
 
@@ -96,6 +98,7 @@ def main():
             else:
                 print(f"\r{msg}", end="", flush=True)
             time.sleep(interval)
+        print(f"\ndone: udp_allow={sent_allow_udp} ssh_allow={sent_allow_ssh} expected_drop={sent_drop}")
     except KeyboardInterrupt:
         print(f"\nstopped: udp_allow={sent_allow_udp} ssh_allow={sent_allow_ssh} expected_drop={sent_drop}")
 

@@ -224,6 +224,18 @@ For the simplest continuous rule demo, start this browser receiver before PC1 st
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
 ```
 
+If the dashboard stays empty, first list the exact Npcap interface names:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --list-ifaces
+```
+
+The dashboard now shows `All frames seen` and `Demo frames seen`. If `All frames seen` is `0`, use a different `--iface`. You can also validate a Wireshark capture with:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --pcap C:\Users\furka\Desktop\wire2.pcapng
+```
+
 Then open:
 
 ```text

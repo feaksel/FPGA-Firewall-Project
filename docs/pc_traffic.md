@@ -129,6 +129,14 @@ Start PC2 first:
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
 ```
 
+If the page stays empty, stop the Python process and list the exact Scapy/Npcap names:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --list-ifaces
+```
+
+Then restart with the matching interface. The dashboard includes `All frames seen` and `Demo frames seen` counters. If `All frames seen` remains `0`, the dashboard is sniffing the wrong Windows interface. If `All frames seen` rises but `Demo frames seen` stays `0`, the interface is right but forwarded demo packets are not arriving.
+
 Open:
 
 ```text

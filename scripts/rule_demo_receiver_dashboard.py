@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 try:
-    from scapy.all import Raw, TCP, UDP, sniff
+    from scapy.all import PcapNgReader, Raw, TCP, UDP, get_if_list, sniff
 except ImportError:
     print("Scapy is required. Install it with: pip install scapy", file=sys.stderr)
     sys.exit(1)
@@ -21,11 +21,25 @@ ALLOW_MARKER = b"FW-DEMO-ALLOW"
 ALLOW_SSH_MARKER = b"FW-DEMO-ALLOW-SSH"
 DROP_TCP_MARKER = b"FW-DEMO-DROP-TCP23"
 SEQ_RE = re.compile(rb"seq=(\d+)")
+APP_VERSION = "rule-demo-2026-05-02-v3-marker-all-ifaces"
 
 
 def parse_seq(payload):
     match = SEQ_RE.search(payload)
     return None if match is None else int(match.group(1))
+
+
+def packet_bytes(pkt):
+    try:
+        return bytes(pkt)
+    except Exception:
+        return b""
+
+
+def packet_payload(pkt):
+    if Raw in pkt:
+        return bytes(pkt[Raw].load)
+    return packet_bytes(pkt)
 
 
 class DemoState:
@@ -40,6 +54,8 @@ class DemoState:
         self.allowed_total = 0
         self.leaks = 0
         self.other = 0
+        self.total_seen = 0
+        self.demo_seen = 0
         self.missing = 0
         self.last_seq = None
         self.last_seen = None
@@ -49,6 +65,7 @@ class DemoState:
         self.events = deque(maxlen=80)
         self.marks = deque(maxlen=120)
         self.sniff_error = ""
+        self.sniff_target = ""
 
     def reset(self):
         with self.lock:
@@ -70,24 +87,14 @@ class DemoState:
     def record_packet(self, pkt):
         now = time.time()
         with self.lock:
-            payload = bytes(pkt[Raw].load) if Raw in pkt else b""
-            if UDP in pkt and pkt[UDP].dport == 80 and ALLOW_MARKER in payload:
-                seq = parse_seq(payload)
-                if seq is not None and self.last_seq is not None and seq > self.last_seq + 1:
-                    gap = seq - self.last_seq - 1
-                    self.missing += gap
-                    self.event("MISS", f"{gap} missing allow seq", seq)
-                if seq is not None:
-                    self.last_seq = seq
-                self.allowed += 1
-                self.allowed_total += 1
-                self.last_seen = now
-                self.event("ALLOW", f"UDP/80 seq {seq}", seq)
-                self.update_rate(now)
-                return
+            self.total_seen += 1
+            frame = packet_bytes(pkt)
+            payload = packet_payload(pkt)
+            searchable = payload + frame
 
-            if TCP in pkt and pkt[TCP].dport == 22 and ALLOW_SSH_MARKER in payload:
-                seq = parse_seq(payload)
+            if ALLOW_SSH_MARKER in searchable:
+                seq = parse_seq(searchable)
+                self.demo_seen += 1
                 self.allowed_ssh += 1
                 self.allowed_total += 1
                 self.last_seen = now
@@ -97,9 +104,27 @@ class DemoState:
                 self.update_rate(now)
                 return
 
-            if TCP in pkt and pkt[TCP].dport == 23 and DROP_TCP_MARKER in payload:
+            if ALLOW_MARKER in searchable:
+                seq = parse_seq(payload)
+                if seq is not None and self.last_seq is not None and seq > self.last_seq + 1:
+                    gap = seq - self.last_seq - 1
+                    self.missing += gap
+                    self.event("MISS", f"{gap} missing allow seq", seq)
+                if seq is not None:
+                    self.last_seq = seq
+                self.demo_seen += 1
+                self.allowed += 1
+                self.allowed_total += 1
+                self.last_seen = now
+                detail = f"UDP/80 seq {seq}" if (UDP in pkt and pkt[UDP].dport == 80) else f"UDP allow marker seq {seq}"
+                self.event("ALLOW", detail, seq)
+                self.update_rate(now)
+                return
+
+            if DROP_TCP_MARKER in searchable:
+                self.demo_seen += 1
                 self.leaks += 1
-                self.event("LEAK", "TCP/23 drop packet reached PC2", parse_seq(payload))
+                self.event("LEAK", "TCP/23 drop packet reached PC2", parse_seq(searchable))
                 return
 
             self.other += 1
@@ -107,6 +132,10 @@ class DemoState:
     def set_error(self, error):
         with self.lock:
             self.sniff_error = error
+
+    def set_sniff_target(self, target):
+        with self.lock:
+            self.sniff_target = str(target)
 
     def snapshot(self):
         with self.lock:
@@ -119,6 +148,8 @@ class DemoState:
                 "leaks": self.leaks,
                 "missing": self.missing,
                 "other": self.other,
+                "total_seen": self.total_seen,
+                "demo_seen": self.demo_seen,
                 "last_seq": "-" if self.last_seq is None else self.last_seq,
                 "packets_per_second": self.allowed_total / elapsed,
                 "last_age": None if self.last_seen is None else time.time() - self.last_seen,
@@ -133,6 +164,8 @@ class DemoState:
                     for event in list(self.events)
                 ],
                 "sniff_error": self.sniff_error,
+                "sniff_target": self.sniff_target,
+                "version": APP_VERSION,
             }
 
 
@@ -206,6 +239,8 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
     <div class="metric"><div class="label">Missing allow seq</div><div class="value" id="missing">0</div></div>
     <div class="metric"><div class="label">Allowed/sec</div><div class="value" id="pps">0.0</div></div>
     <div class="metric"><div class="label">Last seq</div><div class="value" id="lastSeq">-</div></div>
+    <div class="metric"><div class="label">Demo frames seen</div><div class="value" id="demoSeen">0</div></div>
+    <div class="metric"><div class="label">All frames seen</div><div class="value" id="totalSeen">0</div></div>
   </section>
   <section class="grid">
     <div class="panel">
@@ -214,6 +249,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
       <div class="strip" id="strip"></div>
       <canvas id="rate" width="1100" height="180"></canvas>
       <p class="note">Green = allowed packet arrived. Red = blocked packet leaked. Amber = missing allowed sequence.</p>
+      <p class="note" id="runtimeInfo"></p>
     </div>
     <div class="panel">
       <h2>Recent Events</h2>
@@ -223,7 +259,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
   </section>
 </main>
 <script>
-const ids = ["totalAllowed","allowed","sshAllowed","drops","leaks","missing","pps","lastSeq","strip","events","error","verdict"];
+const ids = ["totalAllowed","allowed","sshAllowed","drops","leaks","missing","pps","lastSeq","demoSeen","totalSeen","strip","events","error","verdict","runtimeInfo"];
 const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 const canvas = document.getElementById("rate");
 const ctx = canvas.getContext("2d");
@@ -238,8 +274,9 @@ function drawRate(values) {
 }
 async function refresh(){
   const r=await fetch("/api/state",{cache:"no-store"}); const d=await r.json();
-  el.totalAllowed.textContent=d.allowed_total; el.allowed.textContent=d.allowed; el.sshAllowed.textContent=d.allowed_ssh; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq;
+  el.totalAllowed.textContent=d.allowed_total; el.allowed.textContent=d.allowed; el.sshAllowed.textContent=d.allowed_ssh; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq; el.demoSeen.textContent=d.demo_seen; el.totalSeen.textContent=d.total_seen;
   el.verdict.innerHTML = d.allowed_total === 0 ? "Waiting for allowed packets..." : (d.leaks === 0 ? '<span class="ok">PASS: allowed packets are arriving and blocked profiles are absent.</span>' : '<span class="fail">FAIL: a blocked packet reached PC2.</span>');
+  el.runtimeInfo.textContent = `${d.version} | sniffing: ${d.sniff_target || "starting"}`;
   el.strip.innerHTML=d.marks.slice(-60).map(m=>`<div class="mark ${m.kind}" title="${m.kind} seq ${m.seq ?? "-"}"></div>`).join("");
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("") || '<p class="note">No packets yet.</p>';
   el.error.textContent=d.sniff_error || ""; drawRate(d.rate_history);
@@ -287,17 +324,50 @@ class Handler(BaseHTTPRequestHandler):
 
 def sniff_worker(state, iface):
     try:
-        sniff(iface=iface, prn=state.record_packet, store=False)
+        sniff_ifaces = iface if iface else get_if_list()
+        state.event("INFO", f"sniffing {sniff_ifaces if iface else 'all interfaces'}")
+        state.set_sniff_target(sniff_ifaces if iface else "all interfaces")
+        sniff(iface=sniff_ifaces, prn=state.record_packet, store=False, promisc=True)
     except Exception as exc:
         state.set_error(str(exc))
 
 
+def process_pcap(path):
+    state = DemoState()
+    for pkt in PcapNgReader(path):
+        state.record_packet(pkt)
+    snapshot = state.snapshot()
+    print(f"pcap={path}")
+    print(f"total_seen={snapshot['total_seen']}")
+    print(f"demo_seen={snapshot['demo_seen']}")
+    print(f"allowed_total={snapshot['allowed_total']}")
+    print(f"ssh_allowed={snapshot['allowed_ssh']}")
+    print(f"udp_allowed={snapshot['allowed']}")
+    print(f"drop_leaks={snapshot['leaks']}")
+    print(f"last_seq={snapshot['last_seq']}")
+    print("recent_events:")
+    for event in snapshot["events"][:12]:
+        print(f"  {event['time']} {event['kind']} {event['detail']}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="PC2 browser dashboard for the simple FPGA firewall rule demo.")
-    parser.add_argument("--iface", required=True, help="Windows Ethernet interface connected to W5500 B.")
+    parser.add_argument("--iface", help="Windows Ethernet interface connected to W5500 B. Omit to sniff all interfaces.")
+    parser.add_argument("--list-ifaces", action="store_true", help="List Scapy/Npcap interface names and exit.")
+    parser.add_argument("--pcap", help="Parse a pcapng file with the same marker logic and exit.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8091)
     args = parser.parse_args()
+
+    if args.list_ifaces:
+        print("Scapy interfaces:")
+        for iface in get_if_list():
+            print(f"  {iface}")
+        return
+
+    if args.pcap:
+        process_pcap(args.pcap)
+        return
 
     state = DemoState()
     Handler.state = state
