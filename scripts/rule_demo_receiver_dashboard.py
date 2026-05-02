@@ -18,8 +18,8 @@ except ImportError:
 
 
 ALLOW_MARKER = b"FW-DEMO-ALLOW"
+ALLOW_SSH_MARKER = b"FW-DEMO-ALLOW-SSH"
 DROP_TCP_MARKER = b"FW-DEMO-DROP-TCP23"
-DROP_UDP_MARKER = b"FW-DEMO-DROP-UDP5002"
 SEQ_RE = re.compile(rb"seq=(\d+)")
 
 
@@ -36,6 +36,7 @@ class DemoState:
     def reset_unlocked(self):
         self.started_at = time.time()
         self.allowed = 0
+        self.allowed_ssh = 0
         self.leaks = 0
         self.other = 0
         self.missing = 0
@@ -69,7 +70,7 @@ class DemoState:
         now = time.time()
         with self.lock:
             payload = bytes(pkt[Raw].load) if Raw in pkt else b""
-            if UDP in pkt and pkt[UDP].dport == 5001 and ALLOW_MARKER in payload:
+            if UDP in pkt and pkt[UDP].dport == 80 and ALLOW_MARKER in payload:
                 seq = parse_seq(payload)
                 if seq is not None and self.last_seq is not None and seq > self.last_seq + 1:
                     gap = seq - self.last_seq - 1
@@ -79,18 +80,19 @@ class DemoState:
                     self.last_seq = seq
                 self.allowed += 1
                 self.last_seen = now
-                self.event("ALLOW", f"UDP/5001 seq {seq}", seq)
+                self.event("ALLOW", f"UDP/80 seq {seq}", seq)
                 self.update_rate(now)
+                return
+
+            if TCP in pkt and pkt[TCP].dport == 22 and ALLOW_SSH_MARKER in payload:
+                seq = parse_seq(payload)
+                self.allowed_ssh += 1
+                self.event("ALLOW", f"TCP/22 SSH seq {seq}", seq)
                 return
 
             if TCP in pkt and pkt[TCP].dport == 23 and DROP_TCP_MARKER in payload:
                 self.leaks += 1
                 self.event("LEAK", "TCP/23 drop packet reached PC2", parse_seq(payload))
-                return
-
-            if UDP in pkt and pkt[UDP].dport == 5002 and DROP_UDP_MARKER in payload:
-                self.leaks += 1
-                self.event("LEAK", "UDP/5002 drop packet reached PC2", parse_seq(payload))
                 return
 
             self.other += 1
@@ -104,7 +106,8 @@ class DemoState:
             elapsed = max(time.time() - self.started_at, 0.001)
             return {
                 "allowed": self.allowed,
-                "expected_drops": self.allowed * 2,
+                "allowed_ssh": self.allowed_ssh,
+                "expected_drops": self.allowed,
                 "leaks": self.leaks,
                 "missing": self.missing,
                 "other": self.other,
@@ -175,7 +178,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
 </head>
 <body>
 <header>
-  <div><h1>FPGA Firewall Rule Demo</h1><div class="sub">PC1 sends allow/drop rule packets. PC2 should receive only allowed UDP/5001 packets.</div></div>
+  <div><h1>FPGA Firewall Rule Demo</h1><div class="sub">PC1 sends known rule packets. PC2 should receive UDP/80 and SSH allow packets, with zero TCP/23 leaks.</div></div>
   <button id="reset">Restart dashboard</button>
 </header>
 <main>
@@ -187,7 +190,8 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
     <div class="node"><div class="label">PC2</div><div class="value">Allowed only</div></div>
   </section>
   <section class="metrics">
-    <div class="metric good"><div class="label">Allowed received</div><div class="value" id="allowed">0</div></div>
+    <div class="metric good"><div class="label">UDP allow received</div><div class="value" id="allowed">0</div></div>
+    <div class="metric good"><div class="label">SSH allow received</div><div class="value" id="sshAllowed">0</div></div>
     <div class="metric"><div class="label">Expected drops</div><div class="value" id="drops">0</div></div>
     <div class="metric bad"><div class="label">Drop leaks</div><div class="value" id="leaks">0</div></div>
     <div class="metric"><div class="label">Missing allow seq</div><div class="value" id="missing">0</div></div>
@@ -210,7 +214,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
   </section>
 </main>
 <script>
-const ids = ["allowed","drops","leaks","missing","pps","lastSeq","strip","events","error","verdict"];
+const ids = ["allowed","sshAllowed","drops","leaks","missing","pps","lastSeq","strip","events","error","verdict"];
 const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 const canvas = document.getElementById("rate");
 const ctx = canvas.getContext("2d");
@@ -225,7 +229,7 @@ function drawRate(values) {
 }
 async function refresh(){
   const r=await fetch("/api/state",{cache:"no-store"}); const d=await r.json();
-  el.allowed.textContent=d.allowed; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq;
+  el.allowed.textContent=d.allowed; el.sshAllowed.textContent=d.allowed_ssh; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq;
   el.verdict.innerHTML = d.allowed === 0 ? "Waiting for allowed packets..." : (d.leaks === 0 ? '<span class="ok">PASS: allowed packets are arriving and blocked profiles are absent.</span>' : '<span class="fail">FAIL: a blocked packet reached PC2.</span>');
   el.strip.innerHTML=d.marks.slice(-60).map(m=>`<div class="mark ${m.kind}" title="${m.kind} seq ${m.seq ?? "-"}"></div>`).join("");
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("") || '<p class="note">No packets yet.</p>';

@@ -188,7 +188,7 @@ For the simplest continuous rule demo, run this first:
 sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
 ```
 
-This sends one allowed UDP/5001 packet plus TCP/23 and UDP/5002 blocked decoys every cycle.
+This sends known-good deterministic rule profiles every cycle: UDP/80 allow, TCP/22 SSH allow, and TCP/23 drop.
 
 For the continuous live demo, run:
 
