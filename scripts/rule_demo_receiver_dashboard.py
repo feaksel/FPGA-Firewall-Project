@@ -37,6 +37,7 @@ class DemoState:
         self.started_at = time.time()
         self.allowed = 0
         self.allowed_ssh = 0
+        self.allowed_total = 0
         self.leaks = 0
         self.other = 0
         self.missing = 0
@@ -60,10 +61,10 @@ class DemoState:
 
     def update_rate(self, now):
         if now - self.last_rate_time >= 0.5:
-            delta = self.allowed - self.last_rate_allowed
+            delta = self.allowed_total - self.last_rate_allowed
             elapsed = max(now - self.last_rate_time, 0.001)
             self.rate_history.append(delta / elapsed)
-            self.last_rate_allowed = self.allowed
+            self.last_rate_allowed = self.allowed_total
             self.last_rate_time = now
 
     def record_packet(self, pkt):
@@ -79,6 +80,7 @@ class DemoState:
                 if seq is not None:
                     self.last_seq = seq
                 self.allowed += 1
+                self.allowed_total += 1
                 self.last_seen = now
                 self.event("ALLOW", f"UDP/80 seq {seq}", seq)
                 self.update_rate(now)
@@ -87,7 +89,12 @@ class DemoState:
             if TCP in pkt and pkt[TCP].dport == 22 and ALLOW_SSH_MARKER in payload:
                 seq = parse_seq(payload)
                 self.allowed_ssh += 1
+                self.allowed_total += 1
+                self.last_seen = now
+                if seq is not None:
+                    self.last_seq = seq
                 self.event("ALLOW", f"TCP/22 SSH seq {seq}", seq)
+                self.update_rate(now)
                 return
 
             if TCP in pkt and pkt[TCP].dport == 23 and DROP_TCP_MARKER in payload:
@@ -107,12 +114,13 @@ class DemoState:
             return {
                 "allowed": self.allowed,
                 "allowed_ssh": self.allowed_ssh,
-                "expected_drops": self.allowed,
+                "allowed_total": self.allowed_total,
+                "expected_drops": max(self.allowed, self.allowed_ssh),
                 "leaks": self.leaks,
                 "missing": self.missing,
                 "other": self.other,
                 "last_seq": "-" if self.last_seq is None else self.last_seq,
-                "packets_per_second": self.allowed / elapsed,
+                "packets_per_second": self.allowed_total / elapsed,
                 "last_age": None if self.last_seen is None else time.time() - self.last_seen,
                 "rate_history": list(self.rate_history),
                 "marks": list(self.marks),
@@ -178,7 +186,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
 </head>
 <body>
 <header>
-  <div><h1>FPGA Firewall Rule Demo</h1><div class="sub">PC1 sends known rule packets. PC2 should receive UDP/80 and SSH allow packets, with zero TCP/23 leaks.</div></div>
+  <div><h1>FPGA Firewall Rule Demo</h1><div class="sub">PC1 sends known rule packets. PC2 should receive SSH allow packets, with zero TCP/23 leaks.</div></div>
   <button id="reset">Restart dashboard</button>
 </header>
 <main>
@@ -190,8 +198,9 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
     <div class="node"><div class="label">PC2</div><div class="value">Allowed only</div></div>
   </section>
   <section class="metrics">
-    <div class="metric good"><div class="label">UDP allow received</div><div class="value" id="allowed">0</div></div>
+    <div class="metric good"><div class="label">Total allowed</div><div class="value" id="totalAllowed">0</div></div>
     <div class="metric good"><div class="label">SSH allow received</div><div class="value" id="sshAllowed">0</div></div>
+    <div class="metric"><div class="label">UDP allow received</div><div class="value" id="allowed">0</div></div>
     <div class="metric"><div class="label">Expected drops</div><div class="value" id="drops">0</div></div>
     <div class="metric bad"><div class="label">Drop leaks</div><div class="value" id="leaks">0</div></div>
     <div class="metric"><div class="label">Missing allow seq</div><div class="value" id="missing">0</div></div>
@@ -214,7 +223,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
   </section>
 </main>
 <script>
-const ids = ["allowed","sshAllowed","drops","leaks","missing","pps","lastSeq","strip","events","error","verdict"];
+const ids = ["totalAllowed","allowed","sshAllowed","drops","leaks","missing","pps","lastSeq","strip","events","error","verdict"];
 const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 const canvas = document.getElementById("rate");
 const ctx = canvas.getContext("2d");
@@ -229,8 +238,8 @@ function drawRate(values) {
 }
 async function refresh(){
   const r=await fetch("/api/state",{cache:"no-store"}); const d=await r.json();
-  el.allowed.textContent=d.allowed; el.sshAllowed.textContent=d.allowed_ssh; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq;
-  el.verdict.innerHTML = d.allowed === 0 ? "Waiting for allowed packets..." : (d.leaks === 0 ? '<span class="ok">PASS: allowed packets are arriving and blocked profiles are absent.</span>' : '<span class="fail">FAIL: a blocked packet reached PC2.</span>');
+  el.totalAllowed.textContent=d.allowed_total; el.allowed.textContent=d.allowed; el.sshAllowed.textContent=d.allowed_ssh; el.drops.textContent=d.expected_drops; el.leaks.textContent=d.leaks; el.missing.textContent=d.missing; el.pps.textContent=d.packets_per_second.toFixed(1); el.lastSeq.textContent=d.last_seq;
+  el.verdict.innerHTML = d.allowed_total === 0 ? "Waiting for allowed packets..." : (d.leaks === 0 ? '<span class="ok">PASS: allowed packets are arriving and blocked profiles are absent.</span>' : '<span class="fail">FAIL: a blocked packet reached PC2.</span>');
   el.strip.innerHTML=d.marks.slice(-60).map(m=>`<div class="mark ${m.kind}" title="${m.kind} seq ${m.seq ?? "-"}"></div>`).join("");
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("") || '<p class="note">No packets yet.</p>';
   el.error.textContent=d.sniff_error || ""; drawRate(d.rate_history);

@@ -142,11 +142,16 @@ sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
 ```
 
 Expected result:
-- `UDP allow received` increases because UDP destination port `80` is forwarded.
 - `SSH allow received` increases because TCP destination port `22` from `10.1.2.3` is forwarded.
 - `Expected drops` increases because each cycle includes a TCP/23 blocked decoy.
 - `Drop leaks` stays `0`.
 - FPGA `SW[3:1]=001` RX count, `010` allow count, `011` drop count should increase while the sender runs.
+
+Add `--udp-allow` to the sender if you also want to test the UDP/80 allow profile:
+
+```bash
+sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2 --udp-allow
+```
 
 If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W5500 A. Recheck that PC1 is sending on the Mac Ethernet interface connected to W5500 A, `SW0` is high/start-init, `LEDR0=1`, and `LEDR1=0`.
 

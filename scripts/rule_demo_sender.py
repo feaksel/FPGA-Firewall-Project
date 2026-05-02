@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--rate", type=float, default=2.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
     parser.add_argument("--list-ifaces", action="store_true", help="List Scapy interface names and exit.")
     parser.add_argument("--verbose-each", action="store_true", help="Print one line per send cycle instead of updating one status line.")
-    parser.add_argument("--no-ssh-allow", action="store_true", help="Do not send TCP/22 SSH allow packets.")
+    parser.add_argument("--udp-allow", action="store_true", help="Also send the UDP/80 allow profile. SSH allow is the default primary profile.")
     parser.add_argument("--no-tcp-drop", action="store_true", help="Do not send TCP/23 drop decoys.")
     args = parser.parse_args()
 
@@ -74,17 +74,17 @@ def main():
 
     print("FPGA firewall rule demo sender")
     print(f"iface={args.iface} rate={args.rate:g} cycles/sec")
-    print("Cycle: UDP/80 allow, TCP/22 SSH allow, TCP/23 drop")
+    print("Cycle: TCP/22 SSH allow, TCP/23 drop" + (", UDP/80 allow" if args.udp_allow else ""))
     print("Stop with Ctrl+C.")
 
     try:
         for seq in itertools.count():
-            sendp(allowed_udp(seq), iface=args.iface, verbose=False)
-            sent_allow_udp += 1
+            sendp(allowed_ssh(seq), iface=args.iface, verbose=False)
+            sent_allow_ssh += 1
 
-            if not args.no_ssh_allow:
-                sendp(allowed_ssh(seq), iface=args.iface, verbose=False)
-                sent_allow_ssh += 1
+            if args.udp_allow:
+                sendp(allowed_udp(seq), iface=args.iface, verbose=False)
+                sent_allow_udp += 1
 
             if not args.no_tcp_drop:
                 sendp(dropped_tcp(seq), iface=args.iface, verbose=False)

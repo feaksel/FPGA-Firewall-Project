@@ -188,7 +188,7 @@ For the simplest continuous rule demo, run this first:
 sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
 ```
 
-This sends known-good deterministic rule profiles every cycle: UDP/80 allow, TCP/22 SSH allow, and TCP/23 drop.
+This sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. Add `--udp-allow` if you also want to test the UDP/80 allow profile.
 
 For the continuous live demo, run:
 
@@ -230,7 +230,7 @@ Then open:
 http://127.0.0.1:8091
 ```
 
-Expected result: allowed packets increase, expected drops increase, and `Drop leaks` stays `0`.
+Expected result: `Total allowed` and `SSH allow received` increase, expected drops increase, and `Drop leaks` stays `0`.
 
 If `SW[3:1]=001` is stuck, set `SW5=1` while keeping `SW[3:1]=001`. That page then shows raw W5500 A ingress-drain count instead of firewall RX count. If it increases, ingress wiring/sending works and the downstream forwarding/TX path is the problem. Set `SW5=0` for normal firewall behavior.
 
