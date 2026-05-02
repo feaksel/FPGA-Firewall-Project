@@ -113,6 +113,42 @@ The video version is chunked file transfer, not live streaming. The intentionall
 
 For the live presentation, use the continuous sine-wave demo before or beside the file-transfer proof.
 
+## Phase F0: Simple continuous rule demo
+
+Use this demo first when hardware bring-up feels confusing. It avoids waveform/state complexity and only proves packet forwarding plus rule enforcement.
+
+Topology:
+
+```text
+PC1 rule sender -> W5500 A -> FPGA allow/drop -> W5500 B -> PC2 rule dashboard
+```
+
+Start PC2 first:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
+```
+
+Open:
+
+```text
+http://127.0.0.1:8091
+```
+
+Start PC1:
+
+```bash
+sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
+```
+
+Expected result:
+- `Allowed received` increases because UDP destination port `5001` is forwarded.
+- `Expected drops` increases because each cycle includes TCP/23 and UDP/5002 blocked decoys.
+- `Drop leaks` stays `0`.
+- FPGA `SW[3:1]=001` RX count, `010` allow count, `011` drop count should increase while the sender runs.
+
+If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W5500 A. Recheck that PC1 is sending on the Mac Ethernet interface connected to W5500 A, `SW0` is high/start-init, `LEDR0=1`, and `LEDR1=0`.
+
 Topology:
 
 ```text

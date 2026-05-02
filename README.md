@@ -182,6 +182,14 @@ Use the interface name that matches the wired Ethernet adapter. In the examples 
 
 Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
 
+For the simplest continuous rule demo, run this first:
+
+```bash
+sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
+```
+
+This sends one allowed UDP/5001 packet plus TCP/23 and UDP/5002 blocked decoys every cycle.
+
 For the continuous live demo, run:
 
 ```powershell
@@ -209,6 +217,20 @@ What PC1 does:
 ### PC2: receiver side
 
 Connect W5500 B, the FPGA egress module, to PC2 Ethernet.
+
+For the simplest continuous rule demo, start this browser receiver before PC1 starts sending:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8091
+```
+
+Expected result: allowed packets increase, expected drops increase, and `Drop leaks` stays `0`.
 
 For the continuous live demo, start the browser receiver before PC1 starts sending:
 
