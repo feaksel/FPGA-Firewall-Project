@@ -150,6 +150,8 @@ Expected result:
 
 If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W5500 A. Recheck that PC1 is sending on the Mac Ethernet interface connected to W5500 A, `SW0` is high/start-init, `LEDR0=1`, and `LEDR1=0`.
 
+Hardware debug shortcut: set `SW5=1` and `SW[3:1]=001`. In this mode, `HEX3..HEX0` shows a raw W5500 A ingress-drain count, independent of the firewall forwarder and W5500 B TX path. If this raw count increases, PC1 -> W5500 A is alive and the issue is downstream. Set `SW5=0` for normal firewall forwarding/counting.
+
 Topology:
 
 ```text

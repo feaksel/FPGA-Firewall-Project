@@ -28,6 +28,8 @@ module de1_soc_w5500_top (
     wire spi_b_cs_n;
     wire uart_tx;
     wire [31:0] rx_count;
+    reg  [31:0] raw_rx_count;
+    wire [31:0] display_rx_count;
     wire [31:0] allow_count;
     wire [31:0] drop_count;
     wire init_done_a;
@@ -49,6 +51,8 @@ module de1_soc_w5500_top (
     wire        rx_frame_eop;
     wire [0:0]  rx_frame_src_port;
     wire        rx_frame_ready;
+    wire        forwarder_in_ready;
+    wire        rx_drain_debug;
     wire        tx_frame_valid;
     wire [7:0]  tx_frame_data;
     wire        tx_frame_sop;
@@ -90,6 +94,9 @@ module de1_soc_w5500_top (
     assign spi_a_miso     = GPIO_0[4];
     assign spi_b_miso     = GPIO_1[4];
     assign debug_page     = SW[3:1];
+    assign rx_drain_debug = SW[5];
+    assign rx_frame_ready = rx_drain_debug ? 1'b1 : forwarder_in_ready;
+    assign display_rx_count = rx_drain_debug ? raw_rx_count : rx_count;
     assign init_done      = init_done_a && init_done_b;
     assign init_error     = init_error_a || init_error_b || tx_error_b;
 
@@ -132,10 +139,10 @@ module de1_soc_w5500_top (
                 hex0_value = {forwarder_overflow, init_error, init_done, rx_packet_seen_a};
             end
             3'b001: begin
-                hex3_value = rx_count[15:12];
-                hex2_value = rx_count[11:8];
-                hex1_value = rx_count[7:4];
-                hex0_value = rx_count[3:0];
+                hex3_value = display_rx_count[15:12];
+                hex2_value = display_rx_count[11:8];
+                hex1_value = display_rx_count[7:4];
+                hex0_value = display_rx_count[3:0];
             end
             3'b010: begin
                 hex3_value = allow_count[15:12];
@@ -165,6 +172,14 @@ module de1_soc_w5500_top (
                 hex_blank = 1'b1;
             end
         endcase
+    end
+
+    always @(posedge CLOCK_50 or negedge rst_n) begin
+        if (!rst_n) begin
+            raw_rx_count <= 32'd0;
+        end else if (rx_frame_valid && rx_frame_ready && rx_frame_eop) begin
+            raw_rx_count <= raw_rx_count + 32'd1;
+        end
     end
 
     seven_seg_hex u_hex0 (
@@ -241,12 +256,12 @@ module de1_soc_w5500_top (
     ) u_firewall_forwarder (
         .clk(CLOCK_50),
         .rst_n(rst_n),
-        .in_valid(rx_frame_valid),
+        .in_valid(rx_drain_debug ? 1'b0 : rx_frame_valid),
         .in_data(rx_frame_data),
         .in_sop(rx_frame_sop),
         .in_eop(rx_frame_eop),
         .in_src_port(rx_frame_src_port),
-        .in_ready(rx_frame_ready),
+        .in_ready(forwarder_in_ready),
         .out_valid(tx_frame_valid),
         .out_data(tx_frame_data),
         .out_sop(tx_frame_sop),

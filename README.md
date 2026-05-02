@@ -232,6 +232,8 @@ http://127.0.0.1:8091
 
 Expected result: allowed packets increase, expected drops increase, and `Drop leaks` stays `0`.
 
+If `SW[3:1]=001` is stuck, set `SW5=1` while keeping `SW[3:1]=001`. That page then shows raw W5500 A ingress-drain count instead of firewall RX count. If it increases, ingress wiring/sending works and the downstream forwarding/TX path is the problem. Set `SW5=0` for normal firewall behavior.
+
 For the continuous live demo, start the browser receiver before PC1 starts sending:
 
 ```powershell
