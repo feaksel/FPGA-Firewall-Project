@@ -17,20 +17,36 @@ except ImportError:
     sys.exit(1)
 
 
-MAGIC = b"FWSINE1\0"
-HEADER_LEN = len(MAGIC) + 4 + 2 + 2 + 2
+MAGIC_V1 = b"FWSINE1\0"
+MAGIC_V2 = b"FWSINE2\0"
+HEADER_V1_LEN = len(MAGIC_V1) + 4 + 2 + 2 + 2
+HEADER_V2_LEN = len(MAGIC_V2) + 4 + 4 + 2 + 2 + 2
 DEFAULT_FILE_PORT = 5001
 
 
 def parse_sine_payload(payload):
-    if len(payload) < HEADER_LEN or not payload.startswith(MAGIC):
+    if payload.startswith(MAGIC_V2):
+        if len(payload) < HEADER_V2_LEN:
+            return None
+        run_id, seq, sample_rate, sine_hz, sample_count = struct.unpack(
+            "!IIHHH", payload[len(MAGIC_V2):HEADER_V2_LEN]
+        )
+        header_len = HEADER_V2_LEN
+    elif payload.startswith(MAGIC_V1):
+        if len(payload) < HEADER_V1_LEN:
+            return None
+        seq, sample_rate, sine_hz, sample_count = struct.unpack("!IHHH", payload[len(MAGIC_V1):HEADER_V1_LEN])
+        run_id = 0
+        header_len = HEADER_V1_LEN
+    else:
         return None
-    seq, sample_rate, sine_hz, sample_count = struct.unpack("!IHHH", payload[len(MAGIC):HEADER_LEN])
-    expected_len = HEADER_LEN + sample_count * 2
+
+    expected_len = header_len + sample_count * 2
     if len(payload) < expected_len:
         return None
-    samples = struct.unpack("!" + "h" * sample_count, payload[HEADER_LEN:expected_len])
+    samples = struct.unpack("!" + "h" * sample_count, payload[header_len:expected_len])
     return {
+        "run_id": run_id,
         "seq": seq,
         "sample_rate": sample_rate,
         "sine_hz": sine_hz,
@@ -56,6 +72,8 @@ class SineState:
         self.decoy_leaks = 0
         self.other_packets = 0
         self.missing_packets = 0
+        self.ignored_packets = 0
+        self.run_id = None
         self.last_seq = None
         self.last_seen = None
         self.sample_rate = 0
@@ -63,6 +81,21 @@ class SineState:
         self.sniff_error = ""
         self.last_rate_time = time.time()
         self.last_rate_packets = 0
+
+    def reset_stream_unlocked(self, now, run_id, reason):
+        self.started_at = now
+        self.samples.clear()
+        self.packet_marks.clear()
+        self.rate_history.clear()
+        self.allowed_packets = 0
+        self.expected_drops = 0
+        self.missing_packets = 0
+        self.last_seq = None
+        self.last_seen = None
+        self.last_rate_time = now
+        self.last_rate_packets = 0
+        self.run_id = run_id
+        self.events.appendleft({"time": now, "kind": "SYNC", "detail": reason})
 
     def reset(self):
         with self.lock:
@@ -78,6 +111,19 @@ class SineState:
                     return
 
                 seq = parsed["seq"]
+                run_id = parsed["run_id"]
+                if self.run_id is None:
+                    self.run_id = run_id
+                    self.events.appendleft({"time": now, "kind": "SYNC", "detail": f"run 0x{run_id:08x}"})
+                elif run_id != self.run_id:
+                    self.reset_stream_unlocked(now, run_id, f"new run 0x{run_id:08x}")
+
+                if self.last_seq is not None and seq <= self.last_seq:
+                    self.ignored_packets += 1
+                    self.packet_marks.append({"kind": "old", "seq": seq, "time": now})
+                    self.events.appendleft({"time": now, "kind": "OLD", "detail": f"ignored seq {seq} after {self.last_seq}"})
+                    return
+
                 if self.last_seq is not None and seq > self.last_seq + 1:
                     missing = seq - self.last_seq - 1
                     self.missing_packets += missing
@@ -136,6 +182,8 @@ class SineState:
                 "decoy_leaks": self.decoy_leaks,
                 "other_packets": self.other_packets,
                 "missing_packets": self.missing_packets,
+                "ignored_packets": self.ignored_packets,
+                "run_id": "-" if self.run_id is None else f"0x{self.run_id:08x}",
                 "last_seq": self.last_seq if self.last_seq is not None else "-",
                 "last_age": last_age,
                 "packets_per_second": self.allowed_packets / elapsed,
@@ -183,7 +231,7 @@ h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: 0; }
 button { border: 1px solid #b7c4d4; background: #fff; color: var(--ink); border-radius: 7px; min-height: 36px; padding: 0 12px; font-weight: 650; cursor: pointer; }
 button:hover { border-color: var(--blue); color: var(--blue); }
 main { padding: 18px 22px 28px; display: grid; gap: 14px; }
-.metrics { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; }
+.metrics { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 12px; }
 .metric, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .metric { padding: 13px 15px; }
 .metric .label { color: var(--muted); font-size: 12px; text-transform: uppercase; }
@@ -212,6 +260,7 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
 .packet.drop { background: var(--red); opacity: 0.35; border-color: var(--red); }
 .packet.leak { background: var(--red); box-shadow: 0 0 0 2px rgba(189, 58, 50, 0.25); }
 .packet.miss { background: var(--amber); }
+.packet.old { background: #7f8da1; opacity: 0.55; }
 .decision-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; }
 .decision-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: #d8e0ea; }
 .decision-legend .allow-key::before { background: var(--green); }
@@ -266,6 +315,8 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
     <div class="metric"><div class="label">Missing seq</div><div class="value" id="missing">0</div></div>
     <div class="metric"><div class="label">Packets/sec</div><div class="value" id="pps">0</div></div>
     <div class="metric"><div class="label">Last seq</div><div class="value" id="lastSeq">-</div></div>
+    <div class="metric"><div class="label">Run ID</div><div class="value" id="runId">-</div></div>
+    <div class="metric"><div class="label">Ignored old</div><div class="value" id="ignored">0</div></div>
   </section>
   <section class="grid">
     <div class="panel">
@@ -295,6 +346,8 @@ const fields = {
   missing: document.getElementById("missing"),
   pps: document.getElementById("pps"),
   lastSeq: document.getElementById("lastSeq"),
+  runId: document.getElementById("runId"),
+  ignored: document.getElementById("ignored"),
   events: document.getElementById("events"),
   status: document.getElementById("statusLine"),
   error: document.getElementById("error"),
@@ -384,6 +437,8 @@ async function refresh() {
   fields.missing.textContent = data.missing_packets;
   fields.pps.textContent = data.packets_per_second.toFixed(1);
   fields.lastSeq.textContent = data.last_seq;
+  fields.runId.textContent = data.run_id;
+  fields.ignored.textContent = data.ignored_packets;
   fields.status.textContent = data.sample_rate ? `${data.sine_hz} Hz sine, sample rate ${data.sample_rate} Hz` : "Waiting for packets...";
   fields.error.textContent = data.sniff_error || "";
   fields.events.innerHTML = data.events.map(ev => {

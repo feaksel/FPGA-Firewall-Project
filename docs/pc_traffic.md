@@ -137,6 +137,8 @@ Start PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
+The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `8` samples per packet, and `5` allowed packets/sec. Each sender start also creates a new run ID, which lets the dashboard distinguish a fresh demo take from old or restarted packet streams.
+
 Expected result:
 - PC2 shows a continuously moving sine wave,
 - allowed packet count increases,
@@ -149,6 +151,12 @@ The **Restart dashboard** button clears the PC2-side view without restarting the
 
 If the button is not visible, stop and restart the dashboard script once. The page is embedded in the running Python process, so browser refresh alone cannot load code changes made after the process started.
 
+For the cleanest take, stop all old PC1 sender processes before starting a new one. On macOS/Linux:
+
+```bash
+pkill -f sine_sender.py
+```
+
 The sender continuously interleaves blocked decoys:
 - TCP destination port `23`
 - UDP destination port `5002`
@@ -158,8 +166,10 @@ The allowed stream uses UDP destination port `5001`, matching the file-transfer 
 If the sine wave is too dense or too slow, tune PC1:
 
 ```powershell
-py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 2 --packets-per-second 10
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 1 --packets-per-second 3 --samples-per-packet 8
 ```
+
+Increase `--packets-per-second` gradually after the stable case works. Large packets or high packet rates can overrun the current demo because the FPGA W5500 TX adapter still writes TX payload bytes one SPI transaction at a time.
 
 If the expected-drop markers do not line up, use the same `--decoy-every` value on both sides:
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import math
+import random
 import struct
 import sys
 import time
@@ -12,7 +13,7 @@ except ImportError:
     sys.exit(1)
 
 
-MAGIC = b"FWSINE1\0"
+MAGIC = b"FWSINE2\0"
 DEFAULT_SRC_MAC = "00:11:22:33:44:55"
 DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
 DEFAULT_SRC_IP = "192.168.50.10"
@@ -20,14 +21,14 @@ DEFAULT_DST_IP = "192.168.50.20"
 DEFAULT_FILE_PORT = 5001
 
 
-def build_sine_payload(seq, sample_rate, sine_hz, samples_per_packet, phase):
+def build_sine_payload(run_id, seq, sample_rate, sine_hz, samples_per_packet, phase):
     samples = []
     for idx in range(samples_per_packet):
         t = phase + idx / sample_rate
         value = int(28000 * math.sin(2.0 * math.pi * sine_hz * t))
         samples.append(value)
     next_phase = phase + samples_per_packet / sample_rate
-    header = MAGIC + struct.pack("!IHHH", seq, sample_rate, sine_hz, samples_per_packet)
+    header = MAGIC + struct.pack("!IIHHH", run_id, seq, sample_rate, sine_hz, samples_per_packet)
     body = struct.pack("!" + "h" * samples_per_packet, *samples)
     return header + body, next_phase
 
@@ -69,24 +70,33 @@ def main():
     parser.add_argument("--src-port", type=int, default=40000)
     parser.add_argument("--port", type=int, default=DEFAULT_FILE_PORT, help="Allowed UDP destination port.")
     parser.add_argument("--decoy-port", type=int, default=5002)
-    parser.add_argument("--sample-rate", type=int, default=1000)
-    parser.add_argument("--sine-hz", type=int, default=3)
-    parser.add_argument("--samples-per-packet", type=int, default=32)
-    parser.add_argument("--packets-per-second", type=float, default=20.0)
+    parser.add_argument("--sample-rate", type=int, default=200)
+    parser.add_argument("--sine-hz", type=int, default=1)
+    parser.add_argument("--samples-per-packet", type=int, default=8)
+    parser.add_argument("--packets-per-second", type=float, default=5.0)
     parser.add_argument("--decoy-every", type=int, default=4, help="Send one blocked decoy every N allowed packets; 0 disables decoys.")
     parser.add_argument("--decoy-mode", choices=["tcp", "udp", "mixed"], default="tcp", help="Blocked decoy profile to interleave.")
+    parser.add_argument("--run-id", type=lambda value: int(value, 0), default=None, help="Optional 32-bit stream ID; default is random per run.")
     args = parser.parse_args()
 
+    if args.packets_per_second <= 0:
+        parser.error("--packets-per-second must be greater than 0")
+    if args.samples_per_packet <= 0:
+        parser.error("--samples-per-packet must be greater than 0")
+
     interval = 1.0 / args.packets_per_second
+    run_id = args.run_id if args.run_id is not None else random.getrandbits(32)
+    run_id &= 0xFFFFFFFF
     seq = 0
     phase = 0.0
     print(f"Streaming sine wave on {args.iface}: {args.sine_hz} Hz, UDP dst port {args.port}")
     print(f"Allowed packets/sec={args.packets_per_second:g}, samples/packet={args.samples_per_packet}")
+    print(f"Run ID=0x{run_id:08x}")
     print("Stop with Ctrl+C.")
 
     try:
         while True:
-            payload, phase = build_sine_payload(seq, args.sample_rate, args.sine_hz, args.samples_per_packet, phase)
+            payload, phase = build_sine_payload(run_id, seq, args.sample_rate, args.sine_hz, args.samples_per_packet, phase)
             sendp(build_allowed_packet(args, payload), iface=args.iface, verbose=False)
 
             if args.decoy_every > 0 and seq % args.decoy_every == 0:

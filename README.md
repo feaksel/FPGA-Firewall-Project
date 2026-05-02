@@ -190,8 +190,9 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 
 This continuously sends:
 - allowed sine-wave packets on UDP destination port `5001`,
-- blocked decoy packets on TCP port `23` and UDP port `5002`.
-- a slow default waveform, so the receiver graph is readable during a live demo.
+- blocked decoy packets on TCP port `23` by default,
+- a per-run stream ID so dashboard restarts and old packets do not look like real loss,
+- a small default packet shape (`5` packets/sec, `8` samples/packet, `1 Hz`) that is steadier on the current byte-at-a-time W5500 TX path.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
 
@@ -228,6 +229,7 @@ The dashboard shows:
 - expected drop count,
 - missing sequence count,
 - packets per second,
+- run ID and ignored stale packet count,
 - decoy leak count.
 
 The expected result is a moving sine wave, green allowed packet marks, faded red expected-drop marks, and `Leaks = 0`.
@@ -235,6 +237,8 @@ The expected result is a moving sine wave, green allowed packet marks, faded red
 Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, event log, and rate graph without restarting the receiver process.
 
 If the button is not visible, stop and restart `sine_receiver_dashboard.py` once. The dashboard HTML is embedded in the Python process, so an already-running dashboard will keep serving the old page until the process restarts.
+
+Before a clean demo take, stop old sender processes on PC1 and start only one new sender. Mixed sender runs are now ignored by run ID where possible, but a single sender gives the cleanest waveform and packet strip.
 
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
