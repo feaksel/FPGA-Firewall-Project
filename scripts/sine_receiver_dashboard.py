@@ -38,8 +38,11 @@ def parse_sine_payload(payload):
         seq, sample_rate, sine_hz, sample_count = struct.unpack("!IHHH", payload[len(MAGIC_V1):HEADER_V1_LEN])
         run_id = 0
         header_len = HEADER_V1_LEN
+        legacy = True
     else:
         return None
+    if payload.startswith(MAGIC_V2):
+        legacy = False
 
     expected_len = header_len + sample_count * 2
     if len(payload) < expected_len:
@@ -47,6 +50,7 @@ def parse_sine_payload(payload):
     samples = struct.unpack("!" + "h" * sample_count, payload[header_len:expected_len])
     return {
         "run_id": run_id,
+        "legacy": legacy,
         "seq": seq,
         "sample_rate": sample_rate,
         "sine_hz": sine_hz,
@@ -55,9 +59,11 @@ def parse_sine_payload(payload):
 
 
 class SineState:
-    def __init__(self, file_port, decoy_every):
+    def __init__(self, file_port, decoy_every, run_switch_idle_sec, accept_legacy):
         self.file_port = file_port
         self.decoy_every = decoy_every
+        self.run_switch_idle_sec = run_switch_idle_sec
+        self.accept_legacy = accept_legacy
         self.lock = threading.Lock()
         self.reset_unlocked()
 
@@ -109,6 +115,11 @@ class SineState:
                 if parsed is None:
                     self.other_packets += 1
                     return
+                if parsed["legacy"] and not self.accept_legacy:
+                    self.ignored_packets += 1
+                    self.packet_marks.append({"kind": "old", "seq": None, "time": now})
+                    self.events.appendleft({"time": now, "kind": "OLD", "detail": "ignored legacy FWSINE1 packet"})
+                    return
 
                 seq = parsed["seq"]
                 run_id = parsed["run_id"]
@@ -116,6 +127,17 @@ class SineState:
                     self.run_id = run_id
                     self.events.appendleft({"time": now, "kind": "SYNC", "detail": f"run 0x{run_id:08x}"})
                 elif run_id != self.run_id:
+                    active_age = None if self.last_seen is None else now - self.last_seen
+                    can_switch = self.run_switch_idle_sec > 0 and active_age is not None and active_age >= self.run_switch_idle_sec
+                    if not can_switch:
+                        self.ignored_packets += 1
+                        self.packet_marks.append({"kind": "old", "seq": seq, "time": now})
+                        self.events.appendleft({
+                            "time": now,
+                            "kind": "OLD",
+                            "detail": f"ignored run 0x{run_id:08x} while 0x{self.run_id:08x} is active",
+                        })
+                        return
                     self.reset_stream_unlocked(now, run_id, f"new run 0x{run_id:08x}")
 
                 if self.last_seq is not None and seq <= self.last_seq:
@@ -508,11 +530,13 @@ def main():
     parser.add_argument("--iface", required=True, help="Scapy interface connected to W5500 B / FPGA egress.")
     parser.add_argument("--file-port", type=int, default=DEFAULT_FILE_PORT)
     parser.add_argument("--decoy-every", type=int, default=4, help="Sender decoy cadence used to draw expected drop markers.")
+    parser.add_argument("--run-switch-idle-sec", type=float, default=0.0, help="Switch to a different run ID only after this many idle seconds; 0 disables auto-switch.")
+    parser.add_argument("--accept-legacy", action="store_true", help="Accept older FWSINE1 packets that do not carry a run ID.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8090)
     args = parser.parse_args()
 
-    state = SineState(args.file_port, args.decoy_every)
+    state = SineState(args.file_port, args.decoy_every, args.run_switch_idle_sec, args.accept_legacy)
     Handler.state = state
     thread = threading.Thread(target=sniff_worker, args=(state, args.iface), daemon=True)
     thread.start()

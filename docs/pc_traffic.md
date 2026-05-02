@@ -137,7 +137,7 @@ Start PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
-The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `8` samples per packet, and `5` allowed packets/sec. Each sender start also creates a new run ID, which lets the dashboard distinguish a fresh demo take from old or restarted packet streams.
+The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. Each sender start also creates a new run ID, which lets the dashboard distinguish a fresh demo take from old or restarted packet streams.
 
 Expected result:
 - PC2 shows a continuously moving sine wave,
@@ -147,7 +147,7 @@ Expected result:
 - missing sequence count stays low,
 - leak count stays `0`.
 
-The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings.
+The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings. By default the dashboard locks onto the first `FWSINE2` run it sees and ignores older `FWSINE1` packets or packets from a different run ID. This prevents mixed sender processes from repeatedly resetting the waveform.
 
 If the button is not visible, stop and restart the dashboard script once. The page is embedded in the running Python process, so browser refresh alone cannot load code changes made after the process started.
 
@@ -166,10 +166,12 @@ The allowed stream uses UDP destination port `5001`, matching the file-transfer 
 If the sine wave is too dense or too slow, tune PC1:
 
 ```powershell
-py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 1 --packets-per-second 3 --samples-per-packet 8
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 1 --packets-per-second 3 --samples-per-packet 16
 ```
 
 Increase `--packets-per-second` gradually after the stable case works. Large packets or high packet rates can overrun the current demo because the FPGA W5500 TX adapter still writes TX payload bytes one SPI transaction at a time.
+
+For presentation, keep one sender process active. `20` packets/sec is useful as a stress test, but it is not the best visual demo until the FPGA W5500 TX path supports burst writes. Use `3` to `5` packets/sec for the clean visual demo, then show higher rates separately as a throughput/bottleneck discussion.
 
 If the expected-drop markers do not line up, use the same `--decoy-every` value on both sides:
 

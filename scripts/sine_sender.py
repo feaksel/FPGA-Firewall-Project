@@ -72,7 +72,7 @@ def main():
     parser.add_argument("--decoy-port", type=int, default=5002)
     parser.add_argument("--sample-rate", type=int, default=200)
     parser.add_argument("--sine-hz", type=int, default=1)
-    parser.add_argument("--samples-per-packet", type=int, default=8)
+    parser.add_argument("--samples-per-packet", type=int, default=16)
     parser.add_argument("--packets-per-second", type=float, default=5.0)
     parser.add_argument("--decoy-every", type=int, default=4, help="Send one blocked decoy every N allowed packets; 0 disables decoys.")
     parser.add_argument("--decoy-mode", choices=["tcp", "udp", "mixed"], default="tcp", help="Blocked decoy profile to interleave.")
@@ -97,8 +97,8 @@ def main():
     try:
         while True:
             payload, phase = build_sine_payload(run_id, seq, args.sample_rate, args.sine_hz, args.samples_per_packet, phase)
-            sendp(build_allowed_packet(args, payload), iface=args.iface, verbose=False)
 
+            sendp(build_allowed_packet(args, payload), iface=args.iface, verbose=False)
             if args.decoy_every > 0 and seq % args.decoy_every == 0:
                 sendp(build_decoy_packet(args, seq), iface=args.iface, verbose=False)
 
