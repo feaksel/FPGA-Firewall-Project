@@ -151,8 +151,8 @@ module w5500_tx_model #(
                         spi_out_shift = read_byte(trans_addr, received_byte);
                     end
 
-                    3: begin
-                        write_byte(trans_addr, trans_ctrl, received_byte);
+                    default: begin
+                        write_byte(trans_addr + (byte_idx - 3), trans_ctrl, received_byte);
                         spi_out_shift = 8'h00;
                     end
                 endcase

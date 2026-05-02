@@ -44,7 +44,8 @@
 - [x] Extend the dashboard with a two-port file-demo preview panel
 - [ ] Make `firewall_forwarder_tb` pass reliably under XSim
 - [ ] Make `w5500_tx_engine_tb` pass under XSim
-- [ ] Integrate W5500 A RX -> rules -> W5500 B TX in a single hardware top
+- [x] Integrate W5500 A RX -> rules -> W5500 B TX in a single hardware top
+- [x] Replace W5500 B byte-at-a-time TX payload writes with burst TX-buffer writes
 - [ ] Use PC2 receiver/Wireshark plus board HEX pages as the first no-UART two-port telemetry path
 - [ ] Add a PC/dashboard UART reader later as an optional live FPGA counter source
 - [ ] Validate W5500 B alone on hardware: reset, `VERSIONR`, MACRAW init

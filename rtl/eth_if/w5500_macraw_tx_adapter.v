@@ -94,8 +94,9 @@ module w5500_macraw_tx_adapter #(
 
     reg        seq_active;
     reg        seq_done;
-    reg [2:0]  seq_count;
-    reg [2:0]  seq_index;
+    reg [15:0] seq_count;
+    reg [15:0] seq_index;
+    reg        seq_txbuf_burst;
     reg [7:0]  seq_tx [0:3];
     reg [7:0]  seq_rx [0:3];
 
@@ -129,7 +130,8 @@ module w5500_macraw_tx_adapter #(
             seq_tx[2]   <= ctrl;
             seq_tx[3]   <= 8'h00;
             seq_count   <= 3'd4;
-            seq_index   <= 3'd0;
+            seq_index   <= 16'd0;
+            seq_txbuf_burst <= 1'b0;
             seq_active  <= 1'b1;
             spi_tx_data <= addr[15:8];
             spi_hold_cs <= 1'b1;
@@ -147,11 +149,29 @@ module w5500_macraw_tx_adapter #(
             seq_tx[2]   <= ctrl;
             seq_tx[3]   <= data;
             seq_count   <= 3'd4;
-            seq_index   <= 3'd0;
+            seq_index   <= 16'd0;
+            seq_txbuf_burst <= 1'b0;
             seq_active  <= 1'b1;
             spi_tx_data <= addr[15:8];
             spi_hold_cs <= 1'b1;
             spi_start   <= 1'b1;
+        end
+    endtask
+
+    task start_spi_txbuf_burst;
+        input [15:0] addr;
+        begin
+            seq_tx[0]        <= addr[15:8];
+            seq_tx[1]        <= addr[7:0];
+            seq_tx[2]        <= CTRL_S0_TXBUF_WRITE;
+            seq_tx[3]        <= pkt_mem[0];
+            seq_count        <= pkt_len + 16'd3;
+            seq_index        <= 16'd0;
+            seq_txbuf_burst  <= 1'b1;
+            seq_active       <= 1'b1;
+            spi_tx_data      <= addr[15:8];
+            spi_hold_cs      <= 1'b1;
+            spi_start        <= 1'b1;
         end
     endtask
 
@@ -173,8 +193,9 @@ module w5500_macraw_tx_adapter #(
             spi_tx_data       <= 8'd0;
             seq_active        <= 1'b0;
             seq_done          <= 1'b0;
-            seq_count         <= 3'd0;
-            seq_index         <= 3'd0;
+            seq_count         <= 16'd0;
+            seq_index         <= 16'd0;
+            seq_txbuf_burst   <= 1'b0;
             init_busy         <= 1'b0;
             init_done         <= 1'b0;
             init_error        <= 1'b0;
@@ -202,13 +223,24 @@ module w5500_macraw_tx_adapter #(
             end
 
             if (seq_active && spi_done) begin
-                seq_rx[seq_index] <= spi_rx_data;
+                if (seq_index < 16'd4)
+                    seq_rx[seq_index[1:0]] <= spi_rx_data;
                 if (seq_index == (seq_count - 1'b1)) begin
-                    seq_active <= 1'b0;
-                    seq_done   <= 1'b1;
+                    seq_active      <= 1'b0;
+                    seq_done        <= 1'b1;
+                    seq_txbuf_burst <= 1'b0;
                 end else begin
-                    seq_index   <= seq_index + 1'b1;
-                    spi_tx_data <= seq_tx[seq_index + 1'b1];
+                    seq_index <= seq_index + 1'b1;
+                    if (seq_txbuf_burst && ((seq_index + 1'b1) >= 16'd3))
+                        spi_tx_data <= pkt_mem[(seq_index + 1'b1) - 16'd3];
+                    else begin
+                        case (seq_index[1:0])
+                            2'd0: spi_tx_data <= seq_tx[1];
+                            2'd1: spi_tx_data <= seq_tx[2];
+                            2'd2: spi_tx_data <= seq_tx[3];
+                            default: spi_tx_data <= seq_tx[0];
+                        endcase
+                    end
                     spi_hold_cs <= ((seq_index + 1'b1) != (seq_count - 1'b1));
                     spi_start   <= 1'b1;
                 end
@@ -353,15 +385,11 @@ module w5500_macraw_tx_adapter #(
 
                 ST_WRITE_BUF: begin
                     if (!seq_active && !seq_done)
-                        start_spi_write(tx_write_ptr + frame_index, CTRL_S0_TXBUF_WRITE, pkt_mem[frame_index]);
+                        start_spi_txbuf_burst(tx_write_ptr);
                     else if (seq_done) begin
-                        if (frame_index == (pkt_len - 1)) begin
-                            next_tx_write_ptr <= tx_write_ptr + pkt_len;
-                            frame_index       <= 16'd0;
-                            state             <= ST_WRITE_WR_MSB;
-                        end else begin
-                            frame_index <= frame_index + 16'd1;
-                        end
+                        next_tx_write_ptr <= tx_write_ptr + pkt_len;
+                        frame_index       <= 16'd0;
+                        state             <= ST_WRITE_WR_MSB;
                     end
                 end
 

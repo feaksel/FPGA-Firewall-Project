@@ -137,7 +137,7 @@ Start PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
-The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. Each sender start also creates a new run ID, which lets the dashboard distinguish a fresh demo take from old or restarted packet streams.
+The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
 
 Expected result:
 - PC2 shows a continuously moving sine wave,
@@ -157,6 +157,8 @@ For the cleanest take, stop all old PC1 sender processes before starting a new o
 pkill -f sine_sender.py
 ```
 
+If you want to reset the continuous demo from sequence `0`, delete `.sine_sender_state.json` on PC1 or start the sender with `--fresh-run`.
+
 The sender continuously interleaves blocked decoys:
 - TCP destination port `23`
 - UDP destination port `5002`
@@ -169,9 +171,9 @@ If the sine wave is too dense or too slow, tune PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 1 --packets-per-second 3 --samples-per-packet 16
 ```
 
-Increase `--packets-per-second` gradually after the stable case works. Large packets or high packet rates can overrun the current demo because the FPGA W5500 TX adapter still writes TX payload bytes one SPI transaction at a time.
+Increase `--packets-per-second` gradually after the stable case works. W5500 B TX now uses burst TX-buffer writes in RTL, which removes the old byte-at-a-time payload-write bottleneck. The PC2 receiver can still show gaps if PC1 is sending multiple streams, if the sender rate is too high for the current full path, or if packet capture misses frames.
 
-For presentation, keep one sender process active. `20` packets/sec is useful as a stress test, but it is not the best visual demo until the FPGA W5500 TX path supports burst writes. Use `3` to `5` packets/sec for the clean visual demo, then show higher rates separately as a throughput/bottleneck discussion.
+For presentation, keep one sender process active. Start at `5` packets/sec, then try `10`, `15`, and `20` packets/sec after the dashboard shows a clean run with `Leaks = 0`.
 
 If the expected-drop markers do not line up, use the same `--decoy-every` value on both sides:
 

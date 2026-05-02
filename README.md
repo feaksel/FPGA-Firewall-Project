@@ -191,8 +191,8 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 This continuously sends:
 - allowed sine-wave packets on UDP destination port `5001`,
 - blocked decoy packets on TCP port `23` by default,
-- a per-run stream ID so dashboard restarts and old packets do not look like real loss,
-- a small default packet shape (`5` packets/sec, `16` samples/packet, `1 Hz`) that is steadier on the current byte-at-a-time W5500 TX path.
+- a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
+- a small default packet shape (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
 
@@ -238,7 +238,7 @@ Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, eve
 
 If the button is not visible, stop and restart `sine_receiver_dashboard.py` once. The dashboard HTML is embedded in the Python process, so an already-running dashboard will keep serving the old page until the process restarts.
 
-Before a clean demo take, stop old sender processes on PC1 and start only one new sender. The dashboard locks onto the first new-format `FWSINE2` run it sees and ignores legacy or different-run packets, but a single sender gives the cleanest waveform and packet strip. Treat `20` packets/sec as a stress test for now; `3` to `5` packets/sec is the stable presentation range until W5500 burst TX is implemented in RTL.
+Before a clean demo take, stop old sender processes on PC1 and start only one new sender. The sender saves `.sine_sender_state.json` by default, so restarting it continues the same run ID and sequence. Use `--fresh-run` only when you intentionally want a new demo run. The dashboard locks onto the first new-format `FWSINE2` run it sees and ignores legacy or different-run packets, but a single sender gives the cleanest waveform and packet strip. W5500 B TX now uses burst TX-buffer writes in RTL, so higher sender rates are more realistic, but increase `--packets-per-second` gradually while watching PC2 packet gaps and leaks.
 
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 

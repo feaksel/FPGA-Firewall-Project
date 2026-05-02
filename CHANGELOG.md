@@ -53,4 +53,5 @@
 - Added a continuous sine-wave demo sender and PC2 browser dashboard for live allow/drop visualization
 - Improved the sine demo with slower readable defaults, a packet-by-packet decision strip, expected-drop markers, leak markers, missing-sequence markers, and a live packet-rate graph
 - Added a restart button to the sine receiver dashboard for clearing the live demo view without restarting the sniffer
+- Changed W5500 B TX payload writes from one SPI transaction per byte to a single burst TX-buffer write per frame, improving the two-port forwarding demo throughput
 - Added the same restart/reset control to the deterministic traffic dashboard

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import math
+from pathlib import Path
 import random
 import struct
 import sys
@@ -19,6 +21,32 @@ DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
 DEFAULT_SRC_IP = "192.168.50.10"
 DEFAULT_DST_IP = "192.168.50.20"
 DEFAULT_FILE_PORT = 5001
+DEFAULT_STATE_FILE = ".sine_sender_state.json"
+
+
+def load_state(path):
+    if path is None or not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            state = json.load(handle)
+        return {
+            "run_id": int(state["run_id"]) & 0xFFFFFFFF,
+            "seq": int(state["seq"]) & 0xFFFFFFFF,
+            "phase": float(state["phase"]),
+        }
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def save_state(path, run_id, seq, phase):
+    if path is None:
+        return
+    state = {"run_id": run_id & 0xFFFFFFFF, "seq": seq & 0xFFFFFFFF, "phase": phase}
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
+        json.dump(state, handle, separators=(",", ":"))
+    tmp_path.replace(path)
 
 
 def build_sine_payload(run_id, seq, sample_rate, sine_hz, samples_per_packet, phase):
@@ -77,6 +105,8 @@ def main():
     parser.add_argument("--decoy-every", type=int, default=4, help="Send one blocked decoy every N allowed packets; 0 disables decoys.")
     parser.add_argument("--decoy-mode", choices=["tcp", "udp", "mixed"], default="tcp", help="Blocked decoy profile to interleave.")
     parser.add_argument("--run-id", type=lambda value: int(value, 0), default=None, help="Optional 32-bit stream ID; default is random per run.")
+    parser.add_argument("--state-file", default=DEFAULT_STATE_FILE, help="Persist run ID, sequence, and phase for one continuous demo across sender restarts; empty disables.")
+    parser.add_argument("--fresh-run", action="store_true", help="Ignore saved state and start a new run ID/sequence.")
     args = parser.parse_args()
 
     if args.packets_per_second <= 0:
@@ -85,13 +115,20 @@ def main():
         parser.error("--samples-per-packet must be greater than 0")
 
     interval = 1.0 / args.packets_per_second
-    run_id = args.run_id if args.run_id is not None else random.getrandbits(32)
+    state_path = Path(args.state_file).expanduser() if args.state_file else None
+    saved_state = None if args.fresh_run or args.run_id is not None else load_state(state_path)
+    run_id = args.run_id if args.run_id is not None else (
+        saved_state["run_id"] if saved_state is not None else random.getrandbits(32)
+    )
     run_id &= 0xFFFFFFFF
-    seq = 0
-    phase = 0.0
+    seq = saved_state["seq"] if saved_state is not None else 0
+    phase = saved_state["phase"] if saved_state is not None else 0.0
     print(f"Streaming sine wave on {args.iface}: {args.sine_hz} Hz, UDP dst port {args.port}")
     print(f"Allowed packets/sec={args.packets_per_second:g}, samples/packet={args.samples_per_packet}")
     print(f"Run ID=0x{run_id:08x}")
+    print(f"Starting seq={seq}")
+    if state_path is not None:
+        print(f"State file={state_path}")
     print("Stop with Ctrl+C.")
 
     try:
@@ -102,9 +139,12 @@ def main():
             if args.decoy_every > 0 and seq % args.decoy_every == 0:
                 sendp(build_decoy_packet(args, seq), iface=args.iface, verbose=False)
 
-            seq += 1
+            seq = (seq + 1) & 0xFFFFFFFF
+            if (seq % 10) == 0:
+                save_state(state_path, run_id, seq, phase)
             time.sleep(interval)
     except KeyboardInterrupt:
+        save_state(state_path, run_id, seq, phase)
         print(f"\nstopped after {seq} allowed packets")
 
 
