@@ -240,7 +240,14 @@ module firewall_forwarder #(
                                 last_action_allow    <= 1'b1;
                                 last_matched_rule_id <= 4'd2;
                             end else if ((fwd_protocol == 8'h11) &&
-                                         ({fwd_dst_port[15:8], in_data} == 16'd5001)) begin
+                                         ({fwd_dst_port[15:8], in_data} == 16'd5002)) begin
+                                fwd_action_allow     <= 1'b0;
+                                fwd_rule_id          <= 4'd4;
+                                pkt_action_allow     <= 1'b0;
+                                pkt_rule_id          <= 4'd4;
+                                last_action_allow    <= 1'b0;
+                                last_matched_rule_id <= 4'd4;
+                            end else if (fwd_protocol == 8'h11) begin
                                 fwd_action_allow     <= 1'b1;
                                 fwd_rule_id          <= 4'd3;
                                 pkt_action_allow     <= 1'b1;

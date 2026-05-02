@@ -43,7 +43,7 @@ def build_allowed_packet(args, payload):
 
 def build_decoy_packet(args, seq):
     marker = f"FW-SINE-DECOY-DROP-{seq}".encode("ascii")
-    if seq % 2 == 0:
+    if args.decoy_mode == "tcp" or (args.decoy_mode == "mixed" and seq % 2 == 0):
         return (
             Ether(dst=args.dst_mac, src=args.src_mac)
             / IP(src=args.blocked_src_ip, dst=args.dst_ip)
@@ -74,6 +74,7 @@ def main():
     parser.add_argument("--samples-per-packet", type=int, default=32)
     parser.add_argument("--packets-per-second", type=float, default=20.0)
     parser.add_argument("--decoy-every", type=int, default=4, help="Send one blocked decoy every N allowed packets; 0 disables decoys.")
+    parser.add_argument("--decoy-mode", choices=["tcp", "udp", "mixed"], default="tcp", help="Blocked decoy profile to interleave.")
     args = parser.parse_args()
 
     interval = 1.0 / args.packets_per_second
