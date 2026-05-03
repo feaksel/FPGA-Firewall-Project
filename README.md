@@ -211,7 +211,7 @@ For the simplest continuous rule demo, run this first:
 sudo python3 scripts/rule_demo_sender.py --iface enX
 ```
 
-This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. By default it uses PC1's real Ethernet MAC address, which is the preferred hardware path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic. Add `--udp-allow` if you also want to test the UDP/80 allow profile. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
+This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: UDP/80 allow, TCP/22 SSH allow, and TCP/23 drop. By default it uses PC1's real Ethernet MAC address and an IPv4 multicast destination MAC (`01:00:5e:00:00:fb`), because SignalTap/pcap proved that Mac-origin multicast traffic crosses the two-W5500 path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
 
 For the continuous live demo, run:
 

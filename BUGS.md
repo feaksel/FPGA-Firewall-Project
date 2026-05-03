@@ -19,7 +19,8 @@
     - The `SW7` path is now proven to reach W5500 B TX and PC2 for at least some Mac-origin frames.
     - The intended rule-demo packets used a spoofed Ethernet source MAC `00:11:22:33:44:55`. Because forwarded real-Mac background frames appear while spoofed demo markers are absent, the next fix is to run demo senders with PC1's real interface MAC by default.
   - Next debug:
-    - Re-test `scripts/rule_demo_sender.py --iface enX` after the sender source-MAC default change. The script now prints the MAC it will use.
+    - Re-test `scripts/rule_demo_sender.py --iface enX` after the sender source/destination MAC default change. The script now prints both MACs it will use.
+    - The updated sender sends UDP/80 allow by default and uses destination MAC `01:00:5e:00:00:fb`, matching the multicast path already proven by SignalTap and `sw7-0004.pcapng`.
     - Capture PC2 with no Wireshark filter first, then use marker filters such as `frame contains "FW-DEMO"` instead of relying on the old spoofed source MAC.
     - If marker frames still do not arrive, take another CLI SignalTap capture while the updated sender is running and confirm `stp_a_rx_first16` contains the real Mac source plus IPv4 ethertype `0800`.
 

@@ -275,7 +275,28 @@ The remaining rule-demo failure is now narrower: the older sender used a
 spoofed Ethernet source MAC `00:11:22:33:44:55`. Because real Mac-origin
 background frames were forwarded while the spoofed demo markers were absent,
 the PC1 demo senders now default to the selected interface's real MAC address.
-Use `--src-mac ...` only when intentionally testing spoofed-source traffic.
+The rule-demo sender also defaults to destination MAC `01:00:5e:00:00:fb`,
+matching the multicast path that hardware has already proven. Use
+`--src-mac ...` only when intentionally testing spoofed-source traffic.
+
+## 2026-05-04 SW7=0 normal firewall capture
+
+With `SW7=0` and `SW0=1`, command-line SignalTap showed:
+
+- `stp_switches = 0x003`, so `SW0=1`, `SW1=1`, and `SW7=0`.
+- `stp_b_buf_writes = 4`.
+- `stp_b_send_issued = 4`.
+- `stp_b_send_cleared = 4`.
+- `stp_b_send_timeouts = 0`.
+- `stp_b_tx_count = 4`.
+- `stp_a_rx_first16 = 01005E0000FB1CF64C44FF4608004500`.
+- `stp_b_tx_first16 = 01005E0000FB1CF64C44FF4608004500`.
+
+Interpretation: the normal firewall path is not stuck at the B TX boundary.
+It forwarded an IPv4 multicast frame from the Mac through W5500 B. The dashboard
+did not update because the captured forwarded frame was background mDNS traffic,
+not a `FW-DEMO-*` marker. The next retest should use the updated
+multicast/real-MAC rule-demo sender.
 
 ## Command-line SignalTap note
 
@@ -301,7 +322,9 @@ The repo includes a wrapper:
 
 The wrapper auto-detects the generated SignalTap instance, signal-set, and
 trigger names from `quartus/de1_soc_w5500.stp`. If Quartus changes the names
-again after a GUI edit, the same command should still work.
+again after a GUI edit, the same command should still work. The wrapper ignores
+Quartus's internal `auto_stp_external_storage_qualifier` name, which is not a
+valid trigger.
 
 Then summarize the exported CSV:
 

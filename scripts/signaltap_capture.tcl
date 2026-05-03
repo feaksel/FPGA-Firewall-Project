@@ -36,7 +36,7 @@ if {$signal_set eq "" || $trigger eq ""} {
         }
     }
     if {$trigger eq ""} {
-        if {[regexp {<trigger[^>]*name="([^"]+)"} $stp_text -> parsed_trigger]} {
+        if {[regexp {<trigger[[:space:]][^>]*name="(trigger:[^"]+)"} $stp_text -> parsed_trigger]} {
             set trigger $parsed_trigger
         } else {
             puts "ERROR: could not auto-detect trigger name from $stp_file"

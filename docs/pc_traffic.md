@@ -157,11 +157,12 @@ Start PC1:
 sudo python3 scripts/rule_demo_sender.py --iface enX
 ```
 
-The sender defaults are intentionally conservative for hardware reliability: `--rate 1`, `--burst 1`, and `--packet-gap 0.15`. This sends one allowed TCP/22 frame, waits briefly, then sends one TCP/23 decoy/drop frame. After this is stable, try `--rate 2 --packet-gap 0.15`; avoid `--burst` for the normal forwarding demo.
+The sender defaults are intentionally conservative for hardware reliability: `--rate 1`, `--burst 1`, and `--packet-gap 0.15`. This sends one UDP/80 allow frame, one TCP/22 allow frame, then one TCP/23 decoy/drop frame. After this is stable, try `--rate 2 --packet-gap 0.15`; avoid `--burst` for the normal forwarding demo.
 
-The sender now uses PC1's real Ethernet MAC address by default. That is the main demo path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic.
+The sender now uses PC1's real Ethernet MAC address and destination MAC `01:00:5e:00:00:fb` by default. That is the main demo path because SignalTap and pcap comparison proved Mac-origin multicast frames cross the hardware path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic.
 
 Expected result:
+- `UDP allow received` increases because UDP destination port `80` from `192.168.1.10` is forwarded.
 - `SSH allow received` increases because TCP destination port `22` from `10.1.2.3` is forwarded.
 - `Expected drops` increases because each cycle includes a TCP/23 blocked decoy.
 - `Drop leaks` stays `0`.
