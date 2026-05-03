@@ -30,6 +30,10 @@ module de1_soc_w5500_top (
     wire [31:0] rx_count;
     reg  [31:0] raw_rx_count;
     wire [31:0] display_rx_count;
+    wire [31:0] rx_commit_count_a;
+    wire [31:0] rx_stream_byte_count_a;
+    wire [15:0] last_rx_size_bytes_a;
+    wire [15:0] last_frame_len_bytes_a;
     wire [31:0] allow_count;
     wire [31:0] drop_count;
     wire init_done_a;
@@ -121,8 +125,8 @@ module de1_soc_w5500_top (
     assign LEDR[2] = rx_packet_seen_a;
     assign LEDR[6:3] = SW[4] ? adapter_b_debug_state : adapter_a_debug_state;
     assign LEDR[7] = rx_count[0];
-    assign LEDR[8] = allow_count[0];
-    assign LEDR[9] = drop_count[0];
+    assign LEDR[8] = rx_stream_byte_count_a[0];
+    assign LEDR[9] = rx_commit_count_a[0];
 
     always @* begin
         hex0_value = 4'h0;
@@ -131,6 +135,61 @@ module de1_soc_w5500_top (
         hex3_value = 4'h0;
         hex_blank  = 1'b0;
 
+        if (rx_drain_debug) begin
+            case (debug_page)
+                3'b000: begin
+                    hex3_value = adapter_a_debug_state;
+                    hex2_value = 4'h5;
+                    hex1_value = 4'h0;
+                    hex0_value = {forwarder_overflow, init_error, init_done, rx_packet_seen_a};
+                end
+                3'b001: begin
+                    hex3_value = rx_stream_byte_count_a[15:12];
+                    hex2_value = rx_stream_byte_count_a[11:8];
+                    hex1_value = rx_stream_byte_count_a[7:4];
+                    hex0_value = rx_stream_byte_count_a[3:0];
+                end
+                3'b010: begin
+                    hex3_value = rx_commit_count_a[15:12];
+                    hex2_value = rx_commit_count_a[11:8];
+                    hex1_value = rx_commit_count_a[7:4];
+                    hex0_value = rx_commit_count_a[3:0];
+                end
+                3'b011: begin
+                    hex3_value = last_rx_size_bytes_a[15:12];
+                    hex2_value = last_rx_size_bytes_a[11:8];
+                    hex1_value = last_rx_size_bytes_a[7:4];
+                    hex0_value = last_rx_size_bytes_a[3:0];
+                end
+                3'b100: begin
+                    hex3_value = last_frame_len_bytes_a[15:12];
+                    hex2_value = last_frame_len_bytes_a[11:8];
+                    hex1_value = last_frame_len_bytes_a[7:4];
+                    hex0_value = last_frame_len_bytes_a[3:0];
+                end
+                3'b101: begin
+                    hex3_value = raw_rx_count[15:12];
+                    hex2_value = raw_rx_count[11:8];
+                    hex1_value = raw_rx_count[7:4];
+                    hex0_value = raw_rx_count[3:0];
+                end
+                3'b110: begin
+                    hex3_value = {3'b000, w5500_a_int_n};
+                    hex2_value = {3'b000, spi_a_cs_n};
+                    hex1_value = {3'b000, spi_a_sclk};
+                    hex0_value = {3'b000, spi_a_miso};
+                end
+                3'b111: begin
+                    hex3_value = 4'h5;
+                    hex2_value = rx_stream_byte_count_a[3:0];
+                    hex1_value = rx_commit_count_a[3:0];
+                    hex0_value = raw_rx_count[3:0];
+                end
+                default: begin
+                    hex_blank = 1'b1;
+                end
+            endcase
+        end else begin
         case (debug_page)
             3'b000: begin
                 hex3_value = adapter_a_debug_state;
@@ -168,10 +227,23 @@ module de1_soc_w5500_top (
                 hex1_value = tx_count_b[7:4];
                 hex0_value = tx_count_b[3:0];
             end
+            3'b110: begin
+                hex3_value = last_rx_size_bytes_a[15:12];
+                hex2_value = last_rx_size_bytes_a[11:8];
+                hex1_value = last_rx_size_bytes_a[7:4];
+                hex0_value = last_rx_size_bytes_a[3:0];
+            end
+            3'b111: begin
+                hex3_value = last_frame_len_bytes_a[15:12];
+                hex2_value = last_frame_len_bytes_a[11:8];
+                hex1_value = last_frame_len_bytes_a[7:4];
+                hex0_value = last_frame_len_bytes_a[3:0];
+            end
             default: begin
                 hex_blank = 1'b1;
             end
         endcase
+        end
     end
 
     always @(posedge CLOCK_50 or negedge rst_n) begin
@@ -225,7 +297,7 @@ module de1_soc_w5500_top (
         .STARTUP_WAIT_CYCLES(5_000_000),
         .RESET_ASSERT_CYCLES(500_000),
         .RESET_RELEASE_CYCLES(5_000_000),
-        .RX_POLL_WAIT_CYCLES(50_000),
+        .RX_POLL_WAIT_CYCLES(5_000),
         .SPI_CLK_DIV(50),
         .MAX_FRAME_BYTES(2048)
     ) u_w5500_a_rx (
@@ -248,6 +320,10 @@ module de1_soc_w5500_top (
         .frame_eop(rx_frame_eop),
         .frame_src_port(rx_frame_src_port),
         .frame_ready(rx_frame_ready),
+        .rx_commit_count(rx_commit_count_a),
+        .rx_stream_byte_count(rx_stream_byte_count_a),
+        .last_rx_size_bytes(last_rx_size_bytes_a),
+        .last_frame_len_bytes(last_frame_len_bytes_a),
         .debug_state(adapter_a_debug_state)
     );
 

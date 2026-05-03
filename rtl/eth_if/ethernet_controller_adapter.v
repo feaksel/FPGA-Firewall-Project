@@ -31,6 +31,10 @@ module ethernet_controller_adapter #(
     output reg [0:0]   frame_src_port,
     input  wire        frame_ready,
 
+    output reg [31:0]  rx_commit_count,
+    output reg [31:0]  rx_stream_byte_count,
+    output reg [15:0]  last_rx_size_bytes,
+    output reg [15:0]  last_frame_len_bytes,
     output reg [3:0]   debug_state
 );
     localparam ST_IDLE         = 4'd0;
@@ -177,6 +181,10 @@ module ethernet_controller_adapter #(
             frame_sop        <= 1'b0;
             frame_eop        <= 1'b0;
             frame_src_port   <= 1'b0;
+            rx_commit_count  <= 32'd0;
+            rx_stream_byte_count <= 32'd0;
+            last_rx_size_bytes <= 16'd0;
+            last_frame_len_bytes <= 16'd0;
             debug_state      <= ST_IDLE;
             rx_size_bytes    <= 16'd0;
             rx_read_ptr      <= 16'd0;
@@ -327,6 +335,7 @@ module ethernet_controller_adapter #(
                             state_step          <= 3'd1;
                         end else begin
                             rx_size_bytes[7:0] <= seq_rx[3];
+                            last_rx_size_bytes  <= {rx_size_bytes[15:8], seq_rx[3]};
                             state_step         <= 3'd0;
                             rx_poll_wait_ctr   <= 16'd0;
                             if ({rx_size_bytes[15:8], seq_rx[3]} > 16'd2)
@@ -365,6 +374,7 @@ module ethernet_controller_adapter #(
                             state_step            <= 3'd1;
                         end else begin
                             frame_len_bytes[7:0] <= seq_rx[3];
+                            last_frame_len_bytes <= {frame_len_bytes[15:8], seq_rx[3]};
                             state_step           <= 3'd0;
                             frame_index          <= 16'd0;
                             if (({frame_len_bytes[15:8], seq_rx[3]} != 16'd0) &&
@@ -389,6 +399,7 @@ module ethernet_controller_adapter #(
                         frame_sop      <= (frame_index == 16'd0);
                         frame_eop      <= (frame_index == (frame_len_bytes - 1'b1));
                         frame_src_port <= 1'b0;
+                        rx_stream_byte_count <= rx_stream_byte_count + 32'd1;
 
                         if (frame_index == (frame_len_bytes - 1'b1)) begin
                             frame_index <= 16'd0;
@@ -416,6 +427,7 @@ module ethernet_controller_adapter #(
                     end else if (seq_done) begin
                         if (state_step == 3'd2) begin
                             rx_packet_seen   <= 1'b1;
+                            rx_commit_count  <= rx_commit_count + 32'd1;
                             rx_poll_wait_ctr <= 16'd0;
                             state            <= ST_RX_POLL;
                             state_step       <= 3'd0;

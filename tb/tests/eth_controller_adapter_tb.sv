@@ -56,6 +56,10 @@ module eth_controller_adapter_tb;
         .frame_eop(frame_eop),
         .frame_src_port(frame_src_port),
         .frame_ready(frame_ready),
+        .rx_commit_count(),
+        .rx_stream_byte_count(),
+        .last_rx_size_bytes(),
+        .last_frame_len_bytes(),
         .debug_state(debug_state)
     );
 

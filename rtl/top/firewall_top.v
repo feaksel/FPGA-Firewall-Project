@@ -65,6 +65,10 @@ module firewall_top #(
         .frame_eop(adapter_frame_eop),
         .frame_src_port(adapter_frame_src_port),
         .frame_ready(adapter_frame_ready),
+        .rx_commit_count(),
+        .rx_stream_byte_count(),
+        .last_rx_size_bytes(),
+        .last_frame_len_bytes(),
         .debug_state(adapter_debug_state)
     );
 
