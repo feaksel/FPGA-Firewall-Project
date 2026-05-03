@@ -89,8 +89,9 @@ module ethernet_controller_adapter #(
 
     reg        seq_active;
     reg        seq_done;
-    reg [2:0]  seq_count;
-    reg [2:0]  seq_index;
+    reg [15:0] seq_count;
+    reg [15:0] seq_index;
+    reg        seq_rxbuf_burst;
     reg [7:0]  seq_tx [0:3];
     reg [7:0]  seq_rx [0:3];
 
@@ -154,6 +155,23 @@ module ethernet_controller_adapter #(
         end
     endtask
 
+    task start_spi_rxbuf_burst;
+        input [15:0] addr;
+        begin
+            seq_tx[0]       <= addr[15:8];
+            seq_tx[1]       <= addr[7:0];
+            seq_tx[2]       <= CTRL_S0_RXBUF_READ;
+            seq_tx[3]       <= 8'h00;
+            seq_count       <= frame_len_bytes + 16'd3;
+            seq_index       <= 16'd0;
+            seq_rxbuf_burst <= 1'b1;
+            seq_active      <= 1'b1;
+            spi_tx_data     <= addr[15:8];
+            spi_hold_cs     <= 1'b1;
+            spi_start       <= 1'b1;
+        end
+    endtask
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state            <= ST_IDLE;
@@ -166,8 +184,9 @@ module ethernet_controller_adapter #(
             spi_tx_data      <= 8'd0;
             seq_active       <= 1'b0;
             seq_done         <= 1'b0;
-            seq_count        <= 3'd0;
-            seq_index        <= 3'd0;
+            seq_count        <= 16'd0;
+            seq_index        <= 16'd0;
+            seq_rxbuf_burst  <= 1'b0;
             seq_rx[0]        <= 8'd0;
             seq_rx[1]        <= 8'd0;
             seq_rx[2]        <= 8'd0;
@@ -200,13 +219,28 @@ module ethernet_controller_adapter #(
             debug_state <= state;
 
             if (seq_active && spi_done) begin
-                seq_rx[seq_index] <= spi_rx_data;
+                if (seq_index < 16'd4)
+                    seq_rx[seq_index[1:0]] <= spi_rx_data;
+
+                if (seq_rxbuf_burst && (seq_index >= 16'd3)) begin
+                    frame_valid    <= 1'b1;
+                    frame_data     <= spi_rx_data;
+                    frame_sop      <= (seq_index == 16'd3);
+                    frame_eop      <= (seq_index == (seq_count - 1'b1));
+                    frame_src_port <= 1'b0;
+                    rx_stream_byte_count <= rx_stream_byte_count + 32'd1;
+                end
+
                 if (seq_index == (seq_count - 1'b1)) begin
-                    seq_active <= 1'b0;
-                    seq_done   <= 1'b1;
+                    seq_active      <= 1'b0;
+                    seq_done        <= 1'b1;
+                    seq_rxbuf_burst <= 1'b0;
                 end else begin
                     seq_index   <= seq_index + 1'b1;
-                    spi_tx_data <= seq_tx[seq_index + 1'b1];
+                    if (seq_rxbuf_burst && ((seq_index + 1'b1) >= 16'd3))
+                        spi_tx_data <= 8'h00;
+                    else
+                        spi_tx_data <= seq_tx[seq_index[1:0] + 2'd1];
                     spi_hold_cs <= ((seq_index + 1'b1) != (seq_count - 1'b1));
                     spi_start   <= 1'b1;
                 end
@@ -392,22 +426,11 @@ module ethernet_controller_adapter #(
 
                 ST_STREAM_FRAME: begin
                     if (!seq_active && !seq_done && frame_ready) begin
-                        start_spi_read(rx_read_ptr + 16'd2 + frame_index, CTRL_S0_RXBUF_READ);
+                        start_spi_rxbuf_burst(rx_read_ptr + 16'd2);
                     end else if (seq_done) begin
-                        frame_valid    <= 1'b1;
-                        frame_data     <= seq_rx[3];
-                        frame_sop      <= (frame_index == 16'd0);
-                        frame_eop      <= (frame_index == (frame_len_bytes - 1'b1));
-                        frame_src_port <= 1'b0;
-                        rx_stream_byte_count <= rx_stream_byte_count + 32'd1;
-
-                        if (frame_index == (frame_len_bytes - 1'b1)) begin
-                            frame_index <= 16'd0;
-                            state       <= ST_COMMIT_RX;
-                            state_step  <= 3'd0;
-                        end else begin
-                            frame_index <= frame_index + 1'b1;
-                        end
+                        frame_index <= 16'd0;
+                        state       <= ST_COMMIT_RX;
+                        state_step  <= 3'd0;
                     end
                 end
 

@@ -51,9 +51,10 @@ def allowed_ssh(seq):
 def main():
     parser = argparse.ArgumentParser(description="Simple continuous FPGA firewall rule demo sender.")
     parser.add_argument("--iface", required=True, help="Mac Ethernet interface connected to W5500 A.")
-    parser.add_argument("--rate", type=float, default=5.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
+    parser.add_argument("--rate", type=float, default=1.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
     parser.add_argument("--count", type=int, default=0, help="Number of cycles to send; 0 means run forever.")
-    parser.add_argument("--burst", type=int, default=3, help="Repeat each packet this many times per cycle to make hardware bring-up obvious.")
+    parser.add_argument("--burst", type=int, default=1, help="Repeat each packet this many times per cycle.")
+    parser.add_argument("--packet-gap", type=float, default=0.15, help="Seconds to wait between individual packets in a cycle.")
     parser.add_argument("--list-ifaces", action="store_true", help="List Scapy interface names and exit.")
     parser.add_argument("--verbose-each", action="store_true", help="Print one line per send cycle instead of updating one status line.")
     parser.add_argument("--udp-allow", action="store_true", help="Also send the UDP/80 allow profile. SSH allow is the default primary profile.")
@@ -70,6 +71,8 @@ def main():
         parser.error("--rate must be greater than 0")
     if args.burst <= 0:
         parser.error("--burst must be greater than 0")
+    if args.packet_gap < 0:
+        parser.error("--packet-gap must be zero or greater")
 
     interval = 1.0 / args.rate
     sent_allow_udp = 0
@@ -79,7 +82,7 @@ def main():
     print("FPGA firewall rule demo sender")
     print(f"iface={args.iface} rate={args.rate:g} cycles/sec")
     print("Cycle: TCP/22 SSH allow, TCP/23 drop" + (", UDP/80 allow" if args.udp_allow else ""))
-    print(f"burst={args.burst} copies/profile/cycle")
+    print(f"burst={args.burst} copies/profile/cycle packet_gap={args.packet_gap:g}s")
     print("Stop with Ctrl+C.")
 
     try:
@@ -88,23 +91,26 @@ def main():
             for _ in range(args.burst):
                 sendp(allowed_ssh(seq), iface=args.iface, verbose=False)
                 sent_allow_ssh += 1
+                time.sleep(args.packet_gap)
 
             if args.udp_allow:
                 for _ in range(args.burst):
                     sendp(allowed_udp(seq), iface=args.iface, verbose=False)
                     sent_allow_udp += 1
+                    time.sleep(args.packet_gap)
 
             if not args.no_tcp_drop:
                 for _ in range(args.burst):
                     sendp(dropped_tcp(seq), iface=args.iface, verbose=False)
                     sent_drop += 1
+                    time.sleep(args.packet_gap)
 
             msg = f"seq={seq} udp_allow={sent_allow_udp} ssh_allow={sent_allow_ssh} expected_drop={sent_drop}"
             if args.verbose_each:
                 print(msg, flush=True)
             else:
                 print(f"\r{msg}", end="", flush=True)
-            time.sleep(interval)
+            time.sleep(max(interval - (args.packet_gap * args.burst * (1 + int(args.udp_allow) + int(not args.no_tcp_drop))), 0.0))
         print(f"\ndone: udp_allow={sent_allow_udp} ssh_allow={sent_allow_ssh} expected_drop={sent_drop}")
     except KeyboardInterrupt:
         print(f"\nstopped: udp_allow={sent_allow_udp} ssh_allow={sent_allow_ssh} expected_drop={sent_drop}")

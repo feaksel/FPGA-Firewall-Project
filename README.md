@@ -185,10 +185,10 @@ Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
 For the simplest continuous rule demo, run this first:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
+sudo python3 scripts/rule_demo_sender.py --iface enX
 ```
 
-This sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. Add `--udp-allow` if you also want to test the UDP/80 allow profile.
+This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. Add `--udp-allow` if you also want to test the UDP/80 allow profile. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
 
 For the continuous live demo, run:
 
@@ -243,6 +243,8 @@ http://127.0.0.1:8091
 ```
 
 Expected result: `Total allowed` and `SSH allow received` increase, expected drops increase, and `Drop leaks` stays `0`.
+
+If packets arrive for a while and then stop, stop the PC1 sender, press reset/start on the FPGA, keep `SW5=0`, and restart the safe sender command above. Avoid burst mode during the reliable demo path; `--burst` is only for short ingress bring-up tests with `SW5=1`.
 
 If `SW[3:1]=001` is stuck, set `SW5=1` while keeping `SW[3:1]=001`. That page then shows raw W5500 A ingress-drain count instead of firewall RX count. If it increases, ingress wiring/sending works and the downstream forwarding/TX path is the problem. Set `SW5=0` for normal firewall behavior.
 

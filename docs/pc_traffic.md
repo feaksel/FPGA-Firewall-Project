@@ -146,8 +146,10 @@ http://127.0.0.1:8091
 Start PC1:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2
+sudo python3 scripts/rule_demo_sender.py --iface enX
 ```
+
+The sender defaults are intentionally conservative for hardware reliability: `--rate 1`, `--burst 1`, and `--packet-gap 0.15`. This sends one allowed TCP/22 frame, waits briefly, then sends one TCP/23 decoy/drop frame. After this is stable, try `--rate 2 --packet-gap 0.15`; avoid `--burst` for the normal forwarding demo.
 
 Expected result:
 - `SSH allow received` increases because TCP destination port `22` from `10.1.2.3` is forwarded.
@@ -158,8 +160,10 @@ Expected result:
 Add `--udp-allow` to the sender if you also want to test the UDP/80 allow profile:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX --rate 2 --udp-allow
+sudo python3 scripts/rule_demo_sender.py --iface enX --udp-allow
 ```
+
+If forwarding works briefly and then appears to stop, treat that as an overrun/recovery case first: stop PC1 sender, reset/start the FPGA with `SW5=0`, restart the PC2 dashboard, and run the safe default sender again. Use `SW5=1` only for raw ingress-drain debugging; it intentionally disables forwarding to PC2.
 
 If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W5500 A. Recheck that PC1 is sending on the Mac Ethernet interface connected to W5500 A, `SW0` is high/start-init, `LEDR0=1`, and `LEDR1=0`.
 
