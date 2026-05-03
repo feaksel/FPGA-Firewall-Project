@@ -29,7 +29,13 @@ module w5500_macraw_tx_adapter #(
     output reg         init_error,
     output reg [31:0]  tx_count,
     output reg         tx_error,
-    output reg [3:0]   debug_state
+    output reg [4:0]   debug_state,
+    output reg [15:0]  last_pkt_len_dbg,
+    output reg         pkt_available_dbg,
+    output reg [31:0]  buf_write_start_count,
+    output reg [31:0]  send_issued_count,
+    output reg [31:0]  send_cleared_count,
+    output reg [31:0]  send_timeout_count
 );
     localparam ST_IDLE         = 5'd0;
     localparam ST_RESET        = 5'd1;
@@ -204,20 +210,28 @@ module w5500_macraw_tx_adapter #(
             init_error        <= 1'b0;
             tx_count          <= 32'd0;
             tx_error          <= 1'b0;
-            debug_state       <= ST_IDLE;
+            debug_state       <= 5'd0;
+            last_pkt_len_dbg  <= 16'd0;
+            pkt_available_dbg <= 1'b0;
+            buf_write_start_count <= 32'd0;
+            send_issued_count     <= 32'd0;
+            send_cleared_count    <= 32'd0;
+            send_timeout_count    <= 32'd0;
         end else begin
             spi_start   <= 1'b0;
             seq_done    <= 1'b0;
-            debug_state <= state[3:0];
+            debug_state <= state;
+            pkt_available_dbg <= pkt_available;
 
             if (frame_valid && frame_ready) begin
                 if (frame_sop)
                     wr_ptr <= 16'd0;
                 pkt_mem[frame_sop ? 16'd0 : wr_ptr] <= frame_data;
                 if (frame_eop) begin
-                    pkt_len       <= (frame_sop ? 16'd1 : (wr_ptr + 16'd1));
-                    pkt_available <= 1'b1;
-                    wr_ptr        <= 16'd0;
+                    pkt_len          <= (frame_sop ? 16'd1 : (wr_ptr + 16'd1));
+                    last_pkt_len_dbg <= (frame_sop ? 16'd1 : (wr_ptr + 16'd1));
+                    pkt_available    <= 1'b1;
+                    wr_ptr           <= 16'd0;
                 end else begin
                     wr_ptr <= (frame_sop ? 16'd1 : (wr_ptr + 16'd1));
                 end
@@ -383,9 +397,10 @@ module w5500_macraw_tx_adapter #(
                 end
 
                 ST_WRITE_BUF: begin
-                    if (!seq_active && !seq_done)
+                    if (!seq_active && !seq_done) begin
                         start_spi_txbuf_burst(tx_write_ptr);
-                    else if (seq_done) begin
+                        buf_write_start_count <= buf_write_start_count + 32'd1;
+                    end else if (seq_done) begin
                         next_tx_write_ptr <= tx_write_ptr + pkt_len;
                         frame_index       <= 16'd0;
                         state             <= ST_WRITE_WR_MSB;
@@ -410,8 +425,9 @@ module w5500_macraw_tx_adapter #(
                     if (!seq_active && !seq_done)
                         start_spi_write(S0_CR, CTRL_S0_REG_WRITE, S0_CR_SEND);
                     else if (seq_done) begin
-                        send_wait_ctr <= 32'd0;
-                        state         <= ST_WAIT_SEND;
+                        send_issued_count <= send_issued_count + 32'd1;
+                        send_wait_ctr     <= 32'd0;
+                        state             <= ST_WAIT_SEND;
                     end
                 end
 
@@ -420,15 +436,17 @@ module w5500_macraw_tx_adapter #(
                         start_spi_read(S0_CR, CTRL_S0_REG_READ);
                     else if (seq_done) begin
                         if (seq_rx[3] == 8'h00) begin
-                            tx_count      <= tx_count + 32'd1;
-                            pkt_available <= 1'b0;
-                            send_wait_ctr <= 32'd0;
-                            state         <= ST_READY;
+                            tx_count           <= tx_count + 32'd1;
+                            send_cleared_count <= send_cleared_count + 32'd1;
+                            pkt_available      <= 1'b0;
+                            send_wait_ctr      <= 32'd0;
+                            state              <= ST_READY;
                         end else if (send_wait_ctr == 32'd5_000_000) begin
-                            tx_error      <= 1'b1;
-                            pkt_available <= 1'b0;
-                            send_wait_ctr <= 32'd0;
-                            state         <= ST_READY;
+                            tx_error           <= 1'b1;
+                            send_timeout_count <= send_timeout_count + 32'd1;
+                            pkt_available      <= 1'b0;
+                            send_wait_ctr      <= 32'd0;
+                            state              <= ST_READY;
                         end else begin
                             send_wait_ctr <= send_wait_ctr + 32'd1;
                         end

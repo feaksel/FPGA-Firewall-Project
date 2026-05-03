@@ -9,14 +9,13 @@ import sys
 import time
 
 try:
-    from scapy.all import Ether, IP, TCP, UDP, Raw, sendp
+    from scapy.all import Ether, IP, TCP, UDP, Raw, get_if_hwaddr, sendp
 except ImportError:
     print("Scapy is required. Install it with: pip install scapy", file=sys.stderr)
     sys.exit(1)
 
 
 MAGIC = b"FWSINE2\0"
-DEFAULT_SRC_MAC = "00:11:22:33:44:55"
 DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
 DEFAULT_SRC_IP = "192.168.50.10"
 DEFAULT_DST_IP = "192.168.50.20"
@@ -90,7 +89,7 @@ def build_decoy_packet(args, seq):
 def main():
     parser = argparse.ArgumentParser(description="Continuously send a sine-wave demo stream plus blocked decoy traffic.")
     parser.add_argument("--iface", required=True, help="Scapy interface connected to W5500 A / FPGA ingress.")
-    parser.add_argument("--src-mac", default=DEFAULT_SRC_MAC)
+    parser.add_argument("--src-mac", help="Override Ethernet source MAC. Default uses the selected interface's real MAC.")
     parser.add_argument("--dst-mac", default=DEFAULT_DST_MAC)
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
@@ -113,6 +112,11 @@ def main():
         parser.error("--packets-per-second must be greater than 0")
     if args.samples_per_packet <= 0:
         parser.error("--samples-per-packet must be greater than 0")
+    if args.src_mac is None:
+        try:
+            args.src_mac = get_if_hwaddr(args.iface)
+        except Exception as exc:
+            parser.error(f"could not read MAC for {args.iface}: {exc}")
 
     interval = 1.0 / args.packets_per_second
     state_path = Path(args.state_file).expanduser() if args.state_file else None
@@ -125,6 +129,7 @@ def main():
     seq = saved_state["seq"] if can_resume_state else 0
     phase = saved_state["phase"] if can_resume_state else 0.0
     print(f"Streaming sine wave on {args.iface}: {args.sine_hz} Hz, UDP dst port {args.port}")
+    print(f"src_mac={args.src_mac} dst_mac={args.dst_mac}")
     print(f"Allowed packets/sec={args.packets_per_second:g}, samples/packet={args.samples_per_packet}")
     print(f"Run ID=0x{run_id:08x}")
     print(f"Starting seq={seq}")

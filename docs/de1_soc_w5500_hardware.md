@@ -21,6 +21,7 @@ Control assumptions:
 - `SW[6]` = direct W5500 B generated TX self-test
 - `SW[7]` = raw A-to-B bypass debug mode
 - `SW[8]` = experimental generated rule-demo mode
+- `SW[9]` = byte/state debug master mode
 
 ## W5500 A / GPIO_0 wiring contract
 
@@ -105,6 +106,7 @@ Where `RX`, `AL`, and `DR` are receive/allow/drop counters, `R` is the last rule
 
 The board image drives `HEX3..HEX0` as active-low common-anode displays.
 
+Normal mode (`SW9=0`):
 - `SW[3:1] = 000`: `adapter_state`, `last_rule_id`, `A`/`D` action, status bits
 - `SW[3:1] = 001`: low 16 bits of `rx_count`
 - `SW[3:1] = 010`: low 16 bits of `allow_count`
@@ -119,6 +121,33 @@ Action display values:
 - `D` = last packet was dropped
 
 Status nibble on page `000` is `{rx_fifo_overflow, init_error, init_done, rx_packet_seen}`.
+
+Byte/state debug mode (`SW9=1`):
+- `SW5=0, SW4=0`: first 16 committed bytes from W5500 A RX, two bytes per page.
+- `SW5=0, SW4=1`: first 16 committed bytes handed into W5500 B TX, two bytes per page.
+- `SW5=1, SW4=0`: W5500 B TX progress pages:
+  - `000`: sticky flags and init/error bits
+  - `001`: B TX adapter state plus A RX adapter state
+  - `010`: TX-buffer write-start count
+  - `011`: SEND-issued count
+  - `100`: SEND-cleared count
+  - `101`: SEND-timeout count
+  - `110`: W5500 B TX count
+  - `111`: W5500 B last packet length
+- `SW5=1, SW4=1`: SW8 rule-regen parser pages:
+  - `000`: ethertype
+  - `001`: IP protocol
+  - `010`: destination port
+  - `011`: generated allow count
+  - `100`: generated drop count
+  - `101`: frames seen
+  - `110`: last EOP byte index
+  - `111`: max byte index
+
+In `SW9=1` mode, `LEDR[6:3]` changes from adapter-state display to sticky B TX
+progress flags: `{timeout, send_cleared, send_issued, buf_write}`. `LEDR7`
+means the B TX input stream saw an EOP, `LEDR8` means B has a packet pending,
+and `LEDR9` means B TX error.
 
 Special mode notes:
 - With `SW5=1`, forwarding is intentionally disabled. Pages show raw W5500 A receive/drain diagnostics.

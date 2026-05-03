@@ -62,18 +62,30 @@ Current verified state:
   - direct capture contains frames from source MAC `00:11:22:33:44:55`.
 
 Current blocker:
-- A-triggered transmit is not working:
-  - `SW7=1` raw bypass has produced TX counts such as `0004`/`0006`, but PC2 captures show no demo frames.
+- A-triggered transmit is narrowed but not accepted:
+  - `SW7=1` raw bypass has produced TX counts such as `0004`/`0006`, but PC2 captures did not show the intended demo markers.
   - `SW8=1` generated rule-demo mode latest report showed `SW[3:1]=101 = 0000`, so no generated B TX was triggered.
+  - SignalTap now proves `SW7=1` can reach W5500 B TX for at least one frame: SEND is issued, SEND clears, timeout stays zero, and B TX first bytes are `FFFFFFFFFFFF00112233445508004500`.
+  - Command-line SignalTap plus `sw7-0004.pcapng` proves at least some real Mac-origin multicast frames cross A -> FPGA -> B -> PC2.
+  - The old demo senders forced spoofed source MAC `00:11:22:33:44:55`; they now default to PC1's real interface MAC.
+
+Latest debug image:
+- SW9 debug image compiled and programmed on 2026-05-03 at 21:41.
+- Programming file: `build/quartus/de1_soc_w5500.sof`.
+- Programmer checksum: `0x03D248C1`.
+- Adds `SW9` byte/state debug mode for A RX first bytes, B TX input first bytes, W5500 B TX progress, and SW8 parser fields.
+- SignalTap-enabled image compiled and programmed on 2026-05-03 at 23:02.
+- SignalTap programmer checksum: `0x06381BE5`.
+- Adds preserved `stp_*` probe registers for A RX, B TX input, B TX progress, SPI B, switches, and SW8 parser fields.
 
 Current rule:
 - Do not treat FPGA TX count alone as proof of forwarding. The acceptance evidence is a PC2 capture containing the expected demo source/payload caused by PC1 traffic.
 
 Next bring-up action:
-1. Add hardware-visible first-byte latches for W5500 A RX.
-2. Add hardware-visible first-byte latches for W5500 B TX input.
-3. Add TX progress states for buffer write, pointer update, SEND write, and command clear.
-4. Re-test `SW6`, `SW5`, then `SW8`.
+1. Re-test PC1 with `sudo python3 scripts/rule_demo_sender.py --iface enX`, using the new real-MAC default.
+2. Compare with PC2 Wireshark using no filter first, then `frame contains "FW-DEMO"`.
+3. Summarize the pcap with `py -3 scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng`.
+4. If demo markers still do not appear, capture `SW7=1` around `stp_tx_b_ctrl[1] = 1` or `stp_b_send_issued[0]` rising while the updated sender is running.
 
 ## Red flags
 Stop and document before proceeding if:

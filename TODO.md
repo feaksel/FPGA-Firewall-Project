@@ -12,10 +12,11 @@
 - [ ] M9: File/video transfer demo with telemetry dashboard
 
 Current status note, 2026-05-03:
-- M8 is blocked. `SW6` proves W5500 B can transmit a known FPGA-generated frame to PC2, and `SW5` proves W5500 A can receive PC1 traffic. However, A-triggered transmission is not yet working on real hardware:
-  - `SW7` raw A-to-B bypass: TX count can rise, but PC2 sees no demo frames.
+- M8 is narrowed but not accepted yet. `SW6` proves W5500 B can transmit a known FPGA-generated frame to PC2, and `SW5` proves W5500 A can receive PC1 traffic. SignalTap plus `sw7-0004.pcapng` now prove `SW7` can forward at least some real Mac-origin frames through A -> FPGA -> B -> PC2. The intended demo markers still need a clean retest:
+  - `SW7` raw A-to-B bypass: command-line SignalTap shows B TX buffer writes/SEND clears with no timeout; PC2 pcap includes matching Mac-origin multicast frames.
+  - Old demo sender commands used spoofed source MAC `00:11:22:33:44:55`; the senders now default to PC1's real interface MAC.
   - `SW8` generated rule-demo mode: latest hardware report shows `SW[3:1]=101` stuck at `0000`, so the generated TX trigger is not firing.
-- The next milestone is hardware diagnostics, not more demo features.
+- The next milestone is a real-MAC rule-demo retest plus SignalTap capture if the markers still do not arrive.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -41,6 +42,14 @@ Current status note, 2026-05-03:
 - [x] Add dashboard user-manual reference for HEX pages, switches, and test flow
 - [x] Make dashboard manual toggleable and add a compact packet-flow visualization
 - [ ] Validate the new HEX debug pages on the physical board with `udp_allow`, `tcp_drop`, and `tcp_allow_ssh`
+- [x] Program and validate the `SW9` byte/state debug image:
+  - A RX first bytes should match the PC1 demo frame destination/source/ethertype.
+  - B TX first bytes should match the frame intended for PC2.
+  - B TX progress pages should show whether TX-buffer write, SEND issue, SEND clear, or timeout happened.
+- [ ] Re-test the rule demo with the updated real-MAC sender default:
+  - PC1: `sudo python3 scripts/rule_demo_sender.py --iface enX`
+  - PC2: dashboard plus no-filter Wireshark capture.
+  - If needed, summarize the capture with `scripts/pcap_summary.py`.
 - [x] Add the first stream-level forwarding wrapper for allow/drop forwarding tests
 - [x] Reserve the second W5500 logical wiring on `GPIO_1[0..5]`
 - [x] Add a standalone W5500 TX engine and simulation model for TX-buffer/SEND coverage

@@ -7,14 +7,13 @@ import time
 from pathlib import Path
 
 try:
-    from scapy.all import Ether, IP, TCP, UDP, Raw, sendp
+    from scapy.all import Ether, IP, TCP, UDP, Raw, get_if_hwaddr, sendp
 except ImportError:
     print("Scapy is required. Install it with: pip install scapy", file=sys.stderr)
     sys.exit(1)
 
 
 MAGIC = b"FWFILE1\0"
-DEFAULT_SRC_MAC = "00:11:22:33:44:55"
 DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
 DEFAULT_SRC_IP = "192.168.50.10"
 DEFAULT_DST_IP = "192.168.50.20"
@@ -62,7 +61,7 @@ def main():
     parser.add_argument("--chunk-size", type=int, default=512, help="Payload bytes per allowed file chunk.")
     parser.add_argument("--interval", type=float, default=0.01, help="Seconds between frames.")
     parser.add_argument("--file-id", type=int, default=1, help="16-bit file transfer id.")
-    parser.add_argument("--src-mac", default=DEFAULT_SRC_MAC)
+    parser.add_argument("--src-mac", help="Override Ethernet source MAC. Default uses the selected interface's real MAC.")
     parser.add_argument("--dst-mac", default=DEFAULT_DST_MAC)
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
@@ -73,6 +72,12 @@ def main():
     parser.add_argument("--decoys", type=int, default=1, help="Decoy/drop frames to interleave after each chunk.")
     args = parser.parse_args()
 
+    if args.src_mac is None:
+        try:
+            args.src_mac = get_if_hwaddr(args.iface)
+        except Exception as exc:
+            parser.error(f"could not read MAC for {args.iface}: {exc}")
+
     src_path = Path(args.file)
     data = src_path.read_bytes()
     sha256_hex = hashlib.sha256(data).hexdigest()
@@ -81,6 +86,7 @@ def main():
 
     print(f"Sending {src_path} ({len(data)} bytes, {total_chunks} chunks)")
     print(f"sha256={sha256_hex}")
+    print(f"src_mac={args.src_mac} dst_mac={args.dst_mac}")
     print(f"allowed profile: UDP dst port {args.file_port}")
     print("blocked decoys: TCP dst port 23 and UDP non-file port")
 

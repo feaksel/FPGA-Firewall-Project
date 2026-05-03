@@ -78,3 +78,16 @@
   - added `S0_CR` readback/clear behavior to `w5500_tx_model`.
 - Updated simulation runners to include the newer TX/debug sources.
 - Documented the current unresolved hardware blocker: individual A RX and B TX paths work, but A-triggered TX still fails on real hardware.
+- Added `SW9` byte/state debug mode:
+  - first 16 committed bytes from W5500 A RX,
+  - first 16 committed bytes handed to W5500 B TX,
+  - W5500 B TX progress counters and sticky progress LEDs,
+  - SW8 rule-regen parser field visibility.
+- Widened W5500 B TX adapter debug state to 5 bits so state `16` no longer aliases to idle on debug outputs.
+- Added `docs/signaltap_debug.md` with a practical SignalTap II setup guide for the A-triggered TX hardware blocker.
+- Added preserved `stp_*` SignalTap probe registers and a SignalTap-enabled compile/program flow.
+- Captured first useful SW7 SignalTap evidence: A-triggered B TX writes one 0x4E-byte frame, issues SEND, W5500 B clears SEND, and no TX timeout occurs.
+- Added command-line SignalTap capture/export support with `scripts/signaltap_capture.tcl` and CSV summarization with `scripts/inspect_signaltap_csv.py`.
+- Added `scripts/pcap_summary.py` for quick Wireshark capture triage by Ethernet source/destination, ethertype, IP pair, ports, and demo markers.
+- Used SignalTap plus `sw7-0004.pcapng` to narrow the SW7 bug: Mac-origin multicast frames are forwarded through A -> FPGA -> B -> PC2, while the old spoofed-source demo markers are absent.
+- Changed `rule_demo_sender.py`, `sine_sender.py`, and `file_sender.py` to use PC1's real interface MAC by default; `--src-mac` is now an explicit spoofing override.

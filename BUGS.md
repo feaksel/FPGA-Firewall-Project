@@ -2,21 +2,26 @@
 
 ## Open Bugs
 
-- **B-2026-05-03-01: A-triggered W5500 B transmit does not appear on PC2.**
-  - Status: open, current top hardware blocker.
+- **B-2026-05-03-01: A-triggered W5500 B transmit does not reliably show the intended demo frames on PC2.**
+  - Status: open, narrowed by SignalTap; no longer considered a totally dead SW7 path.
   - Evidence:
     - `SW6=1` direct B transmit test works; PC2/Wireshark sees the internally generated `FW-DEMO-ALLOW-SSH` frame.
     - `SW5=1` raw A ingress debug works; A-side raw byte/commit counts rise and last frame length is around `0x50` to `0x52`.
     - Direct PC1-to-PC2 cable capture works; `wire_rawPc1traffic.pcapng` contains 18 demo frames from source MAC `00:11:22:33:44:55`.
-    - `SW7=1` raw bypass does not show demo frames on PC2. Captures such as `sw7simple.pcapng` and `sw7-0004.pcapng` contain only local/background PC2 traffic, even when FPGA TX count reaches values like `0004` or `0006`.
+    - `SW7=1` raw bypass did not show demo frames on PC2. Captures such as `sw7simple.pcapng` and `sw7-0004.pcapng` originally looked like only local/background PC2 traffic, even when FPGA TX count reached values like `0004` or `0006`.
     - `SW8=1` generated rule-demo mode was added, but the latest hardware observation was `SW[3:1]=101 = 0000`, so the generated TX path did not trigger.
+    - First SignalTap capture in `SW7=1` showed `stp_b_buf_writes=1`, `stp_b_send_issued=1`, `stp_b_send_cleared=1`, `stp_b_send_timeouts=0`, `stp_b_tx_count=1`, `stp_b_last_pkt_len=0x004E`, and `stp_b_tx_first16=FFFFFFFFFFFF00112233445508004500`.
+    - SEND-window SignalTap capture in `SW7=1` showed B TX state moving from `0x0E` (`ST_SEND`) to `0x10` (`ST_WAIT_SEND`), `stp_b_send_issued` rising to `1`, active B SPI, and no timeout inside the short 2K sample window.
+    - Command-line SignalTap capture in `SW7=1` showed `stp_b_buf_writes=3`, `stp_b_send_issued=3`, `stp_b_send_cleared=3`, `stp_b_send_timeouts=0`, and matching A RX/B TX first bytes `3333000000FB1CF64C44FF4686DD6008`.
+    - `scripts/pcap_summary.py C:\Users\furka\Desktop\sw7-0004.pcapng` shows three frames from the Mac source MAC `1c:f6:4c:44:ff:46`, matching the SignalTap multicast frame. This proves at least some real Mac-origin frames crossed A -> FPGA -> B -> PC2 in SW7.
   - Current interpretation:
     - W5500 A receive and W5500 B direct transmit are individually proven.
-    - The unresolved failure is the A-triggered transmit path: either the rule/trigger logic does not see the expected bytes on hardware, the stream handoff is not producing the same frame bytes as expected, or the W5500 B TX adapter behaves differently when driven by A-derived events.
+    - The `SW7` path is now proven to reach W5500 B TX and PC2 for at least some Mac-origin frames.
+    - The intended rule-demo packets used a spoofed Ethernet source MAC `00:11:22:33:44:55`. Because forwarded real-Mac background frames appear while spoofed demo markers are absent, the next fix is to run demo senders with PC1's real interface MAC by default.
   - Next debug:
-    - Add board-visible first-byte latches for A RX and B TX input.
-    - Add deeper TX state/progress pages rather than relying only on final TX count.
-    - Consider SignalTap or UART/HPS telemetry before adding more demo features.
+    - Re-test `scripts/rule_demo_sender.py --iface enX` after the sender source-MAC default change. The script now prints the MAC it will use.
+    - Capture PC2 with no Wireshark filter first, then use marker filters such as `frame contains "FW-DEMO"` instead of relying on the old spoofed source MAC.
+    - If marker frames still do not arrive, take another CLI SignalTap capture while the updated sender is running and confirm `stp_a_rx_first16` contains the real Mac source plus IPv4 ethertype `0800`.
 
 - **B-2026-05-03-02: W5500 simulation models are not strong enough evidence for the two-port hardware path.**
   - Status: open.

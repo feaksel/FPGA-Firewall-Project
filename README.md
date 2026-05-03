@@ -80,7 +80,7 @@ The current project phase is:
 - one-port hardware bring-up has reached live RX inspection on `DE1-SoC + W5500 A`,
 - W5500 A SPI register access, MACRAW initialization, RX polling, and PC-generated packet reception have been demonstrated on hardware,
 - W5500 B can transmit a fixed internally generated test frame in `SW6` mode,
-- real A-to-B forwarding and generated rule-demo transmission are currently blocked on hardware even though focused simulations pass.
+- real A-to-B forwarding is partially proven by SignalTap and pcap comparison, but the intended rule-demo marker flow is not accepted yet.
 
 ### Current hardware truth, 2026-05-03
 
@@ -89,10 +89,11 @@ This is the most important status snapshot:
 - `SW6=1` direct B transmit test works: PC2/Wireshark sees the FPGA-generated `FW-DEMO-ALLOW-SSH` frame.
 - W5500 A ingress works: with `SW5=1`, raw receive/commit counters rise and last frame length is around `0x50` to `0x52` for the rule-demo sender.
 - A direct cable from PC1 to PC2 works: `wire_rawPc1traffic.pcapng` contains demo frames from source MAC `00:11:22:33:44:55`.
-- `SW7=1` raw A-to-B bypass does not produce visible demo frames on PC2. TX count can rise, but Wireshark sees only local/background PC2 traffic.
+- `SW7=1` raw A-to-B bypass is no longer totally dead: SignalTap shows B TX buffer writes/SEND clears with no timeout, and `sw7-0004.pcapng` contains three forwarded Mac-origin multicast frames matching the SignalTap header. The intended demo marker frames still need a clean retest.
 - `SW8=1` generated rule-demo mode was added as a safer demo pivot, but the latest hardware test reported `SW[3:1]=101` stuck at `0000` and no PC2 packets. This means the generated TX trigger did not fire in hardware and still needs debugging.
+- `SW9=1` enables the newer byte/state debug view. Use it to inspect the first bytes seen on W5500 A, the first bytes handed to W5500 B, B TX progress counters, and SW8 parser fields. See `docs/signaltap_debug.md`.
 
-So the project is not yet a working inline firewall. It is currently a proven one-port RX path plus a proven B-side fixed TX path, with the A-triggered transmit path unresolved.
+So the project is not yet an accepted working inline firewall. It is currently a proven one-port RX path plus a proven B-side fixed TX path, with A-triggered transmit narrowed to a demo-frame/source-MAC retest.
 
 ## Current verification status
 
@@ -143,10 +144,11 @@ Current hardware evidence:
 - direct W5500 B TX test mode works and reaches PC2.
 
 Remaining hardware work:
-- add byte-level hardware diagnostics for the first bytes received from W5500 A and the first bytes submitted to W5500 B,
+- validate the `SW9` byte/state diagnostics for the first bytes received from W5500 A and the first bytes submitted to W5500 B,
 - isolate why A-triggered TX does not emit visible frames even though direct B TX works,
 - only after that, return to real one-way allow/drop forwarding,
 - add UART/SignalTap/HPS readback or another reliable counter path before relying on dashboards for FPGA-internal truth,
+- use the SignalTap guide if HEX/LED diagnostics are not enough to explain the handoff failure,
 - defer the final two-port file/video chunk demo until A-triggered TX is proven.
 
 ## Hardware target
@@ -209,7 +211,7 @@ For the simplest continuous rule demo, run this first:
 sudo python3 scripts/rule_demo_sender.py --iface enX
 ```
 
-This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. Add `--udp-allow` if you also want to test the UDP/80 allow profile. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
+This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: TCP/22 SSH allow and TCP/23 drop. By default it uses PC1's real Ethernet MAC address, which is the preferred hardware path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic. Add `--udp-allow` if you also want to test the UDP/80 allow profile. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
 
 For the continuous live demo, run:
 
@@ -221,6 +223,7 @@ This continuously sends:
 - allowed sine-wave packets on UDP destination port `5001`,
 - blocked decoy packets on TCP port `23` by default,
 - a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
+- PC1's real Ethernet MAC address by default,
 - a small default packet shape (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
@@ -264,6 +267,14 @@ http://127.0.0.1:8091
 ```
 
 Expected result: `Total allowed` and `SSH allow received` increase, expected drops increase, and `Drop leaks` stays `0`.
+
+If `All frames seen` rises but `Demo frames seen` stays `0`, summarize the capture:
+
+```powershell
+py -3 .\scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng
+```
+
+If the pcap shows only PC2 background traffic plus occasional real Mac-source frames, restart PC1 with the default sender command above so it uses the real interface MAC. Older commands that forced `--src-mac 00:11:22:33:44:55` are now a spoofed-MAC diagnostic, not the main demo path.
 
 If packets arrive for a while and then stop, stop the PC1 sender, press reset/start on the FPGA, keep `SW5=0`, and restart the safe sender command above. Avoid burst mode during the reliable demo path; `--burst` is only for short ingress bring-up tests with `SW5=1`.
 

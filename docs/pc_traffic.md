@@ -159,6 +159,8 @@ sudo python3 scripts/rule_demo_sender.py --iface enX
 
 The sender defaults are intentionally conservative for hardware reliability: `--rate 1`, `--burst 1`, and `--packet-gap 0.15`. This sends one allowed TCP/22 frame, waits briefly, then sends one TCP/23 decoy/drop frame. After this is stable, try `--rate 2 --packet-gap 0.15`; avoid `--burst` for the normal forwarding demo.
 
+The sender now uses PC1's real Ethernet MAC address by default. That is the main demo path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic.
+
 Expected result:
 - `SSH allow received` increases because TCP destination port `22` from `10.1.2.3` is forwarded.
 - `Expected drops` increases because each cycle includes a TCP/23 blocked decoy.
@@ -169,7 +171,7 @@ If using the latest debug FPGA image, use these switch modes:
 
 - `SW5=1`: raw W5500 A ingress drain. This disables forwarding and proves PC1 -> W5500 A -> FPGA RX.
 - `SW6=1`: direct W5500 B self-test. This ignores PC1 and periodically sends a known-good `FW-DEMO-ALLOW-SSH` frame to PC2.
-- `SW7=1`: raw A-to-B bypass. This is currently failing on hardware even though the testbench passes.
+- `SW7=1`: raw A-to-B bypass. SignalTap plus `sw7-0004.pcapng` prove this can forward at least some real Mac-origin multicast frames; the rule-demo marker path still needs a clean real-MAC retest.
 - `SW8=1`: generated rule-demo mode. This should use A-side allowed/drop packets as triggers and send a known-good B-side allow frame, but the latest hardware result was `SW[3:1]=101 = 0000`, so it still needs debugging.
 
 Only one of `SW5`, `SW6`, `SW7`, and `SW8` should be enabled during a test.
@@ -187,9 +189,16 @@ If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W550
 Hardware debug shortcut: set `SW5=1` and `SW[3:1]=001`. In this mode, `HEX3..HEX0` shows a raw W5500 A ingress-drain count, independent of the firewall forwarder and W5500 B TX path. If this raw count increases, PC1 -> W5500 A is alive and the issue is downstream. Set `SW5=0` for normal firewall forwarding/counting.
 
 Current known capture interpretation:
-- If PC2 capture contains source MAC `00:11:22:33:44:55`, PC2 is seeing the Scapy demo frames.
-- If PC2 capture only contains MACs such as the Windows NIC and multicast destinations, the FPGA path did not emit visible demo traffic.
+- If PC2 capture contains `FW-DEMO-ALLOW-SSH` or `FW-DEMO-DROP-TCP23`, PC2 is seeing the demo frames. `DROP` markers should not appear during enforced forwarding.
+- If PC2 capture contains the Mac's real source MAC, such as `1c:f6:4c:44:ff:46`, the raw SW7 path is forwarding at least some PC1-origin traffic.
+- If PC2 capture only contains the Windows NIC source MAC and multicast destinations, the dashboard is mostly seeing PC2 background traffic.
 - If board `SW[3:1]=101` rises while PC2 sees no demo frames, the FPGA/W5500 control path believes TX completed but the emitted frame is not visible or not valid. This is not proof of forwarding.
+
+Use this helper for a quick capture summary:
+
+```powershell
+py -3 .\scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng
+```
 
 Topology:
 

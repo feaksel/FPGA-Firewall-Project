@@ -12,7 +12,7 @@ except ImportError:
     sys.exit(1)
 
 
-TEST_SRC_MAC = "00:11:22:33:44:55"
+DEFAULT_SRC_MAC = "00:11:22:33:44:55"
 
 PROFILES = OrderedDict(
     (
@@ -27,8 +27,10 @@ def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def find_profile(pkt):
-    if Ether not in pkt or pkt[Ether].src.lower() != TEST_SRC_MAC:
+def find_profile(pkt, src_mac):
+    if Ether not in pkt:
+        return None
+    if src_mac is not None and pkt[Ether].src.lower() != src_mac:
         return None
 
     payload = bytes(pkt[Raw].load) if Raw in pkt else b""
@@ -39,10 +41,10 @@ def find_profile(pkt):
     return "unknown", "UNKNOWN"
 
 
-def render(counts, last_seen):
+def render(counts, last_seen, src_mac):
     clear_screen()
     print("FPGA firewall PC-side traffic view")
-    print(f"Interface traffic from source MAC {TEST_SRC_MAC}")
+    print(f"Interface traffic source filter: {src_mac or 'any'}")
     print()
     print(f"{'profile':<18} {'expected':<9} {'count':>6}  last seen")
     print("-" * 55)
@@ -56,21 +58,23 @@ def render(counts, last_seen):
 def main() -> int:
     parser = argparse.ArgumentParser(description="Live PC-side view for deterministic FPGA firewall packets.")
     parser.add_argument("--iface", default="Ethernet", help="Scapy interface name to sniff.")
+    parser.add_argument("--src-mac", default=DEFAULT_SRC_MAC, help="Optional source MAC filter; use 'any' to match markers from any source.")
     args = parser.parse_args()
+    src_mac = None if args.src_mac.lower() == "any" else args.src_mac.lower()
 
     counts = {name: 0 for name in PROFILES}
     counts["unknown"] = 0
     last_seen = {name: "" for name in counts}
-    render(counts, last_seen)
+    render(counts, last_seen, src_mac)
 
     def on_packet(pkt):
-        result = find_profile(pkt)
+        result = find_profile(pkt, src_mac)
         if result is None:
             return
         name, _expected = result
         counts[name] += 1
         last_seen[name] = datetime.now().strftime("%H:%M:%S")
-        render(counts, last_seen)
+        render(counts, last_seen, src_mac)
 
     try:
         sniff(iface=args.iface, prn=on_packet, store=False)

@@ -135,7 +135,13 @@ module two_port_bypass_tb;
         .init_error(b_init_error),
         .tx_count(b_tx_count),
         .tx_error(b_tx_error),
-        .debug_state()
+        .debug_state(),
+        .last_pkt_len_dbg(),
+        .pkt_available_dbg(),
+        .buf_write_start_count(),
+        .send_issued_count(),
+        .send_cleared_count(),
+        .send_timeout_count()
     );
 
     w5500_macraw_model #(
