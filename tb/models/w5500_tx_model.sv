@@ -13,22 +13,39 @@ module w5500_tx_model #(
     output reg [31:0] tx_send_count
 );
     localparam [15:0] S0_CR             = 16'h0001;
+    localparam [15:0] COMMON_MR         = 16'h0000;
+    localparam [15:0] COMMON_VERSIONR   = 16'h0039;
+    localparam [15:0] S0_MR             = 16'h0000;
+    localparam [15:0] S0_SR             = 16'h0003;
+    localparam [15:0] S0_RXBUF_SIZE     = 16'h001E;
+    localparam [15:0] S0_TXBUF_SIZE     = 16'h001F;
     localparam [15:0] S0_TX_FSR_MSB     = 16'h0020;
     localparam [15:0] S0_TX_FSR_LSB     = 16'h0021;
     localparam [15:0] S0_TX_WR_MSB      = 16'h0024;
     localparam [15:0] S0_TX_WR_LSB      = 16'h0025;
 
+    localparam [7:0] CTRL_COMMON_READ   = 8'h00;
+    localparam [7:0] CTRL_COMMON_WRITE  = 8'h04;
     localparam [7:0] CTRL_S0_REG_READ   = 8'h08;
     localparam [7:0] CTRL_S0_REG_WRITE  = 8'h0C;
     localparam [7:0] CTRL_S0_TXBUF_WRITE= 8'h14;
 
+    localparam [7:0] W5500_VERSION      = 8'h04;
+    localparam [7:0] S0_CR_OPEN         = 8'h01;
     localparam [7:0] S0_CR_SEND         = 8'h20;
+    localparam [7:0] S0_STATUS_MACRAW   = 8'h42;
 
     reg [7:0] txbuf_mem [0:TXBUF_BYTES-1];
     reg [7:0] sent_mem [0:TXBUF_BYTES-1];
     reg [15:0] s0_tx_fsr;
     reg [15:0] s0_tx_wr;
     reg [15:0] last_send_start;
+    reg [7:0]  s0_cr;
+    reg [7:0]  common_mr;
+    reg [7:0]  s0_mr;
+    reg [7:0]  s0_sr;
+    reg [7:0]  s0_rxbuf_size;
+    reg [7:0]  s0_txbuf_size;
 
     reg [15:0] trans_addr;
     reg [7:0]  trans_ctrl;
@@ -44,6 +61,12 @@ module w5500_tx_model #(
             s0_tx_fsr     = TXBUF_BYTES;
             s0_tx_wr      = 16'd0;
             last_send_start = 16'd0;
+            s0_cr          = 8'h00;
+            common_mr      = 8'h00;
+            s0_mr          = 8'h00;
+            s0_sr          = 8'h00;
+            s0_rxbuf_size  = 8'h00;
+            s0_txbuf_size  = 8'h00;
             saw_send_cmd  = 1'b0;
             tx_frame_len  = 16'd0;
             tx_send_count = 32'd0;
@@ -66,8 +89,16 @@ module w5500_tx_model #(
         input [7:0]  ctrl;
         begin
             read_byte = 8'h00;
-            if (ctrl == CTRL_S0_REG_READ) begin
+            if (ctrl == CTRL_COMMON_READ) begin
+                if (addr == COMMON_VERSIONR)
+                    read_byte = W5500_VERSION;
+            end else if (ctrl == CTRL_S0_REG_READ) begin
                 case (addr)
+                    S0_MR:         read_byte = s0_mr;
+                    S0_SR:         read_byte = s0_sr;
+                    S0_RXBUF_SIZE: read_byte = s0_rxbuf_size;
+                        S0_TXBUF_SIZE: read_byte = s0_txbuf_size;
+                        S0_CR:         read_byte = s0_cr;
                     S0_TX_FSR_MSB: read_byte = s0_tx_fsr[15:8];
                     S0_TX_FSR_LSB: read_byte = s0_tx_fsr[7:0];
                     S0_TX_WR_MSB:  read_byte = s0_tx_wr[15:8];
@@ -96,13 +127,27 @@ module w5500_tx_model #(
         input [7:0]  data;
         begin
             case (ctrl)
+                CTRL_COMMON_WRITE: begin
+                    if (addr == COMMON_MR)
+                        common_mr = data;
+                end
+
                 CTRL_S0_REG_WRITE: begin
                     case (addr)
+                        S0_MR:         s0_mr         = data;
+                        S0_RXBUF_SIZE: s0_rxbuf_size = data;
+                        S0_TXBUF_SIZE: s0_txbuf_size = data;
                         S0_TX_WR_MSB: s0_tx_wr[15:8] = data;
                         S0_TX_WR_LSB: s0_tx_wr[7:0]  = data;
                         S0_CR: begin
-                            if (data == S0_CR_SEND)
+                            s0_cr = data;
+                            if (data == S0_CR_OPEN) begin
+                                s0_sr = S0_STATUS_MACRAW;
+                                s0_cr = 8'h00;
+                            end else if (data == S0_CR_SEND) begin
                                 capture_send();
+                                s0_cr = 8'h00;
+                            end
                         end
                     endcase
                 end

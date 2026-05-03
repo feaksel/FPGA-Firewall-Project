@@ -16,6 +16,11 @@ Control assumptions:
 - `KEY[0]` = active-high board reset release for the design
 - `SW[0]` = start initialization
 - `SW[3:1]` = 7-segment display debug page
+- `SW[4]` = LED state source select (`0` for W5500 A RX state, `1` for W5500 B TX state)
+- `SW[5]` = raw W5500 A ingress drain/debug mode
+- `SW[6]` = direct W5500 B generated TX self-test
+- `SW[7]` = raw A-to-B bypass debug mode
+- `SW[8]` = experimental generated rule-demo mode
 
 ## W5500 A / GPIO_0 wiring contract
 
@@ -105,12 +110,21 @@ The board image drives `HEX3..HEX0` as active-low common-anode displays.
 - `SW[3:1] = 010`: low 16 bits of `allow_count`
 - `SW[3:1] = 011`: low 16 bits of `drop_count`
 - `SW[3:1] = 100`: last rule, last action, FIFO overflow marker, packet/error marker
+- `SW[3:1] = 101`: W5500 B TX count, or direct/generated TX count depending on mode
+- `SW[3:1] = 110`: last W5500 A RX size
+- `SW[3:1] = 111`: last W5500 A frame length
 
 Action display values:
 - `A` = last packet was allowed
 - `D` = last packet was dropped
 
 Status nibble on page `000` is `{rx_fifo_overflow, init_error, init_done, rx_packet_seen}`.
+
+Special mode notes:
+- With `SW5=1`, forwarding is intentionally disabled. Pages show raw W5500 A receive/drain diagnostics.
+- With `SW6=1`, the FPGA ignores PC1 and periodically sends a known-good internal test frame from W5500 B. This is the current proven B-side TX baseline.
+- With `SW7=1`, the FPGA attempts direct raw A-to-B streaming. This currently passes simulation but fails hardware visibility on PC2.
+- With `SW8=1`, the FPGA attempts to parse A-side traffic and generate a clean known-good B-side allow frame. This is experimental and currently not hardware-proven.
 
 ## Bring-up notes
 
@@ -124,9 +138,15 @@ Status nibble on page `000` is `{rx_fifo_overflow, init_error, init_done, rx_pac
 
 ## Current hardware evidence
 
-As of 2026-05-01:
+As of 2026-05-03:
 - the board image programs successfully over JTAG,
 - the W5500 `VERSIONR` read works on the physical module,
-- MACRAW initialization reaches RX polling,
-- deterministic Scapy packets from the PC are visible in Wireshark and cause board receive/counter activity,
-- the board image includes HEX display pages for readable RX/allow/drop counters and last-rule/last-action state.
+- W5500 A MACRAW initialization reaches RX polling,
+- deterministic Scapy packets from PC1 are visible when directly cabled to PC2 and cause board W5500 A receive activity,
+- W5500 B can transmit an internally generated frame to PC2 in `SW6` mode,
+- A-triggered TX modes are not yet working:
+  - `SW7` raw bypass produces no visible demo frames on PC2,
+  - `SW8` generated rule-demo latest report showed TX count page `101 = 0000`.
+
+Current hardware blocker:
+- individual A RX and B TX paths work, but the A-triggered B TX path is not proven. Next debugging should add first-byte and TX-progress observability rather than adding more demo layers.

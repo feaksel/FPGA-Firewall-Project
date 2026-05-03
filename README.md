@@ -76,14 +76,27 @@ The current implementation includes:
 - dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
 
 The current project phase is:
-- simulation-complete for the main MVP pipeline,
-- one-port hardware bring-up has reached live RX inspection on `DE1-SoC + W5500`,
-- W5500 SPI register access, MACRAW initialization, RX polling, and PC-generated packet reception have been demonstrated on hardware,
-- not yet in the optional forwarding stage.
+- simulation-complete for the original receive/inspect MVP pipeline,
+- one-port hardware bring-up has reached live RX inspection on `DE1-SoC + W5500 A`,
+- W5500 A SPI register access, MACRAW initialization, RX polling, and PC-generated packet reception have been demonstrated on hardware,
+- W5500 B can transmit a fixed internally generated test frame in `SW6` mode,
+- real A-to-B forwarding and generated rule-demo transmission are currently blocked on hardware even though focused simulations pass.
+
+### Current hardware truth, 2026-05-03
+
+This is the most important status snapshot:
+
+- `SW6=1` direct B transmit test works: PC2/Wireshark sees the FPGA-generated `FW-DEMO-ALLOW-SSH` frame.
+- W5500 A ingress works: with `SW5=1`, raw receive/commit counters rise and last frame length is around `0x50` to `0x52` for the rule-demo sender.
+- A direct cable from PC1 to PC2 works: `wire_rawPc1traffic.pcapng` contains demo frames from source MAC `00:11:22:33:44:55`.
+- `SW7=1` raw A-to-B bypass does not produce visible demo frames on PC2. TX count can rise, but Wireshark sees only local/background PC2 traffic.
+- `SW8=1` generated rule-demo mode was added as a safer demo pivot, but the latest hardware test reported `SW[3:1]=101` stuck at `0000` and no PC2 packets. This means the generated TX trigger did not fire in hardware and still needs debugging.
+
+So the project is not yet a working inline firewall. It is currently a proven one-port RX path plus a proven B-side fixed TX path, with the A-triggered transmit path unresolved.
 
 ## Current verification status
 
-The XSim regression suite currently passes for:
+The original XSim regression suite passes for:
 - `fake_eth_source_tb`
 - `parser_tb`
 - `rule_engine_tb`
@@ -93,6 +106,13 @@ The XSim regression suite currently passes for:
 - `spi_master_tb`
 - `eth_controller_adapter_tb`
 - `adapter_firewall_integration_tb`
+
+Focused Questa tests added during two-port bring-up:
+- `two_port_bypass_tb`
+- `de1_soc_top_bypass_tb`
+- `de1_soc_top_rule_regen_tb`
+
+These tests prove the intended RTL handshakes against local W5500 models, but the hardware results show that the models are still incomplete for the real two-W5500 path. Passing these tests is necessary but no longer sufficient evidence for the demo.
 
 Run the full suite with:
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1`
@@ -119,14 +139,15 @@ Current hardware evidence:
   - `udp_allow`
   - `tcp_drop`
   - `tcp_allow_ssh`
-- board LEDs show receive/allow/drop counter activity while traffic is present.
+- board LEDs and HEX pages show receive activity while traffic is present.
+- direct W5500 B TX test mode works and reaches PC2.
 
 Remaining hardware work:
-- correlate each deterministic packet profile with the expected allow/drop counter behavior more cleanly,
-- close the new stream-level forwarding and W5500 TX simulations,
-- add a shared W5500 B hardware path for transmit,
-- add UART telemetry for dashboard-visible FPGA counters,
-- run the final two-port file/video chunk demo.
+- add byte-level hardware diagnostics for the first bytes received from W5500 A and the first bytes submitted to W5500 B,
+- isolate why A-triggered TX does not emit visible frames even though direct B TX works,
+- only after that, return to real one-way allow/drop forwarding,
+- add UART/SignalTap/HPS readback or another reliable counter path before relying on dashboards for FPGA-internal truth,
+- defer the final two-port file/video chunk demo until A-triggered TX is proven.
 
 ## Hardware target
 

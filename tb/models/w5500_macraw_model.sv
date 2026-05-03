@@ -2,7 +2,8 @@
 
 module w5500_macraw_model #(
     parameter PACKET_FILE   = "tb/packets/udp_allow.mem",
-    parameter PACKET_LENGTH = 38
+    parameter PACKET_LENGTH = 38,
+    parameter REPEAT_PACKETS = 0
 ) (
     input  wire rst_n,
     input  wire w5500_reset_n,
@@ -57,13 +58,24 @@ module w5500_macraw_model #(
     integer    bit_idx;
     integer    byte_idx;
     integer    init_idx;
+    integer    recv_count;
 
     initial begin
         $readmemh(PACKET_FILE, packet_mem);
     end
 
-    task reset_device;
+    task load_packet_at;
+        input [15:0] base_addr;
         integer idx;
+        begin
+            rxbuf_mem[base_addr]          = PACKET_LENGTH[15:8];
+            rxbuf_mem[base_addr + 16'd1]  = PACKET_LENGTH[7:0];
+            for (idx = 0; idx < PACKET_LENGTH; idx = idx + 1)
+                rxbuf_mem[base_addr + 16'd2 + idx[15:0]] = packet_mem[idx];
+        end
+    endtask
+
+    task reset_device;
         begin
             common_mr        = 8'h00;
             s0_mr            = 8'h00;
@@ -83,10 +95,8 @@ module w5500_macraw_model #(
             trans_ctrl       = 8'd0;
             bit_idx          = 7;
             byte_idx         = 0;
-            rxbuf_mem[0]     = PACKET_LENGTH[15:8];
-            rxbuf_mem[1]     = PACKET_LENGTH[7:0];
-            for (idx = 0; idx < PACKET_LENGTH; idx = idx + 1)
-                rxbuf_mem[idx + 2] = packet_mem[idx];
+            recv_count       = 0;
+            load_packet_at(16'd0);
         end
     endtask
 
@@ -146,8 +156,15 @@ module w5500_macraw_model #(
                                 s0_sr        = S0_STATUS_MACRAW;
                             end else if (data == S0_CR_RECV) begin
                                 saw_recv_cmd = 1'b1;
-                                s0_rx_rsr    = 16'd0;
-                                int_n        = 1'b1;
+                                recv_count   = recv_count + 1;
+                                if (REPEAT_PACKETS) begin
+                                    load_packet_at(s0_rx_rd);
+                                    s0_rx_rsr = PACKET_LENGTH + 16'd2;
+                                    int_n     = 1'b0;
+                                end else begin
+                                    s0_rx_rsr = 16'd0;
+                                    int_n     = 1'b1;
+                                end
                             end
                         end
                     endcase
@@ -191,9 +208,14 @@ module w5500_macraw_model #(
                         spi_out_shift = read_byte(trans_addr, received_byte);
                     end
 
-                    3: begin
-                        write_byte(trans_addr, trans_ctrl, received_byte);
-                        spi_out_shift = 8'h00;
+                    default: begin
+                        if (trans_ctrl == CTRL_S0_RXBUF_READ) begin
+                            spi_out_shift = read_byte(trans_addr + (byte_idx - 2), trans_ctrl);
+                        end else begin
+                            if (byte_idx == 3)
+                                write_byte(trans_addr, trans_ctrl, received_byte);
+                            spi_out_shift = 8'h00;
+                        end
                     end
                 endcase
 

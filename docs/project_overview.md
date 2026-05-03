@@ -29,7 +29,7 @@ This is important because hardware projects fail easily when too many things are
 
 ## What the system does today
 
-At the current stage, the design is a one-port packet receive and inspection pipeline that has now been exercised on the physical DE1-SoC + W5500 hardware.
+At the current stable stage, the design is a one-port packet receive and inspection pipeline that has been exercised on the physical DE1-SoC + W5500 hardware.
 
 In plain language, the flow is:
 
@@ -42,7 +42,15 @@ In plain language, the flow is:
 7. The firewall core records whether the packet was allowed or dropped.
 8. Debug counters and LEDs show what happened.
 
-Right now, the system is focused on receive-side inspection. It is not yet a full inline two-port forwarding firewall. That later extension is planned only after the receive path and allow/drop validation are repeatable on hardware.
+Right now, the system is not yet a full inline two-port forwarding firewall.
+
+As of 2026-05-03, the repo also contains experimental two-port RTL and debug modes. The important hardware status is:
+
+- W5500 A receive works: PC1 traffic reaches the FPGA and raw ingress counters/length pages move.
+- W5500 B direct transmit works: `SW6` sends an internally generated demo frame that PC2 can see.
+- A-triggered transmit does not work yet: `SW7` raw bypass and `SW8` generated rule-demo mode do not currently produce visible demo frames on PC2.
+
+This means the hardware problem is no longer "can we talk to each module?" The problem is specifically the handoff from A-side received traffic into a B-side transmit event/frame.
 
 ## Why the project is organized in stages
 
@@ -373,19 +381,28 @@ Current status as of 2026-05-01:
 - Deterministic Scapy packets sent by the PC were captured in Wireshark and observed by the FPGA receive path.
 - Single-bit LED counters show activity, but a clearer debug method is still needed to prove every packet profile maps to the expected allow/drop counter result.
 
-### Stage 8: Optional forwarding work
+### Stage 8: Two-port forwarding/debug work
 
 Goal:
 - extend the project from receive-side inspection into a more complete forwarding design
 
-This stage is intentionally delayed until the receive path is stable and allow/drop counter correlation is documented.
+This stage is active but blocked on hardware.
 
-Likely work here:
-- second-port handling
-- transmit path buffering
-- forwarding only allowed packets
+What has been implemented experimentally:
+- W5500 B TX adapter and simulation model.
+- `SW6` direct B-side generated-frame TX test.
+- `SW7` raw A-to-B bypass debug path.
+- `SW8` generated rule-demo path that should parse A-side traffic and emit a clean known-good B-side frame for allowed traffic.
+- Top-level tests for bypass and generated rule-demo behavior.
 
-This is not the MVP and should not be allowed to destabilize the current bring-up path.
+What hardware says:
+- `SW6` works.
+- `SW5` raw A ingress works.
+- `SW7` and `SW8` do not yet work on the board.
+
+Move forward only when:
+- PC2 Wireshark sees a frame caused by PC1 traffic passing through W5500 A and FPGA logic, not just the periodic SW6 self-test.
+- The FPGA can distinguish an allowed trigger from a dropped trigger on hardware.
 
 ## How testing works in practice
 
@@ -606,13 +623,14 @@ Already established on hardware:
 - W5500 MACRAW initialization,
 - real packet receive activity from PC traffic,
 - Wireshark confirmation of deterministic Scapy packets.
+- W5500 B can transmit a fixed internally generated frame in `SW6` mode.
 
 Still considered active bring-up work:
+- A-triggered W5500 B transmission,
+- byte-level proof that the first A-side received bytes match the sender's Ethernet header,
+- byte-level proof that the first B-side TX bytes match the intended egress frame,
 - clean allow/drop counter correlation against deterministic PC traffic,
-- `firewall_forwarder` simulation closure,
-- standalone W5500 TX engine simulation closure,
-- a shared hardware controller path that can initialize and transmit on W5500 B,
-- UART telemetry for dashboard-visible FPGA counters.
+- UART, SignalTap, or another readback path for dashboard-visible FPGA counters.
 
 ## Real inline firewall target
 
@@ -622,7 +640,15 @@ The final project target is now a one-way inline firewall first:
 PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
 ```
 
-The first real demo is a chunked file transfer. PC1 sends allowed file chunks on UDP destination port `5001` and intentionally interleaves blocked decoy/error traffic. The FPGA forwards only allowed chunks. PC2 reconstructs the file and verifies SHA-256.
+The first real demo is still intended to be a chunked file transfer. PC1 sends allowed file chunks on UDP destination port `5001` and intentionally interleaves blocked decoy/error traffic. The FPGA forwards only allowed chunks. PC2 reconstructs the file and verifies SHA-256.
+
+This demo is deferred until A-triggered transmit is proven. The current demo target is narrower:
+
+```text
+PC1 sender -> W5500 A -> FPGA detects allowed/drop packet -> W5500 B emits visible allowed demo frame -> PC2 dashboard
+```
+
+The key acceptance criterion is not a counter on the board. It is a PC2 capture showing the allowed FPGA-emitted frame and no blocked decoy leak.
 
 New implementation pieces for this phase:
 - [rtl/firewall/firewall_forwarder.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v): stream-level allow/drop forwarder around the parser, rule engine, and packet buffer.

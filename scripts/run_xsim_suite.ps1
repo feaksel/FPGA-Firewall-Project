@@ -8,7 +8,10 @@ $tests = @(
     "firewall_core_tb",
     "spi_master_tb",
     "eth_controller_adapter_tb",
-    "adapter_firewall_integration_tb"
+    "w5500_tx_engine_tb",
+    "adapter_firewall_integration_tb",
+    "two_port_bypass_tb",
+    "de1_soc_top_bypass_tb"
 )
 
 foreach ($test in $tests) {

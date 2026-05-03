@@ -55,3 +55,26 @@
 - Added a restart button to the sine receiver dashboard for clearing the live demo view without restarting the sniffer
 - Changed W5500 B TX payload writes from one SPI transaction per byte to a single burst TX-buffer write per frame, improving the two-port forwarding demo throughput
 - Added the same restart/reset control to the deterministic traffic dashboard
+
+## 2026-05-03
+- Added focused two-port hardware debug modes to `de1_soc_w5500_top`:
+  - `SW5`: raw W5500 A ingress drain/debug mode.
+  - `SW6`: direct W5500 B internally generated TX test mode.
+  - `SW7`: raw A-to-B bypass debug mode.
+  - `SW8`: experimental generated rule-demo mode that should emit a known-good B-side frame when A-side traffic matches allow rules.
+- Added debug HEX pages for raw ingress counts, W5500 B TX count, last RX size, and last frame length.
+- Confirmed by hardware observation that W5500 A ingress works in raw mode and W5500 B direct transmit works in `SW6`.
+- Confirmed by capture comparison that direct PC1-to-PC2 traffic contains demo frames, while SW7/SW8 FPGA paths do not yet produce visible demo frames on PC2.
+- Added and updated two-port simulation coverage:
+  - `two_port_bypass_tb`
+  - `de1_soc_top_bypass_tb`
+  - `de1_soc_top_rule_regen_tb`
+- Updated W5500 TX behavior:
+  - removed false TX error on normal backpressure,
+  - changed TX free-space handling to wait/retry,
+  - added `S0_CR` command-clear polling after `SEND`.
+- Updated W5500 simulation models:
+  - added repeated RX packet support to `w5500_macraw_model`,
+  - added `S0_CR` readback/clear behavior to `w5500_tx_model`.
+- Updated simulation runners to include the newer TX/debug sources.
+- Documented the current unresolved hardware blocker: individual A RX and B TX paths work, but A-triggered TX still fails on real hardware.

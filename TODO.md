@@ -11,6 +11,12 @@
 - [ ] M8: Real one-way inline forwarding
 - [ ] M9: File/video transfer demo with telemetry dashboard
 
+Current status note, 2026-05-03:
+- M8 is blocked. `SW6` proves W5500 B can transmit a known FPGA-generated frame to PC2, and `SW5` proves W5500 A can receive PC1 traffic. However, A-triggered transmission is not yet working on real hardware:
+  - `SW7` raw A-to-B bypass: TX count can rise, but PC2 sees no demo frames.
+  - `SW8` generated rule-demo mode: latest hardware report shows `SW[3:1]=101` stuck at `0000`, so the generated TX trigger is not firing.
+- The next milestone is hardware diagnostics, not more demo features.
+
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
 - [x] Add packet memory vectors to `tb/packets/`
@@ -52,3 +58,20 @@
 - [ ] Prove a fixed test frame transmitted from FPGA to PC2
 - [ ] Prove one allowed PC1-to-PC2 forwarded packet and one dropped packet
 - [ ] Run the final file/video transfer and verify PC2 SHA-256 match
+
+## Current Debug Tasks
+
+- [ ] Add HEX-visible first-byte diagnostics for W5500 A RX:
+  - received frame byte 0..3 should usually be `FF FF FF FF` for the current broadcast demo frames.
+  - received frame bytes 6..11 should include source MAC `00:11:22:33:44:55` for the Scapy sender.
+- [ ] Add HEX-visible first-byte diagnostics for the frame submitted to W5500 B TX.
+- [ ] Add a TX-completion/error page that distinguishes:
+  - frame accepted by TX adapter,
+  - TX buffer write started,
+  - TX buffer write completed,
+  - `S0_TX_WR` updated,
+  - `SEND` command written,
+  - `S0_CR` cleared.
+- [ ] Re-test `SW6` after every TX adapter edit as the known-good B-side baseline.
+- [ ] Re-test `SW5=1` raw ingress after every RX adapter edit as the known-good A-side baseline.
+- [ ] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2.

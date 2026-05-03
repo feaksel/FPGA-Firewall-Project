@@ -90,3 +90,24 @@
 - Reason: Chunked transfer is robust over W5500-over-SPI and makes policy drops visible without corrupting required file data.
 - Alternatives considered: Live streaming, iperf-only throughput, or a synthetic packet counter demo.
 - Impact: The final presentation can show a real reconstructed artifact while honestly describing the firewall as packet-policy enforcement, not payload malware detection.
+
+## D-014
+- Date: 2026-05-03
+- Decision: Treat `SW6` direct W5500 B transmit as the current B-side hardware baseline, and do not claim the two-port firewall works until A-triggered TX is visible on PC2.
+- Reason: Hardware captures show that B can transmit an internally generated frame, and A can receive PC1 traffic, but A-to-B triggered paths currently do not produce visible demo frames on PC2.
+- Alternatives considered: Continuing to tune sender/dashboard scripts or accepting TX counter increments as proof of forwarding.
+- Impact: PC2 Wireshark/dashboard visibility is required for forwarding claims; FPGA TX counters alone are not enough.
+
+## D-015
+- Date: 2026-05-03
+- Decision: Add `SW8` generated rule-demo mode as an experimental pivot, but document it as blocked until hardware confirms it.
+- Reason: Regenerating a known-good frame on B after parsing A-side traffic is a simpler demo than transparent bridging and avoids forwarding corrupted/raw bytes. The latest hardware test still shows `SW[3:1]=101` stuck at `0000`, so it is not yet proven.
+- Alternatives considered: Continuing to debug only transparent raw bypass, or moving directly to file/video demo.
+- Impact: The next hardware work is byte/state observability for the A-triggered path, not more UX/demo scripting.
+
+## D-016
+- Date: 2026-05-03
+- Decision: Treat the current W5500 models as sequencing checks, not hardware-accuracy proof for two-port operation.
+- Reason: The focused two-port testbenches pass while the board still fails. The models do not yet capture enough real-chip timing, command completion, link behavior, or capture-visible effects.
+- Alternatives considered: Assuming a passing testbench means the issue is only wiring or PC capture.
+- Impact: Future model changes should be driven by measured hardware evidence such as latched bytes, state pages, SignalTap, or UART telemetry.

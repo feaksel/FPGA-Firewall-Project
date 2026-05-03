@@ -55,15 +55,50 @@ module de1_soc_w5500_top (
     wire        rx_frame_eop;
     wire [0:0]  rx_frame_src_port;
     wire        rx_frame_ready;
-    wire        forwarder_in_ready;
+    wire        rx_fifo_in_ready;
+    wire        rx_fifo_overflow;
+    wire        core_frame_valid;
+    wire [7:0]  core_frame_data;
+    wire        core_frame_sop;
+    wire        core_frame_eop;
+    wire [0:0]  core_frame_src_port;
+    wire        core_frame_ready;
     wire        rx_drain_debug;
+    wire        tx_test_mode;
+    wire        forward_bypass_mode;
+    wire        rule_regen_mode;
+    wire        synthetic_tx_mode;
     wire        tx_frame_valid;
     wire [7:0]  tx_frame_data;
     wire        tx_frame_sop;
     wire        tx_frame_eop;
     wire [0:0]  tx_frame_src_port;
     wire        tx_frame_ready;
+    wire        tx_to_b_valid;
+    wire [7:0]  tx_to_b_data;
+    wire        tx_to_b_sop;
+    wire        tx_to_b_eop;
+    wire        forwarder_out_ready;
+    wire        fifo_out_ready;
+    wire        middle_frame_valid;
+    wire [7:0]  middle_frame_data;
+    wire        middle_frame_sop;
+    wire        middle_frame_eop;
     wire [31:0] tx_count_b;
+    reg         tx_test_valid;
+    reg  [7:0]  tx_test_data;
+    reg         tx_test_sop;
+    reg         tx_test_eop;
+    reg  [7:0]  tx_test_index;
+    reg  [31:0] tx_test_wait_ctr;
+    reg  [31:0] tx_test_count;
+    reg         regen_allow_pending;
+    reg  [15:0] regen_byte_index;
+    reg  [15:0] regen_ethertype;
+    reg  [7:0]  regen_ip_proto;
+    reg  [15:0] regen_dst_port;
+    reg  [31:0] regen_allow_count;
+    reg  [31:0] regen_drop_count;
     wire [2:0] debug_page;
     reg  [3:0] hex0_value;
     reg  [3:0] hex1_value;
@@ -99,10 +134,26 @@ module de1_soc_w5500_top (
     assign spi_b_miso     = GPIO_1[4];
     assign debug_page     = SW[3:1];
     assign rx_drain_debug = SW[5];
-    assign rx_frame_ready = rx_drain_debug ? 1'b1 : forwarder_in_ready;
-    assign display_rx_count = rx_drain_debug ? raw_rx_count : rx_count;
+    assign tx_test_mode   = SW[6];
+    assign forward_bypass_mode = SW[7];
+    assign rule_regen_mode = SW[8];
+    assign synthetic_tx_mode = tx_test_mode || rule_regen_mode;
+    assign rx_frame_ready = rx_drain_debug ? 1'b1 :
+                            (rule_regen_mode ? 1'b1 :
+                            (forward_bypass_mode ? tx_frame_ready : rx_fifo_in_ready));
+    assign display_rx_count = (rx_drain_debug || rule_regen_mode) ? raw_rx_count : rx_count;
     assign init_done      = init_done_a && init_done_b;
     assign init_error     = init_error_a || init_error_b || tx_error_b;
+    assign fifo_out_ready = forward_bypass_mode ? 1'b0 : core_frame_ready;
+    assign middle_frame_valid = forward_bypass_mode ? rx_frame_valid : tx_frame_valid;
+    assign middle_frame_data  = forward_bypass_mode ? rx_frame_data  : tx_frame_data;
+    assign middle_frame_sop   = forward_bypass_mode ? rx_frame_sop   : tx_frame_sop;
+    assign middle_frame_eop   = forward_bypass_mode ? rx_frame_eop   : tx_frame_eop;
+    assign tx_to_b_valid  = synthetic_tx_mode ? tx_test_valid : middle_frame_valid;
+    assign tx_to_b_data   = synthetic_tx_mode ? tx_test_data  : middle_frame_data;
+    assign tx_to_b_sop    = synthetic_tx_mode ? tx_test_sop   : middle_frame_sop;
+    assign tx_to_b_eop    = synthetic_tx_mode ? tx_test_eop   : middle_frame_eop;
+    assign forwarder_out_ready = synthetic_tx_mode ? 1'b0 : tx_frame_ready;
 
     assign GPIO_0[0] = spi_a_sclk;
     assign GPIO_0[1] = spi_a_mosi;
@@ -124,9 +175,9 @@ module de1_soc_w5500_top (
     assign LEDR[1] = init_error;
     assign LEDR[2] = rx_packet_seen_a;
     assign LEDR[6:3] = SW[4] ? adapter_b_debug_state : adapter_a_debug_state;
-    assign LEDR[7] = rx_count[0];
-    assign LEDR[8] = rx_stream_byte_count_a[0];
-    assign LEDR[9] = rx_commit_count_a[0];
+    assign LEDR[7] = SW[4] ? tx_to_b_valid : rx_count[0];
+    assign LEDR[8] = SW[4] ? tx_frame_ready : rx_stream_byte_count_a[0];
+    assign LEDR[9] = SW[4] ? rx_fifo_overflow : rx_commit_count_a[0];
 
     always @* begin
         hex0_value = 4'h0;
@@ -204,28 +255,35 @@ module de1_soc_w5500_top (
                 hex0_value = display_rx_count[3:0];
             end
             3'b010: begin
-                hex3_value = allow_count[15:12];
-                hex2_value = allow_count[11:8];
-                hex1_value = allow_count[7:4];
-                hex0_value = allow_count[3:0];
+                hex3_value = rule_regen_mode ? regen_allow_count[15:12] : allow_count[15:12];
+                hex2_value = rule_regen_mode ? regen_allow_count[11:8]  : allow_count[11:8];
+                hex1_value = rule_regen_mode ? regen_allow_count[7:4]   : allow_count[7:4];
+                hex0_value = rule_regen_mode ? regen_allow_count[3:0]   : allow_count[3:0];
             end
             3'b011: begin
-                hex3_value = drop_count[15:12];
-                hex2_value = drop_count[11:8];
-                hex1_value = drop_count[7:4];
-                hex0_value = drop_count[3:0];
+                hex3_value = rule_regen_mode ? regen_drop_count[15:12] : drop_count[15:12];
+                hex2_value = rule_regen_mode ? regen_drop_count[11:8]  : drop_count[11:8];
+                hex1_value = rule_regen_mode ? regen_drop_count[7:4]   : drop_count[7:4];
+                hex0_value = rule_regen_mode ? regen_drop_count[3:0]   : drop_count[3:0];
             end
             3'b100: begin
                 hex3_value = last_matched_rule_id;
                 hex2_value = last_action_allow ? 4'hA : 4'hD;
                 hex1_value = tx_error_b ? 4'hE : adapter_b_debug_state;
-                hex0_value = init_error ? 4'hE : (rx_packet_seen_a ? 4'h1 : 4'h0);
+                hex0_value = {rx_fifo_overflow, tx_frame_ready, fifo_out_ready, rx_packet_seen_a};
             end
             3'b101: begin
-                hex3_value = tx_count_b[15:12];
-                hex2_value = tx_count_b[11:8];
-                hex1_value = tx_count_b[7:4];
-                hex0_value = tx_count_b[3:0];
+                if (synthetic_tx_mode) begin
+                    hex3_value = tx_test_count[15:12];
+                    hex2_value = tx_test_count[11:8];
+                    hex1_value = tx_test_count[7:4];
+                    hex0_value = tx_test_count[3:0];
+                end else begin
+                    hex3_value = tx_count_b[15:12];
+                    hex2_value = tx_count_b[11:8];
+                    hex1_value = tx_count_b[7:4];
+                    hex0_value = tx_count_b[3:0];
+                end
             end
             3'b110: begin
                 hex3_value = last_rx_size_bytes_a[15:12];
@@ -251,6 +309,197 @@ module de1_soc_w5500_top (
             raw_rx_count <= 32'd0;
         end else if (rx_frame_valid && rx_frame_ready && rx_frame_eop) begin
             raw_rx_count <= raw_rx_count + 32'd1;
+        end
+    end
+
+    always @(posedge CLOCK_50 or negedge rst_n) begin
+        if (!rst_n) begin
+            regen_allow_pending <= 1'b0;
+            regen_byte_index    <= 16'd0;
+            regen_ethertype     <= 16'd0;
+            regen_ip_proto      <= 8'd0;
+            regen_dst_port      <= 16'd0;
+            regen_allow_count   <= 32'd0;
+            regen_drop_count    <= 32'd0;
+        end else if (!rule_regen_mode) begin
+            regen_allow_pending <= 1'b0;
+            regen_byte_index    <= 16'd0;
+            regen_ethertype     <= 16'd0;
+            regen_ip_proto      <= 8'd0;
+            regen_dst_port      <= 16'd0;
+        end else if (tx_test_valid && tx_frame_ready && tx_test_eop) begin
+            regen_allow_pending <= 1'b0;
+        end else if (rx_frame_valid && rx_frame_ready) begin
+            if (rx_frame_sop) begin
+                regen_byte_index <= 16'd0;
+                regen_ethertype  <= 16'd0;
+                regen_ip_proto   <= 8'd0;
+                regen_dst_port   <= 16'd0;
+            end else begin
+                regen_byte_index <= regen_byte_index + 16'd1;
+            end
+
+            case (rx_frame_sop ? 16'd0 : (regen_byte_index + 16'd1))
+                16'd12: regen_ethertype[15:8] <= rx_frame_data;
+                16'd13: regen_ethertype[7:0]  <= rx_frame_data;
+                16'd23: regen_ip_proto         <= rx_frame_data;
+                16'd36: regen_dst_port[15:8]   <= rx_frame_data;
+                16'd37: begin
+                    regen_dst_port[7:0] <= rx_frame_data;
+                    if ((regen_ethertype == 16'h0800) &&
+                        (((regen_ip_proto == 8'h06) && ({regen_dst_port[15:8], rx_frame_data} == 16'd22)) ||
+                         ((regen_ip_proto == 8'h11) && ({regen_dst_port[15:8], rx_frame_data} == 16'd80)))) begin
+                        regen_allow_pending <= 1'b1;
+                        regen_allow_count   <= regen_allow_count + 32'd1;
+                    end else if ((regen_ethertype == 16'h0800) &&
+                                 (regen_ip_proto == 8'h06) &&
+                                 ({regen_dst_port[15:8], rx_frame_data} == 16'd23)) begin
+                        regen_drop_count <= regen_drop_count + 32'd1;
+                    end
+                end
+                default: begin end
+            endcase
+        end
+    end
+
+    function [7:0] tx_test_frame_byte;
+        input [7:0] idx;
+        begin
+            case (idx)
+                8'd0:  tx_test_frame_byte = 8'hFF;
+                8'd1:  tx_test_frame_byte = 8'hFF;
+                8'd2:  tx_test_frame_byte = 8'hFF;
+                8'd3:  tx_test_frame_byte = 8'hFF;
+                8'd4:  tx_test_frame_byte = 8'hFF;
+                8'd5:  tx_test_frame_byte = 8'hFF;
+                8'd6:  tx_test_frame_byte = 8'h00;
+                8'd7:  tx_test_frame_byte = 8'h11;
+                8'd8:  tx_test_frame_byte = 8'h22;
+                8'd9:  tx_test_frame_byte = 8'h33;
+                8'd10: tx_test_frame_byte = 8'h44;
+                8'd11: tx_test_frame_byte = 8'h55;
+                8'd12: tx_test_frame_byte = 8'h08;
+                8'd13: tx_test_frame_byte = 8'h00;
+                8'd14: tx_test_frame_byte = 8'h45;
+                8'd15: tx_test_frame_byte = 8'h00;
+                8'd16: tx_test_frame_byte = 8'h00;
+                8'd17: tx_test_frame_byte = 8'h42;
+                8'd18: tx_test_frame_byte = 8'h12;
+                8'd19: tx_test_frame_byte = 8'h34;
+                8'd20: tx_test_frame_byte = 8'h00;
+                8'd21: tx_test_frame_byte = 8'h00;
+                8'd22: tx_test_frame_byte = 8'h40;
+                8'd23: tx_test_frame_byte = 8'h06;
+                8'd24: tx_test_frame_byte = 8'h00;
+                8'd25: tx_test_frame_byte = 8'h00;
+                8'd26: tx_test_frame_byte = 8'h0A;
+                8'd27: tx_test_frame_byte = 8'h01;
+                8'd28: tx_test_frame_byte = 8'h02;
+                8'd29: tx_test_frame_byte = 8'h03;
+                8'd30: tx_test_frame_byte = 8'hC0;
+                8'd31: tx_test_frame_byte = 8'hA8;
+                8'd32: tx_test_frame_byte = 8'h01;
+                8'd33: tx_test_frame_byte = 8'h63;
+                8'd34: tx_test_frame_byte = 8'h08;
+                8'd35: tx_test_frame_byte = 8'hAE;
+                8'd36: tx_test_frame_byte = 8'h00;
+                8'd37: tx_test_frame_byte = 8'h16;
+                8'd38: tx_test_frame_byte = 8'h00;
+                8'd39: tx_test_frame_byte = 8'h00;
+                8'd40: tx_test_frame_byte = 8'h00;
+                8'd41: tx_test_frame_byte = 8'h01;
+                8'd42: tx_test_frame_byte = 8'h00;
+                8'd43: tx_test_frame_byte = 8'h00;
+                8'd44: tx_test_frame_byte = 8'h00;
+                8'd45: tx_test_frame_byte = 8'h00;
+                8'd46: tx_test_frame_byte = 8'h50;
+                8'd47: tx_test_frame_byte = 8'h02;
+                8'd48: tx_test_frame_byte = 8'h20;
+                8'd49: tx_test_frame_byte = 8'h00;
+                8'd50: tx_test_frame_byte = 8'h00;
+                8'd51: tx_test_frame_byte = 8'h00;
+                8'd52: tx_test_frame_byte = "F";
+                8'd53: tx_test_frame_byte = "W";
+                8'd54: tx_test_frame_byte = "-";
+                8'd55: tx_test_frame_byte = "D";
+                8'd56: tx_test_frame_byte = "E";
+                8'd57: tx_test_frame_byte = "M";
+                8'd58: tx_test_frame_byte = "O";
+                8'd59: tx_test_frame_byte = "-";
+                8'd60: tx_test_frame_byte = "A";
+                8'd61: tx_test_frame_byte = "L";
+                8'd62: tx_test_frame_byte = "L";
+                8'd63: tx_test_frame_byte = "O";
+                8'd64: tx_test_frame_byte = "W";
+                8'd65: tx_test_frame_byte = "-";
+                8'd66: tx_test_frame_byte = "S";
+                8'd67: tx_test_frame_byte = "S";
+                8'd68: tx_test_frame_byte = "H";
+                8'd69: tx_test_frame_byte = " ";
+                8'd70: tx_test_frame_byte = "s";
+                8'd71: tx_test_frame_byte = "e";
+                8'd72: tx_test_frame_byte = "q";
+                8'd73: tx_test_frame_byte = "=";
+                8'd74: tx_test_frame_byte = "9";
+                8'd75: tx_test_frame_byte = "0";
+                8'd76: tx_test_frame_byte = "0";
+                8'd77: tx_test_frame_byte = "0";
+                default: tx_test_frame_byte = 8'h00;
+            endcase
+        end
+    endfunction
+
+    always @(posedge CLOCK_50 or negedge rst_n) begin
+        if (!rst_n) begin
+            tx_test_valid    <= 1'b0;
+            tx_test_data     <= 8'd0;
+            tx_test_sop      <= 1'b0;
+            tx_test_eop      <= 1'b0;
+            tx_test_index    <= 8'd0;
+            tx_test_wait_ctr <= 32'd0;
+            tx_test_count    <= 32'd0;
+        end else if (!synthetic_tx_mode) begin
+            tx_test_valid    <= 1'b0;
+            tx_test_sop      <= 1'b0;
+            tx_test_eop      <= 1'b0;
+            tx_test_index    <= 8'd0;
+            tx_test_wait_ctr <= 32'd0;
+        end else begin
+            tx_test_sop <= 1'b0;
+            tx_test_eop <= 1'b0;
+
+            if (tx_test_valid) begin
+                if (tx_frame_ready) begin
+                    if (tx_test_index == 8'd77) begin
+                        tx_test_valid <= 1'b0;
+                        tx_test_index <= 8'd0;
+                        tx_test_count <= tx_test_count + 32'd1;
+                    end else begin
+                        tx_test_index <= tx_test_index + 8'd1;
+                        tx_test_data  <= tx_test_frame_byte(tx_test_index + 8'd1);
+                        tx_test_sop   <= 1'b0;
+                        tx_test_eop   <= (tx_test_index == 8'd76);
+                    end
+                end
+            end else if (rule_regen_mode && regen_allow_pending && init_done_b) begin
+                tx_test_valid    <= 1'b1;
+                tx_test_data     <= tx_test_frame_byte(8'd0);
+                tx_test_sop      <= 1'b1;
+                tx_test_eop      <= 1'b0;
+                tx_test_index    <= 8'd0;
+                tx_test_wait_ctr <= 32'd0;
+            end else if (tx_test_mode && (tx_test_wait_ctr == 32'd25_000_000)) begin
+                tx_test_wait_ctr <= 32'd0;
+                tx_test_valid    <= init_done_b;
+                tx_test_data     <= tx_test_frame_byte(8'd0);
+                tx_test_sop      <= init_done_b;
+                tx_test_eop      <= 1'b0;
+                tx_test_index    <= 8'd0;
+            end else if (tx_test_mode) begin
+                tx_test_wait_ctr <= tx_test_wait_ctr + 32'd1;
+            end else begin
+                tx_test_wait_ctr <= 32'd0;
+            end
         end
     end
 
@@ -327,23 +576,44 @@ module de1_soc_w5500_top (
         .debug_state(adapter_a_debug_state)
     );
 
+    frame_rx_fifo #(
+        .PACKET_DEPTH(8),
+        .MAX_PKT_BYTES(2048)
+    ) u_ingress_fifo (
+        .clk(CLOCK_50),
+        .rst_n(rst_n),
+        .in_valid((rx_drain_debug || forward_bypass_mode || rule_regen_mode) ? 1'b0 : rx_frame_valid),
+        .in_data(rx_frame_data),
+        .in_sop(rx_frame_sop),
+        .in_eop(rx_frame_eop),
+        .in_src_port(rx_frame_src_port),
+        .in_ready(rx_fifo_in_ready),
+        .out_valid(core_frame_valid),
+        .out_data(core_frame_data),
+        .out_sop(core_frame_sop),
+        .out_eop(core_frame_eop),
+        .out_src_port(core_frame_src_port),
+        .out_ready(fifo_out_ready),
+        .overflow_error(rx_fifo_overflow)
+    );
+
     firewall_forwarder #(
         .MAX_PKT_BYTES(2048)
     ) u_firewall_forwarder (
         .clk(CLOCK_50),
         .rst_n(rst_n),
-        .in_valid(rx_drain_debug ? 1'b0 : rx_frame_valid),
-        .in_data(rx_frame_data),
-        .in_sop(rx_frame_sop),
-        .in_eop(rx_frame_eop),
-        .in_src_port(rx_frame_src_port),
-        .in_ready(forwarder_in_ready),
+        .in_valid(forward_bypass_mode ? 1'b0 : core_frame_valid),
+        .in_data(core_frame_data),
+        .in_sop(core_frame_sop),
+        .in_eop(core_frame_eop),
+        .in_src_port(core_frame_src_port),
+        .in_ready(core_frame_ready),
         .out_valid(tx_frame_valid),
         .out_data(tx_frame_data),
         .out_sop(tx_frame_sop),
         .out_eop(tx_frame_eop),
         .out_src_port(tx_frame_src_port),
-        .out_ready(tx_frame_ready),
+        .out_ready(forwarder_out_ready),
         .rx_count(rx_count),
         .allow_count(allow_count),
         .drop_count(drop_count),
@@ -368,10 +638,10 @@ module de1_soc_w5500_top (
         .spi_mosi(spi_b_mosi),
         .spi_miso(spi_b_miso),
         .spi_cs_n(spi_b_cs_n),
-        .frame_valid(tx_frame_valid),
-        .frame_data(tx_frame_data),
-        .frame_sop(tx_frame_sop),
-        .frame_eop(tx_frame_eop),
+        .frame_valid(tx_to_b_valid),
+        .frame_data(tx_to_b_data),
+        .frame_sop(tx_to_b_sop),
+        .frame_eop(tx_to_b_eop),
         .frame_ready(tx_frame_ready),
         .init_busy(),
         .init_done(init_done_b),

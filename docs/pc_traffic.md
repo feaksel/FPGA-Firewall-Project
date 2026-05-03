@@ -115,7 +115,15 @@ For the live presentation, use the continuous sine-wave demo before or beside th
 
 ## Phase F0: Simple continuous rule demo
 
-Use this demo first when hardware bring-up feels confusing. It avoids waveform/state complexity and only proves packet forwarding plus rule enforcement.
+Use this demo first when hardware bring-up feels confusing. It avoids waveform/state complexity and is intended to prove packet forwarding plus rule enforcement.
+
+Current status, 2026-05-03:
+- The PC scripts are working.
+- Direct PC1-to-PC2 capture proves PC1 emits the expected demo packets.
+- FPGA `SW6` direct B TX proves PC2 can see W5500 B generated packets.
+- FPGA `SW7` and `SW8` are not yet producing PC2-visible demo packets.
+
+So this demo is currently a hardware-debug target, not a finished demo.
 
 Topology:
 
@@ -157,6 +165,15 @@ Expected result:
 - `Drop leaks` stays `0`.
 - FPGA `SW[3:1]=001` RX count, `010` allow count, `011` drop count should increase while the sender runs.
 
+If using the latest debug FPGA image, use these switch modes:
+
+- `SW5=1`: raw W5500 A ingress drain. This disables forwarding and proves PC1 -> W5500 A -> FPGA RX.
+- `SW6=1`: direct W5500 B self-test. This ignores PC1 and periodically sends a known-good `FW-DEMO-ALLOW-SSH` frame to PC2.
+- `SW7=1`: raw A-to-B bypass. This is currently failing on hardware even though the testbench passes.
+- `SW8=1`: generated rule-demo mode. This should use A-side allowed/drop packets as triggers and send a known-good B-side allow frame, but the latest hardware result was `SW[3:1]=101 = 0000`, so it still needs debugging.
+
+Only one of `SW5`, `SW6`, `SW7`, and `SW8` should be enabled during a test.
+
 Add `--udp-allow` to the sender if you also want to test the UDP/80 allow profile:
 
 ```bash
@@ -168,6 +185,11 @@ If forwarding works briefly and then appears to stop, treat that as an overrun/r
 If `SW[3:1]=001` stays stuck, the FPGA is not seeing new ingress packets on W5500 A. Recheck that PC1 is sending on the Mac Ethernet interface connected to W5500 A, `SW0` is high/start-init, `LEDR0=1`, and `LEDR1=0`.
 
 Hardware debug shortcut: set `SW5=1` and `SW[3:1]=001`. In this mode, `HEX3..HEX0` shows a raw W5500 A ingress-drain count, independent of the firewall forwarder and W5500 B TX path. If this raw count increases, PC1 -> W5500 A is alive and the issue is downstream. Set `SW5=0` for normal firewall forwarding/counting.
+
+Current known capture interpretation:
+- If PC2 capture contains source MAC `00:11:22:33:44:55`, PC2 is seeing the Scapy demo frames.
+- If PC2 capture only contains MACs such as the Windows NIC and multicast destinations, the FPGA path did not emit visible demo traffic.
+- If board `SW[3:1]=101` rises while PC2 sees no demo frames, the FPGA/W5500 control path believes TX completed but the emitted frame is not visible or not valid. This is not proof of forwarding.
 
 Topology:
 
@@ -284,6 +306,14 @@ This is enough for the first real enforcement demo. UART remains a later conveni
 3. Once the adapter can read packets reliably, switch to deterministic Scapy-generated packets.
 4. Use either the terminal live viewer or the browser dashboard to watch the deterministic packets.
 5. Compare each sent frame against the FPGA-observed behavior before trying higher traffic rates.
+
+## Current script map
+
+- [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py): PC1 sender for the simplest rule demo. Sends TCP/22 allow and TCP/23 drop by default, optionally UDP/80 allow with `--udp-allow`.
+- [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for visible allowed frames and drop leaks. It can also inspect `.pcapng` files with `--pcap`.
+- [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): quick pcap summary tool used during debugging. It reports total packets, source MAC counts, demo marker hits, and common IP pairs.
+- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live visualization demo scripts. These are deferred until the simpler rule demo is hardware-stable.
+- [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): final chunked file/video proof scripts. These are deferred until A-triggered TX is proven.
 
 ## 2026-05-01 observed result
 

@@ -426,11 +426,22 @@ module ethernet_controller_adapter #(
 
                 ST_STREAM_FRAME: begin
                     if (!seq_active && !seq_done && frame_ready) begin
-                        start_spi_rxbuf_burst(rx_read_ptr + 16'd2);
+                        start_spi_read(rx_read_ptr + 16'd2 + frame_index, CTRL_S0_RXBUF_READ);
                     end else if (seq_done) begin
-                        frame_index <= 16'd0;
-                        state       <= ST_COMMIT_RX;
-                        state_step  <= 3'd0;
+                        frame_valid    <= 1'b1;
+                        frame_data     <= seq_rx[3];
+                        frame_sop      <= (frame_index == 16'd0);
+                        frame_eop      <= (frame_index == (frame_len_bytes - 1'b1));
+                        frame_src_port <= 1'b0;
+                        rx_stream_byte_count <= rx_stream_byte_count + 32'd1;
+
+                        if (frame_index == (frame_len_bytes - 1'b1)) begin
+                            frame_index <= 16'd0;
+                            state       <= ST_COMMIT_RX;
+                            state_step  <= 3'd0;
+                        end else begin
+                            frame_index <= frame_index + 1'b1;
+                        end
                     end
                 end
 

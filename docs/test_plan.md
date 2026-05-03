@@ -89,6 +89,21 @@ Pass criteria:
 Move on when:
 - one-way `PC1 -> W5500 A -> FPGA -> W5500 B -> PC2` forwarding is repeatable
 
+Current status, 2026-05-03:
+- Fixed B-side generated TX works in hardware through `SW6`.
+- W5500 A raw ingress works in hardware through `SW5`.
+- `SW7` raw bypass is not repeatable on hardware; PC2 does not see demo frames.
+- `SW8` generated rule-demo mode is not working on hardware yet; latest observation showed B TX count page `101` stuck at `0000`.
+
+Important test caveat:
+- `two_port_bypass_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb` pass, but that does not prove hardware forwarding. These benches currently validate intended RTL sequencing against simplified W5500 models. They must be supplemented with hardware byte/state evidence.
+
+Additional pass criteria now required before claiming M8:
+- A hardware HEX/debug page proves the first bytes read from W5500 A match the PC1 demo frame.
+- A hardware HEX/debug page proves the first bytes submitted to W5500 B match the intended egress frame.
+- PC2 Wireshark sees a frame caused by PC1 traffic through W5500 A, not the autonomous `SW6` test.
+- A blocked TCP/23 packet increments a hardware drop indicator and does not cause a PC2-visible generated allow frame.
+
 ## Milestone 9: File/Video Demo
 
 Pass criteria:
