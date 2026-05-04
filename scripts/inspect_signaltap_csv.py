@@ -25,6 +25,9 @@ INTERESTING = (
     "stp_spi_b",
     "stp_b_tx_first16",
     "stp_a_rx_first16",
+    "stp_regen_ethertype",
+    "stp_regen_ip_proto",
+    "stp_regen_dst_port",
 )
 
 SUMMARY_SIGNALS = (
@@ -44,6 +47,9 @@ SUMMARY_SIGNALS = (
     "stp_tx_b_ctrl[4..0]",
     "stp_tx_b_data[7..0]",
     "stp_spi_b[3..0]",
+    "stp_regen_ethertype[15..0]",
+    "stp_regen_ip_proto[7..0]",
+    "stp_regen_dst_port[15..0]",
 )
 
 

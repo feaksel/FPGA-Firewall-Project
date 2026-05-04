@@ -109,6 +109,10 @@ module de1_soc_w5500_top (
     reg  [15:0] regen_last_eop_byte_idx;
     reg  [15:0] regen_max_byte_idx;
     reg  [15:0] rx_per_frame_byte_idx;
+    reg  [15:0] rx_probe_byte_index;
+    reg  [15:0] rx_probe_ethertype;
+    reg  [7:0]  rx_probe_ip_proto;
+    reg  [15:0] rx_probe_dst_port;
     reg  [7:0]  a_rx_capture [0:15];
     reg  [7:0]  a_rx_shadow  [0:15];
     reg  [4:0]  a_rx_capture_idx;
@@ -181,9 +185,9 @@ module de1_soc_w5500_top (
                              b_tx_shadow[4], b_tx_shadow[5], b_tx_shadow[6], b_tx_shadow[7],
                              b_tx_shadow[8], b_tx_shadow[9], b_tx_shadow[10], b_tx_shadow[11],
                              b_tx_shadow[12], b_tx_shadow[13], b_tx_shadow[14], b_tx_shadow[15]};
-        stp_regen_ethertype <= regen_ethertype;
-        stp_regen_ip_proto <= regen_ip_proto;
-        stp_regen_dst_port <= regen_dst_port;
+        stp_regen_ethertype <= rule_regen_mode ? regen_ethertype : rx_probe_ethertype;
+        stp_regen_ip_proto <= rule_regen_mode ? regen_ip_proto : rx_probe_ip_proto;
+        stp_regen_dst_port <= rule_regen_mode ? regen_dst_port : rx_probe_dst_port;
     end
 
     always @(posedge CLOCK_50 or negedge KEY[0]) begin
@@ -643,11 +647,33 @@ module de1_soc_w5500_top (
             regen_last_eop_byte_idx  <= 16'd0;
             regen_max_byte_idx       <= 16'd0;
             rx_per_frame_byte_idx    <= 16'd0;
+            rx_probe_byte_index      <= 16'd0;
+            rx_probe_ethertype       <= 16'd0;
+            rx_probe_ip_proto        <= 8'd0;
+            rx_probe_dst_port        <= 16'd0;
         end else if (rx_frame_valid && rx_frame_ready) begin
             if (rx_frame_sop)
                 rx_per_frame_byte_idx <= 16'd1;
             else
                 rx_per_frame_byte_idx <= rx_per_frame_byte_idx + 16'd1;
+
+            if (rx_frame_sop) begin
+                rx_probe_byte_index <= 16'd0;
+                rx_probe_ethertype  <= 16'd0;
+                rx_probe_ip_proto   <= 8'd0;
+                rx_probe_dst_port   <= 16'd0;
+            end else begin
+                rx_probe_byte_index <= rx_probe_byte_index + 16'd1;
+            end
+
+            case (rx_frame_sop ? 16'd0 : (rx_probe_byte_index + 16'd1))
+                16'd12: rx_probe_ethertype[15:8] <= rx_frame_data;
+                16'd13: rx_probe_ethertype[7:0]  <= rx_frame_data;
+                16'd23: rx_probe_ip_proto         <= rx_frame_data;
+                16'd36: rx_probe_dst_port[15:8]   <= rx_frame_data;
+                16'd37: rx_probe_dst_port[7:0]    <= rx_frame_data;
+                default: begin end
+            endcase
 
             if (rx_frame_eop) begin
                 regen_frames_seen       <= regen_frames_seen + 32'd1;
