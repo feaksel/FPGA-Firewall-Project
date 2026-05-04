@@ -56,6 +56,12 @@ module w5500_macraw_tx_adapter #(
     localparam ST_WAIT_SEND    = 5'd16;
 
     localparam [15:0] COMMON_MR         = 16'h0000;
+    localparam [15:0] COMMON_SHAR0      = 16'h0009;
+    localparam [15:0] COMMON_SHAR1      = 16'h000A;
+    localparam [15:0] COMMON_SHAR2      = 16'h000B;
+    localparam [15:0] COMMON_SHAR3      = 16'h000C;
+    localparam [15:0] COMMON_SHAR4      = 16'h000D;
+    localparam [15:0] COMMON_SHAR5      = 16'h000E;
     localparam [15:0] COMMON_VERSIONR   = 16'h0039;
     localparam [15:0] S0_MR             = 16'h0000;
     localparam [15:0] S0_CR             = 16'h0001;
@@ -304,11 +310,27 @@ module w5500_macraw_tx_adapter #(
                 end
 
                 ST_COMMON_CFG: begin
-                    if (!seq_active && !seq_done)
-                        start_spi_write(COMMON_MR, CTRL_COMMON_WRITE, 8'h00);
-                    else if (seq_done) begin
-                        state      <= ST_SOCKET_CFG;
-                        state_step <= 3'd0;
+                    if (!seq_active && !seq_done) begin
+                        case (state_step)
+                            3'd0: start_spi_write(COMMON_MR,    CTRL_COMMON_WRITE, 8'h00);
+                            3'd1: start_spi_write(COMMON_SHAR0, CTRL_COMMON_WRITE, 8'h02);
+                            3'd2: start_spi_write(COMMON_SHAR1, CTRL_COMMON_WRITE, 8'h00);
+                            3'd3: start_spi_write(COMMON_SHAR2, CTRL_COMMON_WRITE, 8'h00);
+                            3'd4: start_spi_write(COMMON_SHAR3, CTRL_COMMON_WRITE, 8'hDE);
+                            3'd5: start_spi_write(COMMON_SHAR4, CTRL_COMMON_WRITE, 8'hAD);
+                            3'd6: start_spi_write(COMMON_SHAR5, CTRL_COMMON_WRITE, 8'h0B);
+                            default: begin
+                                state      <= ST_SOCKET_CFG;
+                                state_step <= 3'd0;
+                            end
+                        endcase
+                    end else if (seq_done) begin
+                        if (state_step == 3'd6) begin
+                            state      <= ST_SOCKET_CFG;
+                            state_step <= 3'd0;
+                        end else begin
+                            state_step <= state_step + 1'b1;
+                        end
                     end
                 end
 

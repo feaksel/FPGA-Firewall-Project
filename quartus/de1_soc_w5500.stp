@@ -5282,12 +5282,13 @@
         <trigger_in_editor/>
         <trigger_out_editor/>
       </presentation>
-      <trigger CRC="B9091028" attribute_mem_mode="false" gap_record="true" global_temp="1" is_expanded="true" name="trigger: 2026/05/04 10:13:25  #1" position="pre" power_up_trigger_mode="false" record_data_gap="true" segment_size="64" storage_mode="off" storage_qualifier_disabled="no" storage_qualifier_port_is_pin="true" storage_qualifier_port_name="auto_stp_external_storage_qualifier" storage_qualifier_port_tap_mode="classic" trigger_type="circular">
+      <trigger CRC="B9091028" attribute_mem_mode="false" gap_record="true" global_temp="1" is_expanded="true" name="trigger: 2026/05/04 10:13:25  #1" position="pre" power_up_trigger_mode="false" record_data_gap="true" segment_size="64" storage_mode="off" storage_qualifier_disabled="no" storage_qualifier_port_is_pin="false" storage_qualifier_port_name="auto_stp_external_storage_qualifier" storage_qualifier_port_tap_mode="classic" trigger_type="circular">
         <power_up_trigger position="pre" storage_qualifier_disabled="no"/>
         <events use_custom_flow_control="no">
           <level enabled="yes" name="condition1" type="basic">'stp_b_send_issued[0]' == high &amp;&amp; 'stp_b_send_issued[10]' == low &amp;&amp; 'stp_b_send_issued[11]' == low &amp;&amp; 'stp_b_send_issued[12]' == low &amp;&amp; 'stp_b_send_issued[13]' == low &amp;&amp; 'stp_b_send_issued[14]' == low &amp;&amp; 'stp_b_send_issued[15]' == low &amp;&amp; 'stp_b_send_issued[16]' == low &amp;&amp; 'stp_b_send_issued[17]' == low &amp;&amp; 'stp_b_send_issued[18]' == low &amp;&amp; 'stp_b_send_issued[19]' == low &amp;&amp; 'stp_b_send_issued[1]' == low &amp;&amp; 'stp_b_send_issued[20]' == low &amp;&amp; 'stp_b_send_issued[21]' == low &amp;&amp; 'stp_b_send_issued[22]' == low &amp;&amp; 'stp_b_send_issued[23]' == low &amp;&amp; 'stp_b_send_issued[24]' == low &amp;&amp; 'stp_b_send_issued[25]' == low &amp;&amp; 'stp_b_send_issued[26]' == low &amp;&amp; 'stp_b_send_issued[27]' == low &amp;&amp; 'stp_b_send_issued[28]' == low &amp;&amp; 'stp_b_send_issued[29]' == low &amp;&amp; 'stp_b_send_issued[2]' == low &amp;&amp; 'stp_b_send_issued[30]' == low &amp;&amp; 'stp_b_send_issued[31]' == low &amp;&amp; 'stp_b_send_issued[3]' == low &amp;&amp; 'stp_b_send_issued[4]' == low &amp;&amp; 'stp_b_send_issued[5]' == low &amp;&amp; 'stp_b_send_issued[6]' == low &amp;&amp; 'stp_b_send_issued[7]' == low &amp;&amp; 'stp_b_send_issued[8]' == low &amp;&amp; 'stp_b_send_issued[9]' == low &amp;&amp; 'stp_tx_b_ctrl[0]' == high &amp;&amp; 'stp_tx_b_ctrl[1]' == low &amp;&amp; 'stp_tx_b_ctrl[2]' == low &amp;&amp; 'stp_tx_b_ctrl[3]' == low &amp;&amp; 'stp_tx_b_ctrl[4]' == low
             <power_up enabled="yes">
-            </power_up><op_node/>
+            </power_up>
+            <op_node/>
           </level>
         </events>
         <storage_qualifier_events>
