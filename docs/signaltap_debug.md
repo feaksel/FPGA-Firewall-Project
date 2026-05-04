@@ -109,6 +109,21 @@ Add these first:
 - `stp_regen_ip_proto[7..0]`
 - `stp_regen_dst_port[15..0]`
 
+Round-2 (2026-05-04) probes — add these to defeat IPv6 background traffic
+overwriting the rolling RX shadow:
+
+- `stp_a_rx_ipv4_first16[127..0]` — first 16 bytes of the most recent IPv4-only frame
+- `stp_frames_ipv4[31..0]`
+- `stp_frames_ipv6[31..0]`
+- `stp_frames_arp[31..0]`
+- `stp_frames_other[31..0]`
+- `stp_frames_udp_dport80[31..0]`
+- `stp_frames_demo_match[31..0]`
+
+`scripts/inspect_signaltap_csv.py` already knows about all of these and prints
+a Diagnosis line at the end of the report. See [docs/next_bench_session.md](next_bench_session.md)
+for the round-2 capture/interpret flow.
+
 The packed control buses are:
 
 - `stp_rx_ctrl = {rx_frame_valid, rx_frame_ready, rx_frame_sop, rx_frame_eop, rx_packet_seen_a}`

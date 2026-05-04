@@ -11,9 +11,9 @@ except ImportError:
     sys.exit(1)
 
 
-DEFAULT_DST_MAC = "01:00:5e:00:00:fb"
+DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
 ALLOW_SRC_IP = "192.168.1.10"
-ALLOW_DST_IP = "224.0.0.251"
+ALLOW_DST_IP = "192.168.1.255"
 DROP_SRC_IP = "10.0.0.42"
 DROP_DST_IP = "192.168.1.99"
 SSH_SRC_IP = "10.1.2.3"

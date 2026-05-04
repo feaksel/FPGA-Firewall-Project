@@ -115,7 +115,14 @@ module de1_soc_w5500_top (
     reg  [15:0] rx_probe_dst_port;
     reg  [7:0]  a_rx_capture [0:15];
     reg  [7:0]  a_rx_shadow  [0:15];
+    reg  [7:0]  a_rx_ipv4_shadow [0:15];
     reg  [4:0]  a_rx_capture_idx;
+    reg  [31:0] frames_ipv4_count;
+    reg  [31:0] frames_ipv6_count;
+    reg  [31:0] frames_arp_count;
+    reg  [31:0] frames_other_count;
+    reg  [31:0] frames_udp_dport80_count;
+    reg  [31:0] frames_demo_match_count;
     reg  [7:0]  b_tx_capture [0:15];
     reg  [7:0]  b_tx_shadow  [0:15];
     reg  [4:0]  b_tx_capture_idx;
@@ -155,9 +162,16 @@ module de1_soc_w5500_top (
     (* preserve, noprune *) reg [9:0]   stp_switches;
     (* preserve, noprune *) reg [127:0] stp_a_rx_first16;
     (* preserve, noprune *) reg [127:0] stp_b_tx_first16;
+    (* preserve, noprune *) reg [127:0] stp_a_rx_ipv4_first16;
     (* preserve, noprune *) reg [15:0]  stp_regen_ethertype;
     (* preserve, noprune *) reg [7:0]   stp_regen_ip_proto;
     (* preserve, noprune *) reg [15:0]  stp_regen_dst_port;
+    (* preserve, noprune *) reg [31:0]  stp_frames_ipv4;
+    (* preserve, noprune *) reg [31:0]  stp_frames_ipv6;
+    (* preserve, noprune *) reg [31:0]  stp_frames_arp;
+    (* preserve, noprune *) reg [31:0]  stp_frames_other;
+    (* preserve, noprune *) reg [31:0]  stp_frames_udp_dport80;
+    (* preserve, noprune *) reg [31:0]  stp_frames_demo_match;
 
     always @(posedge CLOCK_50) begin
         stp_rx_data <= rx_frame_data;
@@ -188,6 +202,16 @@ module de1_soc_w5500_top (
         stp_regen_ethertype <= rule_regen_mode ? regen_ethertype : rx_probe_ethertype;
         stp_regen_ip_proto <= rule_regen_mode ? regen_ip_proto : rx_probe_ip_proto;
         stp_regen_dst_port <= rule_regen_mode ? regen_dst_port : rx_probe_dst_port;
+        stp_a_rx_ipv4_first16 <= {a_rx_ipv4_shadow[0], a_rx_ipv4_shadow[1], a_rx_ipv4_shadow[2], a_rx_ipv4_shadow[3],
+                                  a_rx_ipv4_shadow[4], a_rx_ipv4_shadow[5], a_rx_ipv4_shadow[6], a_rx_ipv4_shadow[7],
+                                  a_rx_ipv4_shadow[8], a_rx_ipv4_shadow[9], a_rx_ipv4_shadow[10], a_rx_ipv4_shadow[11],
+                                  a_rx_ipv4_shadow[12], a_rx_ipv4_shadow[13], a_rx_ipv4_shadow[14], a_rx_ipv4_shadow[15]};
+        stp_frames_ipv4        <= frames_ipv4_count;
+        stp_frames_ipv6        <= frames_ipv6_count;
+        stp_frames_arp         <= frames_arp_count;
+        stp_frames_other       <= frames_other_count;
+        stp_frames_udp_dport80 <= frames_udp_dport80_count;
+        stp_frames_demo_match  <= frames_demo_match_count;
     end
 
     always @(posedge CLOCK_50 or negedge KEY[0]) begin
@@ -641,6 +665,7 @@ module de1_soc_w5500_top (
         end
     end
 
+    integer ck;
     always @(posedge CLOCK_50 or negedge rst_n) begin
         if (!rst_n) begin
             regen_frames_seen        <= 32'd0;
@@ -651,6 +676,15 @@ module de1_soc_w5500_top (
             rx_probe_ethertype       <= 16'd0;
             rx_probe_ip_proto        <= 8'd0;
             rx_probe_dst_port        <= 16'd0;
+            frames_ipv4_count        <= 32'd0;
+            frames_ipv6_count        <= 32'd0;
+            frames_arp_count         <= 32'd0;
+            frames_other_count       <= 32'd0;
+            frames_udp_dport80_count <= 32'd0;
+            frames_demo_match_count  <= 32'd0;
+            for (ck = 0; ck < 16; ck = ck + 1) begin
+                a_rx_ipv4_shadow[ck] <= 8'h00;
+            end
         end else if (rx_frame_valid && rx_frame_ready) begin
             if (rx_frame_sop)
                 rx_per_frame_byte_idx <= 16'd1;
@@ -680,6 +714,35 @@ module de1_soc_w5500_top (
                 regen_last_eop_byte_idx <= rx_frame_sop ? 16'd0 : rx_per_frame_byte_idx;
                 if ((rx_frame_sop ? 16'd0 : rx_per_frame_byte_idx) > regen_max_byte_idx)
                     regen_max_byte_idx  <= rx_frame_sop ? 16'd0 : rx_per_frame_byte_idx;
+
+                case (rx_probe_ethertype)
+                    16'h0800: begin
+                        frames_ipv4_count <= frames_ipv4_count + 32'd1;
+                        a_rx_ipv4_shadow[0]  <= a_rx_capture[0];
+                        a_rx_ipv4_shadow[1]  <= a_rx_capture[1];
+                        a_rx_ipv4_shadow[2]  <= a_rx_capture[2];
+                        a_rx_ipv4_shadow[3]  <= a_rx_capture[3];
+                        a_rx_ipv4_shadow[4]  <= a_rx_capture[4];
+                        a_rx_ipv4_shadow[5]  <= a_rx_capture[5];
+                        a_rx_ipv4_shadow[6]  <= a_rx_capture[6];
+                        a_rx_ipv4_shadow[7]  <= a_rx_capture[7];
+                        a_rx_ipv4_shadow[8]  <= a_rx_capture[8];
+                        a_rx_ipv4_shadow[9]  <= a_rx_capture[9];
+                        a_rx_ipv4_shadow[10] <= a_rx_capture[10];
+                        a_rx_ipv4_shadow[11] <= a_rx_capture[11];
+                        a_rx_ipv4_shadow[12] <= a_rx_capture[12];
+                        a_rx_ipv4_shadow[13] <= a_rx_capture[13];
+                        a_rx_ipv4_shadow[14] <= a_rx_capture[14];
+                        a_rx_ipv4_shadow[15] <= a_rx_capture[15];
+                        if ((rx_probe_ip_proto == 8'h11) && (rx_probe_dst_port == 16'd80)) begin
+                            frames_udp_dport80_count <= frames_udp_dport80_count + 32'd1;
+                            frames_demo_match_count  <= frames_demo_match_count + 32'd1;
+                        end
+                    end
+                    16'h86DD: frames_ipv6_count  <= frames_ipv6_count  + 32'd1;
+                    16'h0806: frames_arp_count   <= frames_arp_count   + 32'd1;
+                    default:  frames_other_count <= frames_other_count + 32'd1;
+                endcase
             end
         end
     end
