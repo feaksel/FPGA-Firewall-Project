@@ -34,9 +34,10 @@ module de1_soc_top_rule_regen_tb;
         .GPIO_1(gpio_1)
     );
 
-    w5500_macraw_model #(
+    w5500_udp_rx_model #(
         .PACKET_FILE(UDP_ALLOW_MEM),
-        .PACKET_LENGTH(UDP_ALLOW_LEN)
+        .PACKET_LENGTH(UDP_ALLOW_LEN),
+        .PAYLOAD_LENGTH(0)
     ) u_a_model (
         .rst_n(key[0]),
         .w5500_reset_n(gpio_0[3]),

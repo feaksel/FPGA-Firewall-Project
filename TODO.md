@@ -22,8 +22,15 @@ Current status note, 2026-05-05 (rounds 4-8 condensed):
 - Demo UDP/80 frames are confirmed leaving PC1's en0 by tcpdump (5 packets captured).
 - W5500 A PHY is confirmed linked at 100M FDX (`stp_phy_cfgr = 0xBF`).
 - PHY is fine, sender is fine, cables are direct point-to-point.
-- The chip's RX buffer is being filled mostly by the Mac's `mDNSResponder` link-up flood, and the previous adapter discard path was flushing the *entire* buffer on a single corrupted length header, taking demo frames with it. Round 8 RTL fix caps each discard to 1520 bytes (one max Ethernet frame). Pending hardware verification.
+- The chip's RX buffer is being filled mostly by the Mac's `mDNSResponder` link-up flood, and the previous adapter discard path was flushing the *entire* buffer on a single corrupted length header, taking demo frames with it. Round 8 RTL fix caps each discard to 1520 bytes (one max Ethernet frame). Later rounds showed this helped visibility but did not make MACRAW deliver demo UDP/80.
 - Bench protocol now requires waiting 30 seconds after every reflash before triggering SignalTap, so the post-link-up Bonjour burst settles before we capture.
+
+Current status note, 2026-05-05 (rounds 9-19 condensed):
+- The bounded-discard, faster A SPI drain, repeated bad-length resync, MFEN on/off, multicast/broadcast/raw Scapy sender variants, and normal UDP socket sender variants were all tested.
+- PC1 is definitively putting the demo packet on the direct W5500 A wire: `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 tcpdump captures, zero kernel drops.
+- W5500 A readbacks are definitive: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
+- Even with correct PC1 packets and correct W5500 A MAC/IP configuration, MACRAW A ingress never surfaced UDP/80 in SignalTap (`frames_udp_dport80=0`, `frames_demo_match=0`). It only surfaced broadcast/multicast Mac background frames such as UDP/5353.
+- Decision: A-side MACRAW is no longer the main demo path. Move to W5500 A normal UDP socket receive mode, then reconstruct/synthesize the Ethernet/IP/UDP stream inside the FPGA and feed the existing firewall/forwarder/B-TX path.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -84,25 +91,37 @@ Current status note, 2026-05-05 (rounds 4-8 condensed):
 - [x] Add IPv4-only RX shadow `stp_a_rx_ipv4_first16` and per-ethertype frame counters so background IPv6 traffic can no longer hide what's actually arriving.
 - [x] Add `stp_phy_cfgr` SignalTap probe so we can read the W5500 PHY's link/speed/duplex bits (LNK, SPD, DPX). Round 7 capture confirmed PHY is at 100M FDX.
 - [x] Add round 4 chip-state hardening: `SHAR` write at init, `S0_CR` clear poll after `RECV`, `S0_IR` clear after RECV. Did not change observed counters.
-- [x] Round 8 RTL fix: bounded the bad-length discard to 1520 bytes so a single corrupted length header no longer flushes legitimate frames buffered behind it. Pending hardware verification.
+- [x] Round 8 RTL fix: bounded the bad-length discard to 1520 bytes so a single corrupted length header no longer flushes legitimate frames buffered behind it. Later hardware verified MACRAW still misses demo UDP/80, so this is retained as hardening rather than the final fix.
+- [x] Prove PC1 normal UDP/static-ARP sender is clean with tcpdump on current hardware.
+- [x] Read back W5500 A `S0_MR`, `SHAR`, and `SIPR` from hardware over SPI and expose them in SignalTap.
+- [x] Falsify A-side MACRAW for the current demo packet after correct sender, PHY, SHAR, SIPR, and MFEN readbacks.
+- [x] Add first-pass W5500 A UDP socket receive mode for demo ingress (`w5500_udp_rx_adapter`).
+- [x] Reconstruct an internal Ethernet/IP/UDP byte stream from the UDP socket header/payload so the existing firewall/forwarder/B-TX path can be reused.
+- [ ] Run the new Questa coverage: `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`, `adapter_firewall_integration_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
+- [ ] Recompile Quartus, flash, and repeat the SignalTap force-export capture with the normal UDP socket sender.
 - [ ] Re-test `SW6` after every TX adapter edit as the known-good B-side baseline.
 - [ ] Re-test `SW5=1` raw ingress after every RX adapter edit as the known-good A-side baseline.
 - [ ] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2.
 
 ## Bench protocol checklist (2026-05-05)
 
-The hardware-loop iteration that's now working is:
+The MACRAW hardware-loop iteration that produced the final diagnosis was:
 
 1. PC1 (Mac, en0) <-> direct cable <-> W5500 A.
 2. W5500 B <-> direct cable <-> PC2 (Win NIC for dashboard / Wireshark).
 3. No switches, hubs, or other devices on either link.
 4. Reflash the SOF, press reset (`KEY[0]`), wait for `LEDR0=1`.
 5. **Wait 30 seconds** for the Mac's `mDNSResponder` link-up Bonjour burst to settle.
-6. Start the sender on PC1: `sudo python3 scripts/rule_demo_sender.py --iface en0 --rate 2 --packet-gap 0.05 --no-ssh-allow --no-tcp-drop --verbose-each`.
-7. Verify with `sudo tcpdump -i en0 -nn -e -c 5 udp port 80` that frames are leaving en0.
-8. Capture with `quartus_stp.exe -t scripts/signaltap_capture.tcl quartus/de1_soc_w5500.stp captures/stp/<tag>.csv 30`.
-9. Decode with `py -3 scripts/inspect_signaltap_csv.py captures/stp/<tag>.csv`.
-10. Watch the Diagnosis line for `frames_udp_dport80 > 0` and `b_tx_count > 0`.
+6. Configure PC1 for the normal socket sender:
+   - `sudo ifconfig en0 inet 192.168.1.10 netmask 255.255.255.0 up`
+   - `sudo arp -d 192.168.1.1 2>/dev/null || true`
+   - `sudo arp -s 192.168.1.1 02:00:00:de:ad:0a`
+7. Start the sender on PC1: `python3 scripts/rule_demo_udp_socket_sender.py --iface en0 --rate 2 --verbose-each`.
+8. Verify with `sudo tcpdump -i en0 -nn -e -c 10 'udp port 80 or arp'` that frames are leaving en0 as `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, `192.168.1.10:4660 > 192.168.1.1:80`.
+9. Capture with `quartus_stp.exe -t scripts/signaltap_capture.tcl quartus/de1_soc_w5500.stp captures/stp/<tag>.csv 30`.
+10. Decode with `py -3 scripts/inspect_signaltap_csv.py captures/stp/<tag>.csv`.
+11. For the MACRAW images, the final expected-but-never-observed acceptance was `frames_udp_dport80 > 0` and `b_tx_count > 0`.
+12. For the next UDP-socket ingress image, acceptance is a PC1-triggered receive event at W5500 A, then B TX completion with zero timeouts.
 
 ## Things adding new SignalTap probes requires
 

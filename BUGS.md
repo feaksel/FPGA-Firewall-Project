@@ -67,7 +67,24 @@
   - 2026-05-05 round 8 RTL fix (bounded discard): replaced "flush entire RX buffer on bad length" with `next_rx_read_ptr <= rx_read_ptr + min(rx_size_bytes, 1520)`. A single corrupted length header now costs at most one Ethernet frame's worth of buffer, instead of throwing away every valid frame queued behind it.
   - 2026-05-05 bench protocol change: every reflash power-cycles the W5500 PHY, which makes the Mac's `mDNSResponder` flood ~150 Bonjour announces in the first ~2 seconds. **Wait at least 30 seconds after reset/flash before triggering SignalTap** so the burst has settled; the demo at 2 pps will then dominate the rx_frame stream.
   - Topology confirmed (2026-05-05): PC1 and PC2 are connected directly to W5500 A and W5500 B respectively, with no shared switch or hub. Background broadcast traffic on the W5500 A cable comes only from the Mac's own kernel network stack (mDNS, NDP, ARP).
-  - Open: still need a clean post-burst capture with the bounded-discard SOF to confirm `frames_udp_dport80 > 0` and `b_tx_count > 0` for demo traffic.
+  - 2026-05-05 rounds 9-16 (MACRAW sender/config matrix):
+    - MFEN-on (`S0_MR=0x84`) reduced garbage but did not admit multicast/broadcast demo UDP/80.
+    - A-side SPI drain was raised from divider 50 to 8, then 4; this reduced some churn but did not make UDP/80 appear.
+    - Added repeated-bad-length resync and last-IPv4 parser-field latches. Captures still showed only Mac-origin mDNS/Bonjour style IPv4 (`UDP/5353`) and no `UDP/80`.
+    - Added `--allow-dst-ip/--dst-ip` to `scripts/rule_demo_sender.py` and fixed its stale destination-MAC help text.
+    - Added `scripts/rule_demo_udp_socket_sender.py`, which uses a normal UDP socket plus static ARP so PC1 emits real unicast Ethernet frames to W5500 A's SHAR.
+    - PC1 verified twice with `tcpdump`: `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 captured, zero kernel drops.
+    - SignalTap still showed `frames_udp_dport80=0`, `frames_demo_match=0`; W5500 A continued to surface broadcast/multicast Mac background traffic but not the verified unicast UDP/80 demo packet.
+  - 2026-05-05 rounds 17-19 (chip readback and final MACRAW falsification):
+    - Added W5500 A readback probes for `S0_MR`, `SHAR`, and later `SIPR`; packed them into existing SignalTap columns to avoid another `.stp` node-list edit.
+    - Round 17 readback with MFEN off proved `S0_MR=0x04`, `SHAR=02:00:00:DE:AD:0A`, `PHYCFGR=0xBF`.
+    - Round 18 readback with MFEN on proved `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `PHYCFGR=0xBF`.
+    - Round 19 additionally programmed/read back `SIPR=192.168.1.1` and `SUBR=255.255.255.0`; capture proved `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=C0A80101`, `PHYCFGR=0xBF`.
+    - Even with correct MAC, IP, PHY, and verified PC1 unicast UDP/80 on the wire, MACRAW A ingress still reported `frames_udp_dport80=0` and only surfaced mDNS/background frames.
+  - Current conclusion:
+    - W5500 MACRAW on A is not a reliable ingress mode for this project's PC1 demo packet on the current hardware/Mac direct-link setup.
+    - The FPGA parser, forwarder, FIFO/packet-buffer, W5500 B TX path, PC2 path, PC1 sender, cable, PHY, SHAR, SIPR, and MFEN readback have all been narrowed away.
+    - The practical path forward is to stop spending bench cycles on A-side MACRAW and implement W5500 A normal UDP socket receive mode for the rule-demo ingress. The FPGA should then synthesize the Ethernet/IP/UDP frame metadata internally and feed the existing firewall/forwarder path.
 
 - **B-2026-05-03-02: W5500 simulation models are not strong enough evidence for the two-port hardware path.**
   - Status: open.

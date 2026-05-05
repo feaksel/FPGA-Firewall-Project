@@ -71,6 +71,9 @@ module firewall_top #(
         .last_frame_len_bytes(),
         .phy_cfgr_value(),
         .phy_read_count(),
+        .socket_mode_value(),
+        .shar_value(),
+        .sipr_value(),
         .debug_state(adapter_debug_state)
     );
 

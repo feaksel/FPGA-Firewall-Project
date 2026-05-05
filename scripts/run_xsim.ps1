@@ -39,11 +39,14 @@ $Sources = @(
     (Join-Path $RepoRoot "rtl/firewall/firewall_core.v"),
     (Join-Path $RepoRoot "rtl/firewall/firewall_forwarder.v"),
     (Join-Path $RepoRoot "rtl/eth_if/ethernet_controller_adapter.v"),
+    (Join-Path $RepoRoot "rtl/eth_if/w5500_udp_rx_adapter.v"),
     (Join-Path $RepoRoot "rtl/eth_if/w5500_tx_engine.v"),
+    (Join-Path $RepoRoot "rtl/eth_if/w5500_macraw_tx_adapter.v"),
     (Join-Path $RepoRoot "rtl/top/firewall_top.v"),
     (Join-Path $RepoRoot "rtl/top/de1_soc_w5500_top.v"),
     (Join-Path $RepoRoot "tb/models/fake_eth_source.v"),
     (Join-Path $RepoRoot "tb/models/w5500_macraw_model.sv"),
+    (Join-Path $RepoRoot "tb/models/w5500_udp_rx_model.sv"),
     (Join-Path $RepoRoot "tb/models/w5500_tx_model.sv"),
     $TestFile
 )

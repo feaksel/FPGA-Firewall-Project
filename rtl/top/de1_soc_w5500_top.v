@@ -57,6 +57,10 @@ module de1_soc_w5500_top (
     wire [3:0] last_matched_rule_id;
     wire [7:0] phy_cfgr_a;
     wire [31:0] phy_read_count_a;
+    wire [7:0] socket_mode_a;
+    wire [7:0] socket_status_a;
+    wire [47:0] shar_a;
+    wire [31:0] sipr_a;
     wire        rx_frame_valid;
     wire [7:0]  rx_frame_data;
     wire        rx_frame_sop;
@@ -191,15 +195,15 @@ module de1_soc_w5500_top (
         stp_tx_b_ctrl <= {tx_to_b_valid, tx_frame_ready, tx_to_b_sop, tx_to_b_eop, b_pkt_available};
         stp_adapter_b_state <= adapter_b_debug_state;
         stp_adapter_a_state <= adapter_a_debug_state;
+        // Keep stp_b_status as A socket-status readback while restoring the
+        // B-side TX counters needed to verify the UDP-socket ingress pivot.
         stp_b_buf_writes <= b_buf_write_start_count;
         stp_b_send_issued <= b_send_issued_count;
         stp_b_send_cleared <= b_send_cleared_count;
         stp_b_send_timeouts <= b_send_timeout_count;
         stp_b_tx_count <= tx_count_b;
         stp_b_last_pkt_len <= b_last_pkt_len;
-        stp_b_status <= {tx_error_b, ever_b_send_timeout, ever_b_send_cleared,
-                         ever_b_send_issued, ever_b_buf_write, ever_b_eop_in,
-                         b_pkt_available, init_error_b};
+        stp_b_status <= socket_status_a;
         stp_spi_b <= {spi_b_cs_n, spi_b_sclk, spi_b_mosi, spi_b_miso};
         stp_switches <= SW;
         stp_a_rx_first16 <= {a_rx_shadow[0], a_rx_shadow[1], a_rx_shadow[2], a_rx_shadow[3],
@@ -1000,7 +1004,7 @@ module de1_soc_w5500_top (
         .uart_tx(uart_tx)
     );
 
-    ethernet_controller_adapter #(
+    w5500_udp_rx_adapter #(
         .STARTUP_WAIT_CYCLES(5_000_000),
         .RESET_ASSERT_CYCLES(500_000),
         .RESET_RELEASE_CYCLES(5_000_000),
@@ -1033,6 +1037,10 @@ module de1_soc_w5500_top (
         .last_frame_len_bytes(last_frame_len_bytes_a),
         .phy_cfgr_value(phy_cfgr_a),
         .phy_read_count(phy_read_count_a),
+        .socket_mode_value(socket_mode_a),
+        .socket_status_value(socket_status_a),
+        .shar_value(shar_a),
+        .sipr_value(sipr_a),
         .debug_state(adapter_a_debug_state)
     );
 

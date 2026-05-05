@@ -62,6 +62,9 @@ module eth_controller_adapter_tb;
         .last_frame_len_bytes(),
         .phy_cfgr_value(),
         .phy_read_count(),
+        .socket_mode_value(),
+        .shar_value(),
+        .sipr_value(),
         .debug_state(debug_state)
     );
 

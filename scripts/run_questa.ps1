@@ -38,12 +38,14 @@ $Sources = @(
     "rtl/firewall/firewall_core.v",
     "rtl/firewall/firewall_forwarder.v",
     "rtl/eth_if/ethernet_controller_adapter.v",
+    "rtl/eth_if/w5500_udp_rx_adapter.v",
     "rtl/eth_if/w5500_tx_engine.v",
     "rtl/eth_if/w5500_macraw_tx_adapter.v",
     "rtl/top/firewall_top.v",
     "rtl/top/de1_soc_w5500_top.v",
     "tb/models/fake_eth_source.v",
     "tb/models/w5500_macraw_model.sv",
+    "tb/models/w5500_udp_rx_model.sv",
     "tb/models/w5500_tx_model.sv",
     $TestFile
 )

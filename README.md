@@ -92,11 +92,12 @@ This is the most important status snapshot:
 - `SW7=1` raw A-to-B bypass is proven for real Mac-origin frames: SignalTap shows B TX buffer writes / SEND clears with no timeout, and `sw7-0004.pcapng` contains forwarded Mac-origin multicast frames matching the SignalTap header.
 - `SW9=1` enables the byte/state debug view. Use it to inspect the first bytes seen on W5500 A, the first bytes handed to W5500 B, B TX progress counters, and SW8 parser fields. See `docs/signaltap_debug.md`.
 - W5500 A PHY confirmed at 100 Mbps full-duplex (`stp_phy_cfgr = 0xBF`).
-- PC1's `en0` confirmed putting demo broadcast UDP/80 frames on the wire toward W5500 A (`tcpdump` capture).
-- The senders now default to PC1's real interface MAC and broadcast destination (`ff:ff:ff:ff:ff:ff`, dst IP `192.168.1.255`).
-- The Mac's `mDNSResponder` floods ~150 Bonjour announces on every link-up event. The previous adapter discard path flushed the *entire* RX buffer on a single corrupted length header, taking legitimate frames with it. RTL round 8 (2026-05-05) caps the discard to 1520 bytes (one Ethernet frame). After every reflash, **wait at least 30 seconds** before triggering SignalTap so the Bonjour burst settles.
+- PC1's `en0` confirmed putting demo UDP/80 frames on the wire toward W5500 A in both raw Scapy and normal UDP/static-ARP forms.
+- The final PC1 proof was normal unicast Ethernet: `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 tcpdump packets, zero drops.
+- W5500 A hardware readback confirmed the expected identity: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
+- A-side MACRAW still never surfaced the demo UDP/80 frame (`frames_udp_dport80=0`) even with the correct PC1 packet and correct W5500 A MAC/IP/readbacks. It only surfaced broadcast/multicast Mac background frames such as mDNS UDP/5353.
 
-The forwarding path is proven; the remaining question is whether the bounded-discard adapter lets demo UDP/80 frames survive the chip's RX buffer cleanly. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
+The forwarding path is proven for frames that W5500 A surfaces, but A-side MACRAW is not reliable for the current demo ingress. The code now has a first-pass W5500 A normal UDP socket receive adapter that reconstructs an internal Ethernet/IP/UDP stream for the existing firewall/forwarder/B-TX path. Simulation, Quartus rebuild, and the next SignalTap bench capture are still pending. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
 
 ## Current verification status
 

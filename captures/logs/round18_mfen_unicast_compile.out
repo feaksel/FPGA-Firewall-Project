@@ -1,0 +1,592 @@
+Info: *******************************************************************
+Info: Running Quartus Prime Shell
+    Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+    Info: Copyright (C) 2025  Altera Corporation. All rights reserved.
+    Info: Your use of Altera Corporation's design tools, logic functions 
+    Info: and other software and tools, and any partner logic 
+    Info: functions, and any output files from any of the foregoing 
+    Info: (including device programming or simulation files), and any 
+    Info: associated documentation or information are expressly subject 
+    Info: to the terms and conditions of the Altera Program License 
+    Info: Subscription Agreement, the Altera Quartus Prime License Agreement,
+    Info: the Altera IP License Agreement, or other applicable license
+    Info: agreement, including, without limitation, that your use is for
+    Info: the sole purpose of programming logic devices manufactured by
+    Info: Altera and sold by Altera or its authorized distributors.  Please
+    Info: refer to the Altera Software License Subscription Agreements 
+    Info: on the Quartus Prime software download page.
+    Info: Processing started: Tue May  5 15:42:06 2026
+Info: Command: quartus_sh --flow compile de1_soc_w5500 -c de1_soc_w5500
+Info: Quartus(args): compile de1_soc_w5500 -c de1_soc_w5500
+Info: Project Name = C:/Users/furka/Projects/ELE432_ethernet/quartus/de1_soc_w5500
+Info: Revision Name = de1_soc_w5500
+Info: *******************************************************************
+Info: Running Quartus Prime Analysis & Synthesis
+    Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+    Info: Processing started: Tue May  5 15:42:07 2026
+Info: Command: quartus_map --read_settings_files=on --write_settings_files=off de1_soc_w5500 -c de1_soc_w5500
+Info (20032): Parallel compilation is enabled and will use up to 6 processors
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/top/de1_soc_w5500_top.v
+    Info (12023): Found entity 1: de1_soc_w5500_top File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/top/firewall_top.v
+    Info (12023): Found entity 1: firewall_top File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/firewall_top.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/eth_if/ethernet_controller_adapter.v
+    Info (12023): Found entity 1: ethernet_controller_adapter File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/ethernet_controller_adapter.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/eth_if/w5500_macraw_tx_adapter.v
+    Info (12023): Found entity 1: w5500_macraw_tx_adapter File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_macraw_tx_adapter.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/eth_if/w5500_tx_engine.v
+    Info (12023): Found entity 1: w5500_tx_engine File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_tx_engine.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/firewall/firewall_core.v
+    Info (12023): Found entity 1: firewall_core File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_core.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/firewall/firewall_forwarder.v
+    Info (12023): Found entity 1: firewall_forwarder File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/parser/eth_ipv4_parser.v
+    Info (12023): Found entity 1: eth_ipv4_parser File: C:/Users/furka/Projects/ELE432_ethernet/rtl/parser/eth_ipv4_parser.v Line: 5
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/rules/rule_engine.v
+    Info (12023): Found entity 1: rule_engine File: C:/Users/furka/Projects/ELE432_ethernet/rtl/rules/rule_engine.v Line: 5
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/spi/spi_master.v
+    Info (12023): Found entity 1: spi_master File: C:/Users/furka/Projects/ELE432_ethernet/rtl/spi/spi_master.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/buffer/packet_buffer.v
+    Info (12023): Found entity 1: packet_buffer File: C:/Users/furka/Projects/ELE432_ethernet/rtl/buffer/packet_buffer.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/debug/debug_counters.v
+    Info (12023): Found entity 1: debug_counters File: C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/debug_counters.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/debug/seven_seg_hex.v
+    Info (12023): Found entity 1: seven_seg_hex File: C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/seven_seg_hex.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/debug/uart_tx.v
+    Info (12023): Found entity 1: uart_tx File: C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/uart_tx.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/debug/firewall_telemetry_uart.v
+    Info (12023): Found entity 1: firewall_telemetry_uart File: C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/firewall_telemetry_uart.v Line: 3
+Info (12021): Found 0 design units, including 0 entities, in source file /users/furka/projects/ele432_ethernet/rtl/common/defs.vh
+Info (12021): Found 1 design units, including 1 entities, in source file /users/furka/projects/ele432_ethernet/rtl/buffer/frame_rx_fifo.v
+    Info (12023): Found entity 1: frame_rx_fifo File: C:/Users/furka/Projects/ELE432_ethernet/rtl/buffer/frame_rx_fifo.v Line: 3
+Info (12127): Elaborating entity "de1_soc_w5500_top" for the top level hierarchy
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(155): object "stp_rx_data" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 155
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(156): object "stp_rx_ctrl" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 156
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(157): object "stp_tx_b_data" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 157
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(158): object "stp_tx_b_ctrl" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 158
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(159): object "stp_adapter_b_state" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 159
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(160): object "stp_adapter_a_state" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 160
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(161): object "stp_b_buf_writes" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 161
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(162): object "stp_b_send_issued" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 162
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(163): object "stp_b_send_cleared" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 163
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(164): object "stp_b_send_timeouts" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 164
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(165): object "stp_b_tx_count" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 165
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(166): object "stp_b_last_pkt_len" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 166
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(167): object "stp_b_status" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 167
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(168): object "stp_spi_b" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 168
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(169): object "stp_switches" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 169
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(170): object "stp_a_rx_first16" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 170
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(171): object "stp_b_tx_first16" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 171
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(172): object "stp_a_rx_ipv4_first16" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 172
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(173): object "stp_regen_ethertype" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 173
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(174): object "stp_regen_ip_proto" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 174
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(175): object "stp_regen_dst_port" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 175
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(176): object "stp_frames_ipv4" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 176
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(177): object "stp_frames_ipv6" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 177
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(178): object "stp_frames_arp" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 178
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(179): object "stp_frames_other" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 179
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(180): object "stp_frames_udp_dport80" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 180
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(181): object "stp_frames_demo_match" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 181
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(182): object "stp_last_rx_size" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 182
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(183): object "stp_last_frame_len" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 183
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(184): object "stp_rx_commit_count" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 184
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(185): object "stp_rx_stream_byte_count" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 185
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(186): object "stp_phy_cfgr" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 186
+Warning (10036): Verilog HDL or VHDL warning at de1_soc_w5500_top.v(187): object "stp_phy_read_count" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 187
+Warning (10240): Verilog HDL Always Construct warning at de1_soc_w5500_top.v(690): inferring latch(es) for variable "ck", which holds its previous value in one or more paths through the always construct File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 690
+Info (12128): Elaborating entity "seven_seg_hex" for hierarchy "seven_seg_hex:u_hex0" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 972
+Info (12128): Elaborating entity "firewall_telemetry_uart" for hierarchy "firewall_telemetry_uart:u_firewall_telemetry_uart" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 1005
+Info (12128): Elaborating entity "uart_tx" for hierarchy "firewall_telemetry_uart:u_firewall_telemetry_uart|uart_tx:u_uart_tx" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/debug/firewall_telemetry_uart.v Line: 35
+Info (12128): Elaborating entity "ethernet_controller_adapter" for hierarchy "ethernet_controller_adapter:u_w5500_a_rx" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 1043
+Info (12128): Elaborating entity "spi_master" for hierarchy "ethernet_controller_adapter:u_w5500_a_rx|spi_master:u_spi_master" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/ethernet_controller_adapter.v Line: 139
+Info (12128): Elaborating entity "frame_rx_fifo" for hierarchy "frame_rx_fifo:u_ingress_fifo" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 1064
+Info (12128): Elaborating entity "firewall_forwarder" for hierarchy "firewall_forwarder:u_firewall_forwarder" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 1089
+Warning (10036): Verilog HDL or VHDL warning at firewall_forwarder.v(53): object "pkt_rule_id" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 53
+Warning (10036): Verilog HDL or VHDL warning at firewall_forwarder.v(64): object "fwd_src_port" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 64
+Warning (10036): Verilog HDL or VHDL warning at firewall_forwarder.v(68): object "fwd_rule_id" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 68
+Info (12128): Elaborating entity "packet_buffer" for hierarchy "firewall_forwarder:u_firewall_forwarder|packet_buffer:u_packet_buffer" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 102
+Info (12128): Elaborating entity "eth_ipv4_parser" for hierarchy "firewall_forwarder:u_firewall_forwarder|eth_ipv4_parser:u_parser" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 119
+Info (12128): Elaborating entity "rule_engine" for hierarchy "firewall_forwarder:u_firewall_forwarder|rule_engine:u_rules" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 133
+Info (12128): Elaborating entity "debug_counters" for hierarchy "firewall_forwarder:u_firewall_forwarder|debug_counters:u_debug_counters" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v Line: 144
+Info (12128): Elaborating entity "w5500_macraw_tx_adapter" for hierarchy "w5500_macraw_tx_adapter:u_w5500_b_tx" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 1124
+Warning (10036): Verilog HDL or VHDL warning at w5500_macraw_tx_adapter.v(101): object "frame_index" assigned a value but never read File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_macraw_tx_adapter.v Line: 101
+Info (12128): Elaborating entity "spi_master" for hierarchy "w5500_macraw_tx_adapter:u_w5500_b_tx|spi_master:u_spi_master" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_macraw_tx_adapter.v Line: 136
+Info (12021): Found 1 design units, including 1 entities, in source file db/altsyncram_el84.tdf
+    Info (12023): Found entity 1: altsyncram_el84 File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/altsyncram_el84.tdf Line: 28
+Info (12021): Found 1 design units, including 1 entities, in source file db/mux_dlc.tdf
+    Info (12023): Found entity 1: mux_dlc File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/mux_dlc.tdf Line: 23
+Info (12021): Found 1 design units, including 1 entities, in source file db/decode_vnf.tdf
+    Info (12023): Found entity 1: decode_vnf File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/decode_vnf.tdf Line: 23
+Info (12021): Found 1 design units, including 1 entities, in source file db/cntr_dci.tdf
+    Info (12023): Found entity 1: cntr_dci File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cntr_dci.tdf Line: 28
+Info (12021): Found 1 design units, including 1 entities, in source file db/cmpr_pac.tdf
+    Info (12023): Found entity 1: cmpr_pac File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cmpr_pac.tdf Line: 23
+Info (12021): Found 1 design units, including 1 entities, in source file db/cntr_22j.tdf
+    Info (12023): Found entity 1: cntr_22j File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cntr_22j.tdf Line: 26
+Info (12021): Found 1 design units, including 1 entities, in source file db/cntr_09i.tdf
+    Info (12023): Found entity 1: cntr_09i File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cntr_09i.tdf Line: 28
+Info (12021): Found 1 design units, including 1 entities, in source file db/cmpr_d9c.tdf
+    Info (12023): Found entity 1: cmpr_d9c File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cmpr_d9c.tdf Line: 23
+Info (12021): Found 1 design units, including 1 entities, in source file db/cntr_kri.tdf
+    Info (12023): Found entity 1: cntr_kri File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cntr_kri.tdf Line: 28
+Info (12021): Found 1 design units, including 1 entities, in source file db/cmpr_99c.tdf
+    Info (12023): Found entity 1: cmpr_99c File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/cmpr_99c.tdf Line: 23
+Info (12033): Analysis and Synthesis generated Signal Tap or debug node instance "auto_signaltap_0"
+Info (11170): Starting IP generation for the debug fabric: alt_sld_fab.
+Info (11172): 2026.05.05.15:42:43 Progress: Loading sld0a2caf71/alt_sld_fab_wrapper_hw.tcl
+Info (11172): Alt_sld_fab.alt_sld_fab: SLD fabric agents which did not specify prefer_host were connected to JTAG
+Info (11172): Alt_sld_fab: Generating "alt_sld_fab" for QUARTUS_SYNTH
+Info (11172): Alt_sld_fab: "alt_sld_fab" instantiated alt_sld_fab "alt_sld_fab"
+Info (11172): Presplit: "alt_sld_fab" instantiated altera_super_splitter "presplit"
+Info (11172): Splitter: "alt_sld_fab" instantiated altera_sld_splitter "splitter"
+Info (11172): Sldfabric: "alt_sld_fab" instantiated altera_sld_jtag_hub "sldfabric"
+Info (11172): Ident: "alt_sld_fab" instantiated altera_connection_identification_hub "ident"
+Info (11172): Alt_sld_fab: Done "alt_sld_fab" with 6 modules, 6 files
+Info (11171): Finished IP generation for the debug fabric: alt_sld_fab.
+Info (12021): Found 1 design units, including 1 entities, in source file db/ip/sld0a2caf71/alt_sld_fab.v
+    Info (12023): Found entity 1: alt_sld_fab File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/alt_sld_fab.v Line: 9
+Info (12021): Found 1 design units, including 1 entities, in source file db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab.v
+    Info (12023): Found entity 1: alt_sld_fab_alt_sld_fab File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab.v Line: 9
+Info (12021): Found 1 design units, including 1 entities, in source file db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_ident.sv
+    Info (12023): Found entity 1: alt_sld_fab_alt_sld_fab_ident File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_ident.sv Line: 33
+Info (12021): Found 1 design units, including 1 entities, in source file db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_presplit.sv
+    Info (12023): Found entity 1: alt_sld_fab_alt_sld_fab_presplit File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_presplit.sv Line: 3
+Info (12021): Found 2 design units, including 1 entities, in source file db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_sldfabric.vhd
+    Info (12022): Found design unit 1: alt_sld_fab_alt_sld_fab_sldfabric-rtl File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_sldfabric.vhd Line: 102
+    Info (12023): Found entity 1: alt_sld_fab_alt_sld_fab_sldfabric File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_sldfabric.vhd Line: 11
+Info (12021): Found 1 design units, including 1 entities, in source file db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_splitter.sv
+    Info (12023): Found entity 1: alt_sld_fab_alt_sld_fab_splitter File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/ip/sld0a2caf71/submodules/alt_sld_fab_alt_sld_fab_splitter.sv Line: 3
+Warning (276020): Inferred RAM node "frame_rx_fifo:u_ingress_fifo|data_mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
+Warning (276020): Inferred RAM node "frame_rx_fifo:u_ingress_fifo|sop_mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
+Warning (276020): Inferred RAM node "frame_rx_fifo:u_ingress_fifo|eop_mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
+Info (276014): Found 1 instances of uninferred RAM logic
+    Info (276007): RAM logic "firewall_forwarder:u_firewall_forwarder|packet_buffer:u_packet_buffer|mem" is uninferred due to asynchronous read logic File: C:/Users/furka/Projects/ELE432_ethernet/rtl/buffer/packet_buffer.v Line: 30
+Info (19000): Inferred 3 megafunctions from design logic
+    Info (276029): Inferred altsyncram megafunction from the following design logic: "frame_rx_fifo:u_ingress_fifo|data_mem_rtl_0" 
+        Info (286033): Parameter OPERATION_MODE set to DUAL_PORT
+        Info (286033): Parameter WIDTH_A set to 8
+        Info (286033): Parameter WIDTHAD_A set to 14
+        Info (286033): Parameter NUMWORDS_A set to 16384
+        Info (286033): Parameter WIDTH_B set to 8
+        Info (286033): Parameter WIDTHAD_B set to 14
+        Info (286033): Parameter NUMWORDS_B set to 16384
+        Info (286033): Parameter ADDRESS_ACLR_A set to NONE
+        Info (286033): Parameter OUTDATA_REG_B set to UNREGISTERED
+        Info (286033): Parameter ADDRESS_ACLR_B set to NONE
+        Info (286033): Parameter OUTDATA_ACLR_B set to NONE
+        Info (286033): Parameter ADDRESS_REG_B set to CLOCK0
+        Info (286033): Parameter INDATA_ACLR_A set to NONE
+        Info (286033): Parameter WRCONTROL_ACLR_A set to NONE
+        Info (286033): Parameter READ_DURING_WRITE_MODE_MIXED_PORTS set to OLD_DATA
+    Info (276029): Inferred altsyncram megafunction from the following design logic: "frame_rx_fifo:u_ingress_fifo|sop_mem_rtl_0" 
+        Info (286033): Parameter OPERATION_MODE set to DUAL_PORT
+        Info (286033): Parameter WIDTH_A set to 1
+        Info (286033): Parameter WIDTHAD_A set to 14
+        Info (286033): Parameter NUMWORDS_A set to 16384
+        Info (286033): Parameter WIDTH_B set to 1
+        Info (286033): Parameter WIDTHAD_B set to 14
+        Info (286033): Parameter NUMWORDS_B set to 16384
+        Info (286033): Parameter ADDRESS_ACLR_A set to NONE
+        Info (286033): Parameter OUTDATA_REG_B set to UNREGISTERED
+        Info (286033): Parameter ADDRESS_ACLR_B set to NONE
+        Info (286033): Parameter OUTDATA_ACLR_B set to NONE
+        Info (286033): Parameter ADDRESS_REG_B set to CLOCK0
+        Info (286033): Parameter INDATA_ACLR_A set to NONE
+        Info (286033): Parameter WRCONTROL_ACLR_A set to NONE
+        Info (286033): Parameter READ_DURING_WRITE_MODE_MIXED_PORTS set to OLD_DATA
+    Info (276029): Inferred altsyncram megafunction from the following design logic: "frame_rx_fifo:u_ingress_fifo|eop_mem_rtl_0" 
+        Info (286033): Parameter OPERATION_MODE set to DUAL_PORT
+        Info (286033): Parameter WIDTH_A set to 1
+        Info (286033): Parameter WIDTHAD_A set to 14
+        Info (286033): Parameter NUMWORDS_A set to 16384
+        Info (286033): Parameter WIDTH_B set to 1
+        Info (286033): Parameter WIDTHAD_B set to 14
+        Info (286033): Parameter NUMWORDS_B set to 16384
+        Info (286033): Parameter ADDRESS_ACLR_A set to NONE
+        Info (286033): Parameter OUTDATA_REG_B set to UNREGISTERED
+        Info (286033): Parameter ADDRESS_ACLR_B set to NONE
+        Info (286033): Parameter OUTDATA_ACLR_B set to NONE
+        Info (286033): Parameter ADDRESS_REG_B set to CLOCK0
+        Info (286033): Parameter INDATA_ACLR_A set to NONE
+        Info (286033): Parameter WRCONTROL_ACLR_A set to NONE
+        Info (286033): Parameter READ_DURING_WRITE_MODE_MIXED_PORTS set to OLD_DATA
+Info (12130): Elaborated megafunction instantiation "frame_rx_fifo:u_ingress_fifo|altsyncram:data_mem_rtl_0"
+Info (12133): Instantiated megafunction "frame_rx_fifo:u_ingress_fifo|altsyncram:data_mem_rtl_0" with the following parameter:
+    Info (12134): Parameter "OPERATION_MODE" = "DUAL_PORT"
+    Info (12134): Parameter "WIDTH_A" = "8"
+    Info (12134): Parameter "WIDTHAD_A" = "14"
+    Info (12134): Parameter "NUMWORDS_A" = "16384"
+    Info (12134): Parameter "WIDTH_B" = "8"
+    Info (12134): Parameter "WIDTHAD_B" = "14"
+    Info (12134): Parameter "NUMWORDS_B" = "16384"
+    Info (12134): Parameter "ADDRESS_ACLR_A" = "NONE"
+    Info (12134): Parameter "OUTDATA_REG_B" = "UNREGISTERED"
+    Info (12134): Parameter "ADDRESS_ACLR_B" = "NONE"
+    Info (12134): Parameter "OUTDATA_ACLR_B" = "NONE"
+    Info (12134): Parameter "ADDRESS_REG_B" = "CLOCK0"
+    Info (12134): Parameter "INDATA_ACLR_A" = "NONE"
+    Info (12134): Parameter "WRCONTROL_ACLR_A" = "NONE"
+    Info (12134): Parameter "READ_DURING_WRITE_MODE_MIXED_PORTS" = "OLD_DATA"
+Info (12021): Found 1 design units, including 1 entities, in source file db/altsyncram_dso1.tdf
+    Info (12023): Found entity 1: altsyncram_dso1 File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/altsyncram_dso1.tdf Line: 32
+Info (12021): Found 1 design units, including 1 entities, in source file db/decode_5la.tdf
+    Info (12023): Found entity 1: decode_5la File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/decode_5la.tdf Line: 23
+Info (12021): Found 1 design units, including 1 entities, in source file db/mux_lfb.tdf
+    Info (12023): Found entity 1: mux_lfb File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/mux_lfb.tdf Line: 23
+Info (12130): Elaborated megafunction instantiation "frame_rx_fifo:u_ingress_fifo|altsyncram:sop_mem_rtl_0"
+Info (12133): Instantiated megafunction "frame_rx_fifo:u_ingress_fifo|altsyncram:sop_mem_rtl_0" with the following parameter:
+    Info (12134): Parameter "OPERATION_MODE" = "DUAL_PORT"
+    Info (12134): Parameter "WIDTH_A" = "1"
+    Info (12134): Parameter "WIDTHAD_A" = "14"
+    Info (12134): Parameter "NUMWORDS_A" = "16384"
+    Info (12134): Parameter "WIDTH_B" = "1"
+    Info (12134): Parameter "WIDTHAD_B" = "14"
+    Info (12134): Parameter "NUMWORDS_B" = "16384"
+    Info (12134): Parameter "ADDRESS_ACLR_A" = "NONE"
+    Info (12134): Parameter "OUTDATA_REG_B" = "UNREGISTERED"
+    Info (12134): Parameter "ADDRESS_ACLR_B" = "NONE"
+    Info (12134): Parameter "OUTDATA_ACLR_B" = "NONE"
+    Info (12134): Parameter "ADDRESS_REG_B" = "CLOCK0"
+    Info (12134): Parameter "INDATA_ACLR_A" = "NONE"
+    Info (12134): Parameter "WRCONTROL_ACLR_A" = "NONE"
+    Info (12134): Parameter "READ_DURING_WRITE_MODE_MIXED_PORTS" = "OLD_DATA"
+Info (12021): Found 1 design units, including 1 entities, in source file db/altsyncram_vro1.tdf
+    Info (12023): Found entity 1: altsyncram_vro1 File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/altsyncram_vro1.tdf Line: 32
+Info (12021): Found 1 design units, including 1 entities, in source file db/mux_efb.tdf
+    Info (12023): Found entity 1: mux_efb File: C:/Users/furka/Projects/ELE432_ethernet/quartus/db/mux_efb.tdf Line: 23
+Warning (13034): The following nodes have both tri-state and non-tri-state drivers
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_0[0]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_0[1]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_0[2]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+Warning (13034): The following nodes have both tri-state and non-tri-state drivers
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_0[6]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+Warning (13034): The following nodes have both tri-state and non-tri-state drivers
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_1[3]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+Warning (13034): The following nodes have both tri-state and non-tri-state drivers
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_1[0]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_1[1]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_1[2]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+Warning (13034): The following nodes have both tri-state and non-tri-state drivers
+    Warning (13035): Inserted always-enabled tri-state buffer between "GPIO_0[3]" and its non-tri-state driver. File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+Warning (13009): TRI or OPNDRN buffers permanently enabled
+    Warning (13010): Node "GPIO_0[6]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13010): Node "GPIO_0[0]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13010): Node "GPIO_0[1]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13010): Node "GPIO_0[2]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Warning (13010): Node "GPIO_1[3]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13010): Node "GPIO_1[0]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13010): Node "GPIO_1[1]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13010): Node "GPIO_1[2]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Warning (13010): Node "GPIO_0[3]~synth" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+Info (286031): Timing-Driven Synthesis is running on partition "Top"
+Info (17049): 93 registers lost all their fanouts during netlist optimizations.
+Info (144001): Generated suppressed messages file C:/Users/furka/Projects/ELE432_ethernet/build/quartus/de1_soc_w5500.map.smsg
+Info (35024): Successfully connected in-system debug instance "auto_signaltap_0" to all 2003 required data inputs, trigger inputs, acquisition clocks, and dynamic pins
+Info (16010): Generating hard_block partition "hard_block:auto_generated_inst"
+    Info (16011): Adding 9 node(s), including 0 DDIO, 0 PLL, 0 transceiver and 0 LCELL
+Warning (21074): Design contains 3 input pin(s) that do not drive logic
+    Warning (15610): No output dependent on input pin "KEY[1]" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 5
+    Warning (15610): No output dependent on input pin "KEY[2]" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 5
+    Warning (15610): No output dependent on input pin "KEY[3]" File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 5
+Info (21057): Implemented 68414 device resources after synthesis - the final resource count might be different
+    Info (21058): Implemented 18 input pins
+    Info (21059): Implemented 39 output pins
+    Info (21060): Implemented 42 bidirectional pins
+    Info (21061): Implemented 67309 logic cells
+    Info (21064): Implemented 1005 RAM segments
+Info: Quartus Prime Analysis & Synthesis was successful. 0 errors, 69 warnings
+    Info: Peak virtual memory: 5380 megabytes
+    Info: Processing ended: Tue May  5 15:44:10 2026
+    Info: Elapsed time: 00:02:03
+    Info: Total CPU time (on all processors): 00:03:00
+Info: *******************************************************************
+Info: Running Quartus Prime Fitter
+    Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+    Info: Processing started: Tue May  5 15:44:11 2026
+Info: Command: quartus_fit --read_settings_files=off --write_settings_files=off de1_soc_w5500 -c de1_soc_w5500
+Info: qfit2_default_script.tcl version: #1
+Info: Project  = de1_soc_w5500
+Info: Revision = de1_soc_w5500
+Info (20032): Parallel compilation is enabled and will use up to 6 processors
+Info (119006): Selected device 5CSEMA5F31C6 for design "de1_soc_w5500"
+Info (21076): High junction temperature operating condition is not set. Assuming a default value of '85'.
+Info (21076): Low junction temperature operating condition is not set. Assuming a default value of '0'.
+Info (171003): Fitter is performing an Auto Fit compilation, which may decrease Fitter effort to reduce compilation time
+Warning (292013): Feature LogicLock is only available with a valid subscription license. You can purchase a software subscription to gain full access to this feature.
+Warning (15714): Some pins have incomplete I/O assignments. Refer to the I/O Assignment Warnings report for details
+Info (176045): Design uses memory blocks. Violating setup or hold times of memory block address registers for either read or write operations could cause memory contents to be corrupted. Make sure that all memory block address registers meet the setup and hold time requirements.
+Info (184020): Starting Fitter periphery placement operations
+Info (11191): Automatically promoted 4 clocks (4 global)
+    Info (11162): CLOCK_50~inputCLKENA0 with 46441 fanout uses global clock CLKCTRL_G7
+    Info (11162): altera_internal_jtag~TCKUTAPCLKENA0 with 5225 fanout uses global clock CLKCTRL_G3
+        Info (12525): This signal is driven by core routing -- it may be moved during placement to reduce routing delays
+    Info (11162): sld_signaltap:auto_signaltap_0|sld_signaltap_impl:sld_signaltap_body|sld_signaltap_implb:sld_signaltap_body|reset_all~CLKENA0 with 4067 fanout uses global clock CLKCTRL_G2
+        Info (12525): This signal is driven by core routing -- it may be moved during placement to reduce routing delays
+    Info (11162): rst_sync[1]~CLKENA0 with 2512 fanout uses global clock CLKCTRL_G0
+        Info (12525): This signal is driven by core routing -- it may be moved during placement to reduce routing delays
+Info (184021): Fitter periphery placement operations ending: elapsed time is 00:00:03
+Info (176233): Starting register packing
+Info (332164): Evaluating HDL-embedded SDC commands
+    Info (332165): Entity sld_hub
+        Info (332166): create_clock -name altera_reserved_tck [get_ports {altera_reserved_tck}] -period 30MHz   
+        Info (332166): if { [string equal quartus_fit $::TimeQuestInfo(nameofexecutable)] } { set_max_delay -to [get_ports { altera_reserved_tdo } ] 0 }
+        Info (332166): set_clock_groups -asynchronous -group {altera_reserved_tck}
+Info (332104): Reading SDC File: 'de1_soc_w5500.sdc'
+Info (332143): No user constrained clock uncertainty found in the design. Calling "derive_clock_uncertainty"
+Info (332123): Deriving Clock Uncertainty. Please refer to report_sdc in the Timing Analyzer to see clock uncertainties.
+Info (332129): Detected timing requirements -- optimizing circuit to achieve only the specified requirements
+Info (332111): Found 2 clocks
+    Info (332111):   Period   Clock Name
+    Info (332111): ======== ============
+    Info (332111):   33.333 altera_reserved_tck
+    Info (332111):   20.000     CLOCK_50
+Info (176235): Finished register packing
+    Extra Info (176219): No registers were packed into other blocks
+Info (11798): Fitter preparation operations ending: elapsed time is 00:00:38
+Info (170189): Fitter placement preparation operations beginning
+Info (14951): The Fitter is using Advanced Physical Optimization.
+Info (170190): Fitter placement preparation operations ending: elapsed time is 00:02:34
+Info (170191): Fitter placement operations beginning
+Info (170137): Fitter placement was successful
+Info (170192): Fitter placement operations ending: elapsed time is 00:02:48
+Info (170193): Fitter routing operations beginning
+Info (170089): 5e+03 ns of routing delay (approximately 2.7% of available device routing delay) has been added to meet hold timing. For more information, refer to the Estimated Delay Added for Hold Timing section in the Fitter report.
+Info (170195): Router estimated average interconnect usage is 23% of the available device resources
+    Info (170196): Router estimated peak interconnect usage is 36% of the available device resources in the region that extends from location X11_Y11 to location X21_Y22
+Info (170199): The Fitter performed an Auto Fit compilation.  Optimizations were skipped to reduce compilation time.
+    Info (170201): Optimizations that may affect the design's routability were skipped
+Info (170194): Fitter routing operations ending: elapsed time is 00:01:41
+Info (11888): Total time spent on timing analysis during the Fitter is 125.39 seconds.
+Info (334003): Started post-fitting delay annotation
+Info (334004): Delay annotation completed successfully
+Info (334003): Started post-fitting delay annotation
+Info (334004): Delay annotation completed successfully
+Info (11801): Fitter post-fit operations ending: elapsed time is 00:02:14
+Warning (169064): Following 42 pins have no output enable or a GND or VCC output enable - later changes to this connectivity may change fitting results
+    Info (169065): Pin GPIO_0[6] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[0] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[1] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[2] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[4] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_1[3] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Info (169065): Pin GPIO_1[0] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Info (169065): Pin GPIO_1[1] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Info (169065): Pin GPIO_1[2] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Info (169065): Pin GPIO_1[4] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+    Info (169065): Pin GPIO_0[5] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[3] has a permanently enabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[32] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[33] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[34] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[35] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[30] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[31] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[28] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[29] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[26] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[27] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[24] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[25] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[22] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[23] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[20] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[21] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[18] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[19] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[16] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[17] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[14] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[15] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[12] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[13] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[7] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[8] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[9] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[10] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_0[11] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 12
+    Info (169065): Pin GPIO_1[5] has a permanently disabled output enable File: C:/Users/furka/Projects/ELE432_ethernet/rtl/top/de1_soc_w5500_top.v Line: 14
+Info (144001): Generated suppressed messages file C:/Users/furka/Projects/ELE432_ethernet/build/quartus/de1_soc_w5500.fit.smsg
+Info: Quartus Prime Fitter was successful. 0 errors, 3 warnings
+    Info: Peak virtual memory: 7673 megabytes
+    Info: Processing ended: Tue May  5 15:58:10 2026
+    Info: Elapsed time: 00:13:59
+    Info: Total CPU time (on all processors): 00:46:41
+Info: *******************************************************************
+Info: Running Quartus Prime Assembler
+    Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+    Info: Processing started: Tue May  5 15:58:11 2026
+Info: Command: quartus_asm --read_settings_files=off --write_settings_files=off de1_soc_w5500 -c de1_soc_w5500
+Info (115030): Assembler is generating device programming files
+Info: Quartus Prime Assembler was successful. 0 errors, 0 warnings
+    Info: Peak virtual memory: 5296 megabytes
+    Info: Processing ended: Tue May  5 15:58:55 2026
+    Info: Elapsed time: 00:00:44
+    Info: Total CPU time (on all processors): 00:00:44
+Info (293026): Skipped module Power Analyzer due to the assignment FLOW_ENABLE_POWER_ANALYZER
+Info: *******************************************************************
+Info: Running Quartus Prime Timing Analyzer
+    Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+    Info: Processing started: Tue May  5 15:58:56 2026
+Info: Command: quartus_sta de1_soc_w5500 -c de1_soc_w5500
+Info: qsta_default_script.tcl version: #1
+Info (20032): Parallel compilation is enabled and will use up to 6 processors
+Info (21076): High junction temperature operating condition is not set. Assuming a default value of '85'.
+Info (21076): Low junction temperature operating condition is not set. Assuming a default value of '0'.
+Info (332164): Evaluating HDL-embedded SDC commands
+    Info (332165): Entity sld_hub
+        Info (332166): create_clock -name altera_reserved_tck [get_ports {altera_reserved_tck}] -period 30MHz   
+        Info (332166): if { [string equal quartus_fit $::TimeQuestInfo(nameofexecutable)] } { set_max_delay -to [get_ports { altera_reserved_tdo } ] 0 }
+        Info (332166): set_clock_groups -asynchronous -group {altera_reserved_tck}
+Info (332104): Reading SDC File: 'de1_soc_w5500.sdc'
+Info (332143): No user constrained clock uncertainty found in the design. Calling "derive_clock_uncertainty"
+Info (332123): Deriving Clock Uncertainty. Please refer to report_sdc in the Timing Analyzer to see clock uncertainties.
+Info: Found TIMING_ANALYZER_REPORT_SCRIPT_INCLUDE_DEFAULT_ANALYSIS = ON
+Info: Analyzing Slow 1100mV 85C Model
+Info (332146): Worst-case setup slack is 6.881
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     6.881               0.000 CLOCK_50 
+    Info (332119):    10.639               0.000 altera_reserved_tck 
+Info (332146): Worst-case hold slack is 0.289
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.289               0.000 CLOCK_50 
+    Info (332119):     0.353               0.000 altera_reserved_tck 
+Info (332146): Worst-case recovery slack is 12.183
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    12.183               0.000 CLOCK_50 
+    Info (332119):    25.900               0.000 altera_reserved_tck 
+Info (332146): Worst-case removal slack is 0.975
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.975               0.000 altera_reserved_tck 
+    Info (332119):     4.220               0.000 CLOCK_50 
+Info (332146): Worst-case minimum pulse width slack is 8.873
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     8.873               0.000 CLOCK_50 
+    Info (332119):    15.429               0.000 altera_reserved_tck 
+Info (332114): Report Metastability: Found 161 synchronizer chains.
+    Info (332114): The design MTBF is not calculated because there are no specified synchronizers in the design.
+    Info (332114): Number of Synchronizer Chains Found: 161
+    Info (332114): Shortest Synchronizer Chain: 2 Registers
+    Info (332114): Fraction of Chains for which MTBFs Could Not be Calculated: 1.000
+    Info (332114): Worst Case Available Settling Time: 28.980 ns
+Info: Analyzing Slow 1100mV 0C Model
+Info (334003): Started post-fitting delay annotation
+Info (334004): Delay annotation completed successfully
+Info (332123): Deriving Clock Uncertainty. Please refer to report_sdc in the Timing Analyzer to see clock uncertainties.
+Info (332146): Worst-case setup slack is 7.030
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     7.030               0.000 CLOCK_50 
+    Info (332119):    10.780               0.000 altera_reserved_tck 
+Info (332146): Worst-case hold slack is 0.273
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.273               0.000 CLOCK_50 
+    Info (332119):     0.370               0.000 altera_reserved_tck 
+Info (332146): Worst-case recovery slack is 12.332
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    12.332               0.000 CLOCK_50 
+    Info (332119):    26.040               0.000 altera_reserved_tck 
+Info (332146): Worst-case removal slack is 0.908
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.908               0.000 altera_reserved_tck 
+    Info (332119):     4.098               0.000 CLOCK_50 
+Info (332146): Worst-case minimum pulse width slack is 8.903
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     8.903               0.000 CLOCK_50 
+    Info (332119):    15.393               0.000 altera_reserved_tck 
+Info (332114): Report Metastability: Found 161 synchronizer chains.
+    Info (332114): The design MTBF is not calculated because there are no specified synchronizers in the design.
+    Info (332114): Number of Synchronizer Chains Found: 161
+    Info (332114): Shortest Synchronizer Chain: 2 Registers
+    Info (332114): Fraction of Chains for which MTBFs Could Not be Calculated: 1.000
+    Info (332114): Worst Case Available Settling Time: 29.431 ns
+Info: Analyzing Fast 1100mV 85C Model
+Info (334003): Started post-fitting delay annotation
+Info (334004): Delay annotation completed successfully
+Info (332123): Deriving Clock Uncertainty. Please refer to report_sdc in the Timing Analyzer to see clock uncertainties.
+Info (332146): Worst-case setup slack is 11.130
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    11.130               0.000 CLOCK_50 
+    Info (332119):    13.307               0.000 altera_reserved_tck 
+Info (332146): Worst-case hold slack is 0.161
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.161               0.000 CLOCK_50 
+    Info (332119):     0.176               0.000 altera_reserved_tck 
+Info (332146): Worst-case recovery slack is 15.408
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    15.408               0.000 CLOCK_50 
+    Info (332119):    28.901               0.000 altera_reserved_tck 
+Info (332146): Worst-case removal slack is 0.531
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.531               0.000 altera_reserved_tck 
+    Info (332119):     2.495               0.000 CLOCK_50 
+Info (332146): Worst-case minimum pulse width slack is 8.480
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     8.480               0.000 CLOCK_50 
+    Info (332119):    14.969               0.000 altera_reserved_tck 
+Info (332114): Report Metastability: Found 161 synchronizer chains.
+    Info (332114): The design MTBF is not calculated because there are no specified synchronizers in the design.
+    Info (332114): Number of Synchronizer Chains Found: 161
+    Info (332114): Shortest Synchronizer Chain: 2 Registers
+    Info (332114): Fraction of Chains for which MTBFs Could Not be Calculated: 1.000
+    Info (332114): Worst Case Available Settling Time: 32.808 ns
+Info: Analyzing Fast 1100mV 0C Model
+Info (332123): Deriving Clock Uncertainty. Please refer to report_sdc in the Timing Analyzer to see clock uncertainties.
+Info (332146): Worst-case setup slack is 12.237
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    12.237               0.000 CLOCK_50 
+    Info (332119):    13.806               0.000 altera_reserved_tck 
+Info (332146): Worst-case hold slack is 0.146
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.146               0.000 CLOCK_50 
+    Info (332119):     0.165               0.000 altera_reserved_tck 
+Info (332146): Worst-case recovery slack is 15.658
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):    15.658               0.000 CLOCK_50 
+    Info (332119):    29.132               0.000 altera_reserved_tck 
+Info (332146): Worst-case removal slack is 0.476
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     0.476               0.000 altera_reserved_tck 
+    Info (332119):     2.296               0.000 CLOCK_50 
+Info (332146): Worst-case minimum pulse width slack is 8.434
+    Info (332119):     Slack       End Point TNS Clock 
+    Info (332119): ========= =================== =====================
+    Info (332119):     8.434               0.000 CLOCK_50 
+    Info (332119):    14.909               0.000 altera_reserved_tck 
+Info (332114): Report Metastability: Found 161 synchronizer chains.
+    Info (332114): The design MTBF is not calculated because there are no specified synchronizers in the design.
+    Info (332114): Number of Synchronizer Chains Found: 161
+    Info (332114): Shortest Synchronizer Chain: 2 Registers
+    Info (332114): Fraction of Chains for which MTBFs Could Not be Calculated: 1.000
+    Info (332114): Worst Case Available Settling Time: 33.657 ns
+Info (332102): Design is not fully constrained for setup requirements
+Info (332102): Design is not fully constrained for hold requirements
+Info: Quartus Prime Timing Analyzer was successful. 0 errors, 0 warnings
+    Info: Peak virtual memory: 6098 megabytes
+    Info: Processing ended: Tue May  5 16:00:24 2026
+    Info: Elapsed time: 00:01:28
+    Info: Total CPU time (on all processors): 00:04:54
+Info (293000): Quartus Prime Full Compilation was successful. 0 errors, 72 warnings
+Info (23030): Evaluation of Tcl script c:/altera_lite/25.1std/quartus/common/tcl/internal/qsh_flow.tcl was successful
+Info: Quartus Prime Shell was successful. 0 errors, 72 warnings
+    Info: Peak virtual memory: 4632 megabytes
+    Info: Processing ended: Tue May  5 16:00:25 2026
+    Info: Elapsed time: 00:18:19
+    Info: Total CPU time (on all processors): 00:06:05

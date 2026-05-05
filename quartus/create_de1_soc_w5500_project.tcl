@@ -24,6 +24,7 @@ set_global_assignment -name NUM_PARALLEL_PROCESSORS 6
 set_global_assignment -name VERILOG_FILE "../rtl/top/de1_soc_w5500_top.v"
 set_global_assignment -name VERILOG_FILE "../rtl/top/firewall_top.v"
 set_global_assignment -name VERILOG_FILE "../rtl/eth_if/ethernet_controller_adapter.v"
+set_global_assignment -name VERILOG_FILE "../rtl/eth_if/w5500_udp_rx_adapter.v"
 set_global_assignment -name VERILOG_FILE "../rtl/eth_if/w5500_macraw_tx_adapter.v"
 set_global_assignment -name VERILOG_FILE "../rtl/eth_if/w5500_tx_engine.v"
 set_global_assignment -name VERILOG_FILE "../rtl/firewall/firewall_core.v"

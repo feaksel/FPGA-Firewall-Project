@@ -125,3 +125,33 @@
 ## 2026-05-05 (round 8: bounded discard)
 - `rtl/eth_if/ethernet_controller_adapter.v`: replaced the "flush entire RX buffer on bad length" path with a bounded `rx_read_ptr + min(rx_size_bytes, 1520)` advance. A single corrupted length header now costs at most one Ethernet frame's worth of buffer, instead of throwing away every valid frame queued behind it. Demo UDP/80 frames buffered behind a single noisy mDNS frame should now survive the discard recovery.
 - Bench protocol updated: after every reflash, **wait at least 30 seconds** before triggering SignalTap. The Mac's `mDNSResponder` floods Bonjour announces every time it sees a link-up event; that flood is what produces ~150 discarded frames in the first few seconds and obscures the real demo traffic.
+
+## 2026-05-05 (rounds 9-13: MACRAW filter/drain matrix)
+- Tested bounded-discard plus `MFEN=1` (`S0_MR=0x84`) and confirmed the W5500 A PHY stayed healthy (`PHYCFGR=0xBF`) while UDP/80 still did not appear.
+- Raised W5500 A SPI drain rate from divider 50 to 8, then 4, and added repeated-bad-length resync. Captures still showed PC1-origin IPv4 mDNS/Bonjour frames, not the demo UDP/80 flow.
+- Added last-IPv4 parser-field SignalTap latches so `stp_regen_ethertype/ip_proto/dst_port` can show the last parsed IPv4 frame even when later IPv6 traffic overwrites the rolling shadow.
+- Reverted MFEN for a control image and confirmed MACRAW still forwarded background IPv4 but not the verified demo UDP/80 packet.
+
+## 2026-05-05 (rounds 14-16: sender-shape and normal-socket proof)
+- Added `--allow-dst-ip` / `--dst-ip` to `scripts/rule_demo_sender.py` and fixed its stale `--dst-mac` help text.
+- Added `scripts/rule_demo_udp_socket_sender.py`, a normal UDP socket sender that relies on a static ARP entry for `192.168.1.1 -> 02:00:00:de:ad:0a`.
+- PC1 tcpdump proved the normal socket sender put `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80` on `en0`, 10/10 packets with zero kernel drops.
+- Hardware still showed `frames_udp_dport80=0`; W5500 A continued receiving broadcast/multicast Mac background frames but not the verified unicast UDP/80 packet.
+
+## 2026-05-05 (rounds 17-19: W5500 A readbacks and pivot)
+- Added non-invasive W5500 A readback probes for `S0_MR`, `SHAR`, and `SIPR`, packed into existing SignalTap columns:
+  - `stp_b_status` = A `S0_MR`
+  - `stp_b_last_pkt_len` + `stp_b_buf_writes` = A `SHAR`
+  - `stp_b_send_issued` = A `SIPR`
+- Verified hardware readbacks:
+  - round 17: `S0_MR=0x04`, `SHAR=02:00:00:DE:AD:0A`
+  - round 18: `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`
+  - round 19: `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`
+- Programmed W5500 A common network registers for the unicast test (`GAR=192.168.1.10`, `SUBR=255.255.255.0`, `SIPR=192.168.1.1`) and confirmed readback.
+- Final round-19 capture still reported `frames_udp_dport80=0` with PC1 tcpdump clean. Decision: stop chasing A-side MACRAW for the demo path and pivot to W5500 A normal UDP socket receive mode.
+
+## 2026-05-05 (UDP socket ingress implementation checkpoint)
+- Added `rtl/eth_if/w5500_udp_rx_adapter.v`, which configures W5500 A as a normal UDP socket on port 80, reads the W5500 UDP RX record, and synthesizes an internal Ethernet/IPv4/UDP byte stream for the existing parser/forwarder/B-TX path.
+- Added `tb/models/w5500_udp_rx_model.sv`, `tb/tests/w5500_udp_rx_adapter_tb.sv`, and `tb/tests/de1_soc_top_udp_socket_forward_tb.sv` to cover the socket RX adapter and the normal top-level A-to-B forwarding path.
+- Switched `de1_soc_w5500_top` A ingress from the MACRAW adapter to the UDP socket adapter, while restoring SignalTap's B-side TX counter packing for the next hardware acceptance capture.
+- Updated simulator and Quartus source lists for the new UDP RX RTL/model. Questa execution is still pending because the command approval layer rejected the simulator run in this session.

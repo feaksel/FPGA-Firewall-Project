@@ -20,8 +20,6 @@ module de1_soc_top_bypass_tb;
     logic saw_send_cmd_b;
     logic [15:0] tx_frame_len_b;
     logic [31:0] tx_send_count_b;
-    logic [7:0] udp_mem [0:63];
-    int idx;
 
     de1_soc_w5500_top dut (
         .CLOCK_50(clk),
@@ -36,9 +34,10 @@ module de1_soc_top_bypass_tb;
         .GPIO_1(gpio_1)
     );
 
-    w5500_macraw_model #(
+    w5500_udp_rx_model #(
         .PACKET_FILE(UDP_ALLOW_MEM),
         .PACKET_LENGTH(UDP_ALLOW_LEN),
+        .PAYLOAD_LENGTH(0),
         .REPEAT_PACKETS(1)
     ) u_a_model (
         .rst_n(key[0]),
@@ -74,7 +73,6 @@ module de1_soc_top_bypass_tb;
     end
 
     initial begin
-        $readmemh(UDP_ALLOW_MEM, udp_mem);
         key = 4'b1110;
         sw = 10'd0;
 
@@ -90,11 +88,21 @@ module de1_soc_top_bypass_tb;
         expect_bit("top_bypass.init_error", ledr[1], 1'b0);
         expect_bit("top_bypass.saw_recv_a", saw_recv_cmd_a, 1'b1);
         expect_bit("top_bypass.saw_send_b", saw_send_cmd_b, 1'b1);
-        expect_u16("top_bypass.tx_frame_len", tx_frame_len_b, UDP_ALLOW_LEN);
+        expect_u16("top_bypass.tx_frame_len", tx_frame_len_b, 16'd42);
         expect_u32("top_bypass.tx_send_count", tx_send_count_b, 32'd3);
 
-        for (idx = 0; idx < UDP_ALLOW_LEN; idx = idx + 1)
-            u_b_model.expect_sent_byte(idx, udp_mem[idx]);
+        u_b_model.expect_sent_byte(0, 8'hff);
+        u_b_model.expect_sent_byte(6, 8'h00);
+        u_b_model.expect_sent_byte(12, 8'h08);
+        u_b_model.expect_sent_byte(23, 8'h11);
+        u_b_model.expect_sent_byte(26, 8'hc0);
+        u_b_model.expect_sent_byte(29, 8'h0a);
+        u_b_model.expect_sent_byte(30, 8'hc0);
+        u_b_model.expect_sent_byte(33, 8'h01);
+        u_b_model.expect_sent_byte(34, 8'h12);
+        u_b_model.expect_sent_byte(37, 8'h50);
+        u_b_model.expect_sent_byte(38, 8'h00);
+        u_b_model.expect_sent_byte(39, 8'h08);
 
         $display("PASS: de1_soc_top_bypass_tb");
         $finish;

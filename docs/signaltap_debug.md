@@ -423,6 +423,48 @@ py -3 scripts\pcap_summary.py C:\Users\furka\Desktop\sw7-0004.pcapng
 If the command reports `JTAG chain in use`, close the SignalTap GUI capture
 window or stop the GUI analyzer before retrying.
 
+## 2026-05-05 rounds 17-19 W5500 A readback probes
+
+To avoid another manual SignalTap node-list edit, the round-17 through round-19
+images temporarily packed W5500 A register readbacks into existing `stp_*`
+columns:
+
+- `stp_b_status[7..0]` = W5500 A `S0_MR` readback.
+- `stp_b_last_pkt_len[15..0]` = W5500 A `SHAR[47:32]`.
+- `stp_b_buf_writes[31..0]` = W5500 A `SHAR[31:0]`.
+- `stp_b_send_issued[31..0]` = W5500 A `SIPR` in the later SIPR image.
+
+The final readback image reported:
+
+```text
+PHYCFGR = BF
+S0_MR   = 84
+SHAR    = 020000DEAD0A
+SIPR    = C0A80101
+```
+
+At the same time, fresh PC1 tcpdump proved the Mac was emitting
+`192.168.1.10:4660 -> 192.168.1.1:80` as unicast Ethernet to
+`02:00:00:de:ad:0a`, while SignalTap still showed
+`frames_udp_dport80=0`. This is the evidence that closes the MACRAW debug path
+for the demo ingress.
+
+## 2026-05-05 UDP socket ingress checkpoint
+
+After the UDP socket adapter change, the preserved top-level SignalTap names are
+kept stable, but several meanings return to the B-TX acceptance view:
+
+- `stp_b_status[7..0]` is W5500 A `S0_SR` socket-status readback; expected
+  value is `0x22` for an open UDP socket.
+- `stp_b_buf_writes[31..0]`, `stp_b_send_issued[31..0]`,
+  `stp_b_send_cleared[31..0]`, `stp_b_send_timeouts[31..0]`,
+  `stp_b_tx_count[31..0]`, and `stp_b_last_pkt_len[15..0]` again describe the
+  W5500 B TX adapter, not A-side SHAR/SIPR readback packing.
+- `stp_last_rx_size[15..0]` is now the W5500 UDP socket RX occupancy
+  (`8 + UDP payload length` for one packet), and `stp_last_frame_len[15..0]`
+  is the synthesized Ethernet frame length (`42 + UDP payload length`).
+for the current demo packet and motivates the W5500 A UDP-socket RX pivot.
+
 ## Capture flow
 
 After the .stp is added and Quartus has recompiled:

@@ -1,107 +1,110 @@
-# Next Bench Session — Cheat Sheet (2026-05-05)
+# Next Bench Session - Cheat Sheet (2026-05-05)
 
-This is the working state after eight diagnostic rounds. The remaining open
-question on the FPGA side is whether the new bounded-discard adapter
-(`rtl/eth_if/ethernet_controller_adapter.v`) lets demo UDP/80 frames survive
-the Mac's `mDNSResponder` link-up flood.
+This is the working state after nineteen hardware-debug rounds. The important
+decision is now made: do not keep chasing W5500 A MACRAW for the rule-demo
+ingress. The current RTL checkpoint uses W5500 A normal UDP socket mode and
+synthesizes the Ethernet/IP/UDP stream internally before the existing firewall
+and W5500 B TX path.
 
-## What we know for sure
+## What We Know For Sure
 
 | Layer | Status |
 | --- | --- |
-| PC1 (Mac) Scapy sender | OK. `tcpdump -i en0 udp port 80` confirmed five demo broadcasts leaving en0 with `src=1c:f6:4c:44:ff:46`, `dst=ff:ff:ff:ff:ff:ff`, `dport=80`. |
+| PC1 normal UDP sender | OK. Fresh tcpdump showed `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 packets, zero drops. |
 | Cable PC1 -> W5500 A | OK. Direct point-to-point, no switch. |
-| W5500 A PHY | OK. `stp_phy_cfgr = 0xBF` -> LNK=1, SPD=1 (100M), DPX=1 (full). |
-| W5500 A MAC | Receives mDNS multicast frames cleanly (we see them streamed). |
-| FPGA RX FIFO + parser | OK. Every IPv4/UDP frame counted in `frames_ipv4` / `frames_udp_dport80`. |
-| FPGA forwarder + packet_buffer | OK. Forwards allowed frames to W5500 B. |
-| W5500 B TX adapter | OK. `b_buf_writes / send_issued / send_cleared / tx_count` all increment for forwarded frames; no timeouts. |
-| W5500 B PHY -> PC2 | OK. Wireshark on PC2 has shown forwarded mDNS multicast arriving end-to-end. |
-| Cable W5500 B -> PC2 | OK. Direct point-to-point. |
+| W5500 A PHY | OK. `stp_phy_cfgr = 0xBF` -> link up, 100 Mbps, full duplex. |
+| W5500 A common/register config | OK. Hardware readback proved `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`. |
+| W5500 A MACRAW for background traffic | Partly OK. It surfaces Mac broadcast/multicast background frames such as mDNS UDP/5353. |
+| W5500 A MACRAW for demo UDP/80 | Not OK. It never surfaced the verified unicast UDP/80 demo packet. |
+| FPGA parser/forwarder/B TX for surfaced frames | OK. Mac-origin mDNS frames were forwarded A -> FPGA -> B with zero B SEND timeouts. |
+| W5500 B TX path | OK. Direct SW6 test and forwarded-background captures both prove B can transmit. |
+| PC2 side | OK enough for current diagnosis. It has captured direct/generated/forwarded frames in earlier rounds. |
 
-## What we don't know yet
+## Final MACRAW Evidence
 
-- Whether **demo UDP/80** frames specifically survive the chip's RX buffer.
-  In every round so far, only the Mac's mDNS background ended up in
-  `frames_ipv4` (with `regen_dst_port = 0x14E9 = 5353`). UDP/80 was always 0.
-- Whether the round-8 RTL fix (bounded discard) lets demo frames buffered
-  behind a single corrupted-length mDNS frame survive long enough to be
-  parsed and forwarded.
+Round 19 ran with the best possible MACRAW setup:
 
-## Bench protocol (do exactly this)
+- PC1 sent normal UDP socket traffic to W5500 A:
+  - destination MAC `02:00:00:de:ad:0a`
+  - destination IP/port `192.168.1.1:80`
+  - source `192.168.1.10:4660`
+- W5500 A readbacks from the live chip:
+  - `PHYCFGR=0xBF`
+  - `S0_MR=0x84`
+  - `SHAR=02:00:00:DE:AD:0A`
+  - `SIPR=C0A80101`
+- SignalTap still showed:
+  - `frames_udp_dport80=0`
+  - `frames_demo_match=0`
+  - last IPv4 `dst_port=0x14E9` (UDP/5353 mDNS)
 
-1. Pull the latest repo on PC1 (the sender script default is now
-   broadcast / dst IP `192.168.1.255`).
-2. Confirm topology:
-   ```
-   PC1 (Mac, en0) ---direct cable--- W5500 A (FPGA)
-   W5500 B (FPGA) ---direct cable--- PC2 (Win NIC)
-   ```
-   No switches, hubs, or other devices on either link.
-3. Flash the latest SOF (I'll do this after each Quartus compile finishes).
-4. Press FPGA reset (`KEY[0]`); wait for `LEDR0=1` and `LEDR1=0`.
-5. **Wait at least 30 seconds**. The Mac's `mDNSResponder` floods Bonjour
-   announces every time it sees a link-up event, and that flood is the source
-   of the ~150 "bad-length discard" cycles we kept seeing in earlier captures.
-6. Start the sender on PC1:
+Conclusion: the hardware is not failing because of PC1, cable, PHY, SHAR,
+SIPR, MFEN, parser, forwarder, or W5500 B TX. A-side MACRAW is simply not the
+reliable rule-demo ingress path for this bench.
+
+## Next Implementation Plan
+
+Implement a new W5500 A UDP-socket RX adapter:
+
+1. Program W5500 A common registers:
+   - `SHAR = 02:00:00:DE:AD:0A`
+   - `GAR = 192.168.1.10`
+   - `SUBR = 255.255.255.0`
+   - `SIPR = 192.168.1.1`
+2. Open socket 0 in UDP mode on local port 80.
+3. Poll `S0_RX_RSR`.
+4. Read W5500 UDP RX records from the socket RX buffer.
+5. Reconstruct an internal Ethernet/IP/UDP frame or equivalent parser metadata:
+   - src MAC can be PC1's known MAC for the bench or a synthetic value
+   - dst MAC should be W5500 A SHAR
+   - src IP/port comes from the W5500 UDP record
+   - dst IP/port is W5500 A SIPR / local UDP port 80
+   - payload is the received UDP payload
+6. Feed the reconstructed stream into the existing firewall/forwarder/B-TX path.
+
+Keep W5500 B TX unchanged unless the new path reaches B and exposes a separate
+B-side issue.
+
+## Bench Protocol For The Next Image
+
+1. PC1:
    ```bash
-   sudo python3 scripts/rule_demo_sender.py --iface en0 --rate 2 \
-       --packet-gap 0.05 --no-ssh-allow --no-tcp-drop --verbose-each
+   sudo ifconfig en0 inet 192.168.1.10 netmask 255.255.255.0 up
+   sudo arp -d 192.168.1.1 2>/dev/null || true
+   sudo arp -s 192.168.1.1 02:00:00:de:ad:0a
+   python3 scripts/rule_demo_udp_socket_sender.py --iface en0 --rate 2 --verbose-each
    ```
-   It should print `dst_mac=ff:ff:ff:ff:ff:ff` and `Cycle: UDP/80 allow`.
-7. (Optional sanity check) `sudo tcpdump -i en0 -nn -e -c 5 udp port 80` to
-   verify frames are leaving en0.
-8. Tell me to capture. I'll run:
+2. PC1 tcpdump sanity check:
+   ```bash
+   sudo tcpdump -i en0 -nn -e -c 10 'udp port 80 or arp'
+   ```
+3. Board:
+   - flash the new SOF
+   - wait for `LEDR0=1`, `LEDR1=0`
+   - wait 30 seconds after flash/reset
+4. Capture:
    ```powershell
-   quartus_stp.exe -t scripts/signaltap_capture.tcl `
-       quartus/de1_soc_w5500.stp `
-       captures/stp/round<N>.csv 30
-   py -3 scripts/inspect_signaltap_csv.py captures/stp/round<N>.csv
+   & 'C:\altera_lite\25.1std\quartus\bin64\quartus_stp.exe' `
+     -t scripts\signaltap_capture_force.tcl `
+     quartus\de1_soc_w5500.stp `
+     captures\stp\udp_socket_rx.csv 10
+   py -3 scripts\inspect_signaltap_csv.py captures\stp\udp_socket_rx.csv
    ```
-9. Paste the bottom Diagnosis block back. I'll act on it.
 
-## What to look for in the next capture
+## Acceptance Criteria
 
-- `frames_ipv4` should be **moderate** (not 159). With direct cable + 30 s
-  settle time, expect maybe 5-30 over a 30 s window (Mac's residual mDNS).
-- `frames_udp_dport80 > 0` and `frames_demo_match > 0` — the round-8
-  bounded-discard should let these accumulate at ~2 per second.
-- `b_tx_count > 0` and equal to `frames_demo_match` (plus whatever mDNS got
-  forwarded). Means PC2 is receiving the demo via FPGA.
-- `stp_b_tx_first16` should start with `FFFFFFFFFFFF` (broadcast dst MAC) and
-  ethertype `0800` (IPv4) — proof the demo frame survived end-to-end.
+- W5500 A UDP-mode RX observes PC1 packets at about the sender rate.
+- Internal reconstructed frame/profile counts show UDP destination port 80.
+- Existing B path completes SENDs with `b_send_timeouts=0`.
+- PC2 Wireshark/dashboard sees the allowed demo frame.
 
-## If the demo still doesn't show up after round 8
+## Round History
 
-Two remaining hypotheses:
-
-1. **The Mac's `mDNSResponder` flood is so heavy that the chip's 16 KB
-   RX buffer fills up faster than our SPI drain rate (~166 frames/sec at
-   `SPI_CLK_DIV=50`). Demo frames get dropped at the chip's MAC level when
-   the RX buffer is full.** Mitigation: bump SPI clock by lowering
-   `SPI_CLK_DIV` from 50 to e.g. 8 (faster drain), or temporarily disable
-   mDNSResponder on the Mac:
-   ```bash
-   sudo launchctl unload -w /System/Library/LaunchDaemons/com.apple.mDNSResponder.plist
-   ```
-   (re-enable with `launchctl load`).
-
-2. **The W5500's MAC silently filters broadcast frames in some chip-state
-   we can't see from PHYCFGR alone.** Mitigation: try `MFEN=1` in `S0_MR`
-   (so the chip explicitly accepts broadcast / matches SHAR), or write a
-   non-zero `Sn_IMR` to ensure interrupt handling is enabled.
-
-I'd try mitigation #1 (lower `SPI_CLK_DIV`) first — it's a one-line RTL change.
-
-## Reference — what each round added
-
-| Round | RTL change | Hardware result |
-| --- | --- | --- |
-| 1 | Initial SW9 byte-debug + IPv4-only shadow + per-ethertype counters | Showed only IPv6 mDNS in shadow |
-| 2 | Sender switched to broadcast (no RTL change) | tcpdump confirmed sender works |
-| 3 | First round-2 SignalTap with IPv4-only shadow + frame counters | Confirmed FPGA forwards IPv4 mDNS end-to-end; no UDP/80 |
-| 4 | SHAR write at init + S0_CR clear poll after RECV | No counter change |
-| 5 | S0_IR clear after RECV | No counter change |
-| 6 | New probes for chip RSR / commit / stream byte count | No SOF change yet |
-| 7 | PHYCFGR read + `stp_phy_cfgr` probe | Proved PHY at 100M FDX; revealed 159 commits vs 2 streamed -> bad-length discards eating the buffer |
-| 8 | Bounded discard (`min(rx_size_bytes, 1520)`) | **Pending hardware verification** |
+| Rounds | Result |
+| --- | --- |
+| 1-3 | Proved A/B path forwards some Mac-origin IPv4 background traffic, not demo UDP/80. |
+| 4-5 | SHAR, RECV clear-poll, and S0_IR clear did not fix MACRAW. |
+| 6-8 | PHY/read-size probes found bad-length discard churn; bounded discard fixed the worst misalignment behavior. |
+| 9-13 | Faster A SPI drain, MFEN toggles, resync, and parser latches still showed no UDP/80. |
+| 14-16 | Raw Scapy variants and normal UDP socket/static ARP were tested; PC1 was verified clean, but MACRAW still missed UDP/80. |
+| 17-19 | Hardware readback proved W5500 A mode/MAC/IP are correct; MACRAW still missed UDP/80. Pivot to W5500 UDP socket RX. |

@@ -37,6 +37,9 @@ module ethernet_controller_adapter #(
     output reg [15:0]  last_frame_len_bytes,
     output reg [7:0]   phy_cfgr_value,
     output reg [31:0]  phy_read_count,
+    output reg [7:0]   socket_mode_value,
+    output reg [47:0]  shar_value,
+    output reg [31:0]  sipr_value,
     output reg [3:0]   debug_state
 );
     localparam ST_IDLE         = 4'd0;
@@ -55,12 +58,24 @@ module ethernet_controller_adapter #(
     localparam ST_ERROR        = 4'd15;
 
     localparam [15:0] COMMON_MR         = 16'h0000;
+    localparam [15:0] COMMON_GAR0       = 16'h0001;
+    localparam [15:0] COMMON_GAR1       = 16'h0002;
+    localparam [15:0] COMMON_GAR2       = 16'h0003;
+    localparam [15:0] COMMON_GAR3       = 16'h0004;
+    localparam [15:0] COMMON_SUBR0      = 16'h0005;
+    localparam [15:0] COMMON_SUBR1      = 16'h0006;
+    localparam [15:0] COMMON_SUBR2      = 16'h0007;
+    localparam [15:0] COMMON_SUBR3      = 16'h0008;
     localparam [15:0] COMMON_SHAR0      = 16'h0009;
     localparam [15:0] COMMON_SHAR1      = 16'h000A;
     localparam [15:0] COMMON_SHAR2      = 16'h000B;
     localparam [15:0] COMMON_SHAR3      = 16'h000C;
     localparam [15:0] COMMON_SHAR4      = 16'h000D;
     localparam [15:0] COMMON_SHAR5      = 16'h000E;
+    localparam [15:0] COMMON_SIPR0      = 16'h000F;
+    localparam [15:0] COMMON_SIPR1      = 16'h0010;
+    localparam [15:0] COMMON_SIPR2      = 16'h0011;
+    localparam [15:0] COMMON_SIPR3      = 16'h0012;
     localparam [15:0] COMMON_PHYCFGR    = 16'h002E;
     localparam [15:0] COMMON_VERSIONR   = 16'h0039;
     localparam [15:0] S0_MR             = 16'h0000;
@@ -81,17 +96,17 @@ module ethernet_controller_adapter #(
     localparam [7:0] CTRL_S0_RXBUF_READ = 8'h18;
 
     localparam [7:0] W5500_VERSION      = 8'h04;
-    // MACRAW mode with MFEN=0. Round-12 hardware showed the W5500 reliably
-    // forwarding multicast mDNS with this parser/resync path, while MFEN=1 is
-    // too restrictive for the current multicast demo destination.
-    localparam [7:0] S0_MR_MACRAW       = 8'h04;
+    // MACRAW mode with MFEN=1. Round-17 readback proved SHAR is programmed as
+    // 02:00:00:DE:AD:0A; the reliable demo path now uses normal UDP plus a
+    // static ARP entry so PC1 sends unicast frames directly to that address.
+    localparam [7:0] S0_MR_MACRAW       = 8'h84;
     localparam [7:0] S0_CR_OPEN         = 8'h01;
     localparam [7:0] S0_CR_RECV         = 8'h40;
     localparam [7:0] S0_STATUS_MACRAW   = 8'h42;
     localparam [7:0] SOCKET_BUF_16KB    = 8'h10;
 
     reg [3:0]  state;
-    reg [2:0]  state_step;
+    reg [4:0]  state_step;
     reg [31:0] wait_ctr;
     reg [15:0] rx_poll_wait_ctr;
 
@@ -222,6 +237,9 @@ module ethernet_controller_adapter #(
             last_frame_len_bytes <= 16'd0;
             phy_cfgr_value   <= 8'd0;
             phy_read_count   <= 32'd0;
+            socket_mode_value <= 8'd0;
+            shar_value       <= 48'd0;
+            sipr_value       <= 32'd0;
             debug_state      <= ST_IDLE;
             rx_size_bytes    <= 16'd0;
             rx_read_ptr      <= 16'd0;
@@ -320,20 +338,32 @@ module ethernet_controller_adapter #(
                 ST_COMMON_CFG: begin
                     if (!seq_active && !seq_done) begin
                         case (state_step)
-                            3'd0: start_spi_write(COMMON_MR,    CTRL_COMMON_WRITE, 8'h00);
-                            3'd1: start_spi_write(COMMON_SHAR0, CTRL_COMMON_WRITE, 8'h02);
-                            3'd2: start_spi_write(COMMON_SHAR1, CTRL_COMMON_WRITE, 8'h00);
-                            3'd3: start_spi_write(COMMON_SHAR2, CTRL_COMMON_WRITE, 8'h00);
-                            3'd4: start_spi_write(COMMON_SHAR3, CTRL_COMMON_WRITE, 8'hDE);
-                            3'd5: start_spi_write(COMMON_SHAR4, CTRL_COMMON_WRITE, 8'hAD);
-                            3'd6: start_spi_write(COMMON_SHAR5, CTRL_COMMON_WRITE, 8'h0A);
+                            5'd0:  start_spi_write(COMMON_MR,    CTRL_COMMON_WRITE, 8'h00);
+                            5'd1:  start_spi_write(COMMON_GAR0,  CTRL_COMMON_WRITE, 8'hC0);
+                            5'd2:  start_spi_write(COMMON_GAR1,  CTRL_COMMON_WRITE, 8'hA8);
+                            5'd3:  start_spi_write(COMMON_GAR2,  CTRL_COMMON_WRITE, 8'h01);
+                            5'd4:  start_spi_write(COMMON_GAR3,  CTRL_COMMON_WRITE, 8'h0A);
+                            5'd5:  start_spi_write(COMMON_SUBR0, CTRL_COMMON_WRITE, 8'hFF);
+                            5'd6:  start_spi_write(COMMON_SUBR1, CTRL_COMMON_WRITE, 8'hFF);
+                            5'd7:  start_spi_write(COMMON_SUBR2, CTRL_COMMON_WRITE, 8'hFF);
+                            5'd8:  start_spi_write(COMMON_SUBR3, CTRL_COMMON_WRITE, 8'h00);
+                            5'd9:  start_spi_write(COMMON_SHAR0, CTRL_COMMON_WRITE, 8'h02);
+                            5'd10: start_spi_write(COMMON_SHAR1, CTRL_COMMON_WRITE, 8'h00);
+                            5'd11: start_spi_write(COMMON_SHAR2, CTRL_COMMON_WRITE, 8'h00);
+                            5'd12: start_spi_write(COMMON_SHAR3, CTRL_COMMON_WRITE, 8'hDE);
+                            5'd13: start_spi_write(COMMON_SHAR4, CTRL_COMMON_WRITE, 8'hAD);
+                            5'd14: start_spi_write(COMMON_SHAR5, CTRL_COMMON_WRITE, 8'h0A);
+                            5'd15: start_spi_write(COMMON_SIPR0, CTRL_COMMON_WRITE, 8'hC0);
+                            5'd16: start_spi_write(COMMON_SIPR1, CTRL_COMMON_WRITE, 8'hA8);
+                            5'd17: start_spi_write(COMMON_SIPR2, CTRL_COMMON_WRITE, 8'h01);
+                            5'd18: start_spi_write(COMMON_SIPR3, CTRL_COMMON_WRITE, 8'h01);
                             default: begin
                                 state      <= ST_SOCKET_CFG;
                                 state_step <= 3'd0;
                             end
                         endcase
                     end else if (seq_done) begin
-                        if (state_step == 3'd6) begin
+                        if (state_step == 5'd18) begin
                             state      <= ST_SOCKET_CFG;
                             state_step <= 3'd0;
                         end else begin
@@ -416,14 +446,46 @@ module ethernet_controller_adapter #(
                 end
 
                 ST_READ_PHY: begin
-                    if (!seq_active && !seq_done)
-                        start_spi_read(COMMON_PHYCFGR, CTRL_COMMON_READ);
+                    if (!seq_active && !seq_done) begin
+                        case (state_step)
+                            3'd0: start_spi_read(COMMON_PHYCFGR, CTRL_COMMON_READ);
+                            3'd1: start_spi_read(S0_MR, CTRL_S0_REG_READ);
+                            3'd2: start_spi_read(COMMON_SHAR0, CTRL_COMMON_READ);
+                            3'd3: start_spi_read(COMMON_SHAR1, CTRL_COMMON_READ);
+                            3'd4: start_spi_read(COMMON_SHAR2, CTRL_COMMON_READ);
+                            3'd5: start_spi_read(COMMON_SHAR3, CTRL_COMMON_READ);
+                            3'd6: start_spi_read(COMMON_SHAR4, CTRL_COMMON_READ);
+                            3'd7: start_spi_read(COMMON_SHAR5, CTRL_COMMON_READ);
+                            5'd8: start_spi_read(COMMON_SIPR0, CTRL_COMMON_READ);
+                            5'd9: start_spi_read(COMMON_SIPR1, CTRL_COMMON_READ);
+                            5'd10: start_spi_read(COMMON_SIPR2, CTRL_COMMON_READ);
+                            5'd11: start_spi_read(COMMON_SIPR3, CTRL_COMMON_READ);
+                        endcase
+                    end
                     else if (seq_done) begin
-                        phy_cfgr_value   <= seq_rx[3];
-                        phy_read_count   <= rx_commit_count;
-                        rx_poll_wait_ctr <= 16'd0;
-                        state            <= ST_RX_POLL;
-                        state_step       <= 3'd0;
+                        case (state_step)
+                            3'd0: phy_cfgr_value    <= seq_rx[3];
+                            3'd1: socket_mode_value <= seq_rx[3];
+                            3'd2: shar_value[47:40] <= seq_rx[3];
+                            3'd3: shar_value[39:32] <= seq_rx[3];
+                            3'd4: shar_value[31:24] <= seq_rx[3];
+                            3'd5: shar_value[23:16] <= seq_rx[3];
+                            3'd6: shar_value[15:8]  <= seq_rx[3];
+                            3'd7: shar_value[7:0]   <= seq_rx[3];
+                            5'd8: sipr_value[31:24] <= seq_rx[3];
+                            5'd9: sipr_value[23:16] <= seq_rx[3];
+                            5'd10: sipr_value[15:8] <= seq_rx[3];
+                            5'd11: sipr_value[7:0]  <= seq_rx[3];
+                        endcase
+
+                        if (state_step == 5'd11) begin
+                            phy_read_count   <= rx_commit_count;
+                            rx_poll_wait_ctr <= 16'd0;
+                            state            <= ST_RX_POLL;
+                            state_step       <= 3'd0;
+                        end else begin
+                            state_step <= state_step + 1'b1;
+                        end
                     end
                 end
 
