@@ -81,12 +81,10 @@ module ethernet_controller_adapter #(
     localparam [7:0] CTRL_S0_RXBUF_READ = 8'h18;
 
     localparam [7:0] W5500_VERSION      = 8'h04;
-    // MACRAW mode with MFEN=1 (bit 7): chip's MAC drops anything that isn't
-    // addressed to SHAR, broadcast, or multicast. Demo (broadcast) and mDNS
-    // (multicast) still pass; line noise / partial-frame fragments with
-    // corrupted dst MACs get filtered at the chip instead of bloating our
-    // bad-length discard count.
-    localparam [7:0] S0_MR_MACRAW       = 8'h84;
+    // MACRAW mode with MFEN=0. Round-12 hardware showed the W5500 reliably
+    // forwarding multicast mDNS with this parser/resync path, while MFEN=1 is
+    // too restrictive for the current multicast demo destination.
+    localparam [7:0] S0_MR_MACRAW       = 8'h04;
     localparam [7:0] S0_CR_OPEN         = 8'h01;
     localparam [7:0] S0_CR_RECV         = 8'h40;
     localparam [7:0] S0_STATUS_MACRAW   = 8'h42;
@@ -117,6 +115,7 @@ module ethernet_controller_adapter #(
     reg [15:0] frame_len_bytes;
     reg [15:0] frame_index;
     reg [15:0] next_rx_read_ptr;
+    reg [3:0]  bad_len_streak;
 
     spi_master #(
         .CLK_DIV(SPI_CLK_DIV),
@@ -229,6 +228,7 @@ module ethernet_controller_adapter #(
             frame_len_bytes  <= 16'd0;
             frame_index      <= 16'd0;
             next_rx_read_ptr <= 16'd0;
+            bad_len_streak   <= 4'd0;
         end else begin
             spi_start   <= 1'b0;
             seq_done    <= 1'b0;
@@ -464,17 +464,25 @@ module ethernet_controller_adapter #(
                                 ({frame_len_bytes[15:8], seq_rx[3]} <= MAX_FRAME_BYTES) &&
                                 ({frame_len_bytes[15:8], seq_rx[3]} <= (rx_size_bytes - 16'd2))) begin
                                 next_rx_read_ptr <= rx_read_ptr + {frame_len_bytes[15:8], seq_rx[3]} + 16'd2;
+                                bad_len_streak   <= 4'd0;
                                 state            <= ST_STREAM_FRAME;
                             end else begin
                                 // Length is bogus. Advance a bounded amount so we
                                 // don't flush legitimate frames buffered behind a
-                                // single corrupted length header. Cap at one
-                                // max-Ethernet-frame so misalignment recovers
-                                // within a few iterations.
-                                if (rx_size_bytes <= 16'd1520)
+                                // single corrupted length header. If several
+                                // consecutive bounded skips still land inside
+                                // frame data, flush the current RX occupancy to
+                                // resync on future frames from the live sender.
+                                if (bad_len_streak >= 4'd3) begin
                                     next_rx_read_ptr <= rx_read_ptr + rx_size_bytes;
-                                else
+                                    bad_len_streak   <= 4'd0;
+                                end else if (rx_size_bytes <= 16'd1520) begin
+                                    next_rx_read_ptr <= rx_read_ptr + rx_size_bytes;
+                                    bad_len_streak   <= bad_len_streak + 4'd1;
+                                end else begin
                                     next_rx_read_ptr <= rx_read_ptr + 16'd1520;
+                                    bad_len_streak   <= bad_len_streak + 4'd1;
+                                end
                                 state            <= ST_COMMIT_RX;
                             end
                         end

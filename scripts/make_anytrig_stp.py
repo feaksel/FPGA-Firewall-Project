@@ -24,21 +24,26 @@ def main() -> int:
     raw = src.read_bytes()
     text = raw.decode("utf-8", errors="strict")
 
-    new_text = re.sub(r'level-0="(low|high|rising_edge|falling_edge|edge|0|1)"',
+    new_text = re.sub(r'level-0="(alt_or|low|high|rising_edge|falling_edge|edge|0|1)"',
                       'level-0="dont_care"', text)
 
     # SignalTap requires at least one non-dont_care trigger condition or it
-    # never fires. Force a single bit (SW[0]) to "high" because SW[0]=1 during
-    # normal operation. That makes the trigger essentially "any sample after init".
-    pinned = re.subn(
-        r'(<node\b[^>]*name="stp_switches\[0\]"[^>]*?level-0=)"dont_care"',
-        r'\1"high"',
-        new_text,
-        count=1,
-    )
-    new_text, n_pinned = pinned
+    # never fires. Force SW[0] to "high" because SW[0]=1 during normal
+    # operation. The .stp tag attribute order changes between Quartus sections,
+    # so match the whole trigger-capable tag before replacing its level.
+    n_pinned = 0
 
-    changes = sum(1 for _ in re.finditer(r'level-0="(low|high|rising_edge|falling_edge|edge|0|1)"', text))
+    def pin_sw0(match: re.Match[str]) -> str:
+        nonlocal n_pinned
+        tag = match.group(0)
+        if 'name="stp_switches[0]"' not in tag:
+            return tag
+        n_pinned += 1
+        return re.sub(r'level-0="dont_care"', 'level-0="high"', tag, count=1)
+
+    new_text = re.sub(r'<(?:node|net)\b[^>]*/>', pin_sw0, new_text)
+
+    changes = sum(1 for _ in re.finditer(r'level-0="(alt_or|low|high|rising_edge|falling_edge|edge|0|1)"', text))
     dst.write_bytes(new_text.encode("utf-8"))
     print(f"copied {src} -> {dst}, replaced {changes} non-dont_care trigger levels; pinned stp_switches[0]=high ({n_pinned} match)")
     return 0

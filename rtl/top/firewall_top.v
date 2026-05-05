@@ -69,6 +69,8 @@ module firewall_top #(
         .rx_stream_byte_count(),
         .last_rx_size_bytes(),
         .last_frame_len_bytes(),
+        .phy_cfgr_value(),
+        .phy_read_count(),
         .debug_state(adapter_debug_state)
     );
 

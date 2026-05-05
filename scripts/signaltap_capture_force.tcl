@@ -1,8 +1,6 @@
-# Variant of signaltap_capture.tcl that:
-#   - sets the trigger position to "post" so it captures into a circular
-#     buffer until force-stopped,
-#   - issues a force_trigger after a short delay so we always get a CSV
-#     even when the configured trigger condition does not fire on hardware.
+# Variant of signaltap_capture.tcl that runs acquisition for a short timeout and
+# exports whatever data log Quartus buffered, even if the configured trigger did
+# not fire. This Quartus build does not support a run-time force_trigger option.
 #
 # Usage:
 #   quartus_stp -t scripts/signaltap_capture_force.tcl <stp_file> <out_csv> [delay_s] [instance] [signal_set] [trigger]
@@ -63,12 +61,9 @@ puts "  trigger    = $trigger"
 
 open_session -name $stp_file
 
-# Run in background while we sleep then force-trigger.
-# quartus_stp does not have a true async run; instead we use run -timeout
-# with a short delay and then export whatever buffered samples exist.
 set rc [catch {
     run -instance $instance -signal_set $signal_set -trigger $trigger \
-        -data_log $data_log -timeout $delay_s -force_trigger
+        -data_log $data_log -timeout $delay_s
 } result]
 puts "run result: rc=$rc msg=$result"
 

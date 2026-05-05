@@ -20,10 +20,10 @@ SSH_SRC_IP = "10.1.2.3"
 SSH_DST_IP = "192.168.1.99"
 
 
-def allowed_udp(seq, src_mac, dst_mac):
+def allowed_udp(seq, src_mac, dst_mac, dst_ip):
     return (
         Ether(dst=dst_mac, src=src_mac)
-        / IP(src=ALLOW_SRC_IP, dst=ALLOW_DST_IP, proto=17)
+        / IP(src=ALLOW_SRC_IP, dst=dst_ip, proto=17)
         / UDP(sport=0x1234, dport=80)
         / Raw(load=f"FW-DEMO-ALLOW seq={seq}".encode("ascii"))
     )
@@ -55,7 +55,8 @@ def main():
     parser.add_argument("--packet-gap", type=float, default=0.15, help="Seconds to wait between individual packets in a cycle.")
     parser.add_argument("--list-ifaces", action="store_true", help="List Scapy interface names and exit.")
     parser.add_argument("--verbose-each", action="store_true", help="Print one line per send cycle instead of updating one status line.")
-    parser.add_argument("--dst-mac", default=DEFAULT_DST_MAC, help="Ethernet destination MAC. Default uses IPv4 multicast because that path is proven on the two-W5500 bench.")
+    parser.add_argument("--dst-mac", default=DEFAULT_DST_MAC, help="Ethernet destination MAC. Default is Ethernet broadcast.")
+    parser.add_argument("--allow-dst-ip", "--dst-ip", dest="allow_dst_ip", default=ALLOW_DST_IP, help="IPv4 destination for the UDP/80 allow profile. Default is IPv4 broadcast.")
     parser.add_argument("--udp-allow", action="store_true", default=True, help="Send the UDP/80 allow profile. Enabled by default.")
     parser.add_argument("--no-udp-allow", action="store_false", dest="udp_allow", help="Disable the UDP/80 allow profile.")
     parser.add_argument("--no-ssh-allow", action="store_true", help="Do not send TCP/22 SSH allow frames.")
@@ -90,7 +91,7 @@ def main():
 
     print("FPGA firewall rule demo sender")
     print(f"iface={args.iface} rate={args.rate:g} cycles/sec")
-    print(f"src_mac={src_mac} dst_mac={args.dst_mac}")
+    print(f"src_mac={src_mac} dst_mac={args.dst_mac} allow_dst_ip={args.allow_dst_ip}")
     profiles = []
     if args.udp_allow:
         profiles.append("UDP/80 allow")
@@ -107,7 +108,7 @@ def main():
         for seq in seq_iter:
             if args.udp_allow:
                 for _ in range(args.burst):
-                    sendp(allowed_udp(seq, src_mac, args.dst_mac), iface=args.iface, verbose=False)
+                    sendp(allowed_udp(seq, src_mac, args.dst_mac, args.allow_dst_ip), iface=args.iface, verbose=False)
                     sent_allow_udp += 1
                     time.sleep(args.packet_gap)
 

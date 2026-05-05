@@ -115,6 +115,9 @@ module de1_soc_w5500_top (
     reg  [15:0] rx_probe_ethertype;
     reg  [7:0]  rx_probe_ip_proto;
     reg  [15:0] rx_probe_dst_port;
+    reg  [15:0] rx_last_ipv4_ethertype;
+    reg  [7:0]  rx_last_ipv4_ip_proto;
+    reg  [15:0] rx_last_ipv4_dst_port;
     reg  [7:0]  a_rx_capture [0:15];
     reg  [7:0]  a_rx_shadow  [0:15];
     reg  [7:0]  a_rx_ipv4_shadow [0:15];
@@ -207,9 +210,9 @@ module de1_soc_w5500_top (
                              b_tx_shadow[4], b_tx_shadow[5], b_tx_shadow[6], b_tx_shadow[7],
                              b_tx_shadow[8], b_tx_shadow[9], b_tx_shadow[10], b_tx_shadow[11],
                              b_tx_shadow[12], b_tx_shadow[13], b_tx_shadow[14], b_tx_shadow[15]};
-        stp_regen_ethertype <= rule_regen_mode ? regen_ethertype : rx_probe_ethertype;
-        stp_regen_ip_proto <= rule_regen_mode ? regen_ip_proto : rx_probe_ip_proto;
-        stp_regen_dst_port <= rule_regen_mode ? regen_dst_port : rx_probe_dst_port;
+        stp_regen_ethertype <= rule_regen_mode ? regen_ethertype : rx_last_ipv4_ethertype;
+        stp_regen_ip_proto <= rule_regen_mode ? regen_ip_proto : rx_last_ipv4_ip_proto;
+        stp_regen_dst_port <= rule_regen_mode ? regen_dst_port : rx_last_ipv4_dst_port;
         stp_a_rx_ipv4_first16 <= {a_rx_ipv4_shadow[0], a_rx_ipv4_shadow[1], a_rx_ipv4_shadow[2], a_rx_ipv4_shadow[3],
                                   a_rx_ipv4_shadow[4], a_rx_ipv4_shadow[5], a_rx_ipv4_shadow[6], a_rx_ipv4_shadow[7],
                                   a_rx_ipv4_shadow[8], a_rx_ipv4_shadow[9], a_rx_ipv4_shadow[10], a_rx_ipv4_shadow[11],
@@ -690,6 +693,9 @@ module de1_soc_w5500_top (
             rx_probe_ethertype       <= 16'd0;
             rx_probe_ip_proto        <= 8'd0;
             rx_probe_dst_port        <= 16'd0;
+            rx_last_ipv4_ethertype   <= 16'd0;
+            rx_last_ipv4_ip_proto    <= 8'd0;
+            rx_last_ipv4_dst_port    <= 16'd0;
             frames_ipv4_count        <= 32'd0;
             frames_ipv6_count        <= 32'd0;
             frames_arp_count         <= 32'd0;
@@ -732,6 +738,9 @@ module de1_soc_w5500_top (
                 case (rx_probe_ethertype)
                     16'h0800: begin
                         frames_ipv4_count <= frames_ipv4_count + 32'd1;
+                        rx_last_ipv4_ethertype <= rx_probe_ethertype;
+                        rx_last_ipv4_ip_proto  <= rx_probe_ip_proto;
+                        rx_last_ipv4_dst_port  <= rx_probe_dst_port;
                         a_rx_ipv4_shadow[0]  <= a_rx_capture[0];
                         a_rx_ipv4_shadow[1]  <= a_rx_capture[1];
                         a_rx_ipv4_shadow[2]  <= a_rx_capture[2];
@@ -996,7 +1005,7 @@ module de1_soc_w5500_top (
         .RESET_ASSERT_CYCLES(500_000),
         .RESET_RELEASE_CYCLES(5_000_000),
         .RX_POLL_WAIT_CYCLES(5_000),
-        .SPI_CLK_DIV(50),
+        .SPI_CLK_DIV(4),
         .MAX_FRAME_BYTES(2048)
     ) u_w5500_a_rx (
         .clk(CLOCK_50),

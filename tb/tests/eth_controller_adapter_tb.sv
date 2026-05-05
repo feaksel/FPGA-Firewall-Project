@@ -60,6 +60,8 @@ module eth_controller_adapter_tb;
         .rx_stream_byte_count(),
         .last_rx_size_bytes(),
         .last_frame_len_bytes(),
+        .phy_cfgr_value(),
+        .phy_read_count(),
         .debug_state(debug_state)
     );
 
