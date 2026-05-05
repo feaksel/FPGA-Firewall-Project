@@ -120,9 +120,75 @@ overwriting the rolling RX shadow:
 - `stp_frames_udp_dport80[31..0]`
 - `stp_frames_demo_match[31..0]`
 
+Round-6 (2026-05-04) probes — distinguish chip-side vs. adapter-side RX
+failures by surfacing the chip's own RSR + length values and the adapter's
+commit/stream byte counts:
+
+- `stp_last_rx_size[15..0]` — most recent S0_RX_RSR value the chip reported.
+- `stp_last_frame_len[15..0]` — most recent 2-byte length prefix the adapter
+  read out of the chip's RX buffer. If this is ever above ~1520 or below 14,
+  the adapter is reading frame data as a length, i.e., alignment slipped.
+- `stp_rx_commit_count[31..0]` — number of `RECV` cycles the adapter has
+  completed (good frames + discards).
+- `stp_rx_stream_byte_count[31..0]` — number of bytes the adapter actually
+  streamed into the firewall pipeline. If `commit_count` >> `stream / 80`,
+  most cycles are bad-length discards.
+
+Round-7 (2026-05-04) probes — confirm the W5500 PHY actually negotiated:
+
+- `stp_phy_cfgr[7..0]` — `PHYCFGR` (common 0x002E). Decode bits:
+  - bit 0 = LNK (link up)
+  - bit 1 = SPD (1 = 100M, 0 = 10M)
+  - bit 2 = DPX (1 = full-duplex)
+  - The expected healthy value is `0xBF` (all link bits set, OPMD=software,
+    OPMDC=auto-neg-all-capable).
+- `stp_phy_read_count[31..0]` — number of times we re-read PHYCFGR. Useful
+  to verify the chip is responsive over time.
+
 `scripts/inspect_signaltap_csv.py` already knows about all of these and prints
 a Diagnosis line at the end of the report. See [docs/next_bench_session.md](next_bench_session.md)
 for the round-2 capture/interpret flow.
+
+## CLI capture helpers in `scripts/`
+
+- `scripts/signaltap_capture.tcl <stp> <csv> [timeout_s]` — wrapper around
+  `quartus_stp.exe` that opens the session, runs acquisition with the
+  configured trigger, and exports the result to CSV. Auto-detects the
+  signal_set and trigger names from the .stp.
+- `scripts/signaltap_capture_force.tcl <stp> <csv> [delay_s]` — same as above
+  but exports the data log even if the trigger times out, so you still get
+  whatever was buffered during the FILL/PRE phases. **Note**: the `run` Tcl
+  command does not actually accept a `-force_trigger` flag in this Quartus
+  build, so this script falls back to "run with short timeout, then export
+  whatever's buffered."
+- `scripts/make_anytrig_stp.py <in.stp> <out.stp>` — produces a copy of a
+  `.stp` with all `level-0` trigger conditions relaxed to `dont_care` and one
+  bit (`stp_switches[0]`) pinned to `high` so the trigger fires immediately
+  in normal operation (since SW0=1 is part of every test). Use this when the
+  configured trigger is on something rare (e.g. `b_send_issued[0]=high`) and
+  you just want any sample.
+- `scripts/inspect_signaltap_csv.py <csv>` — decodes the CSV: shows the
+  most-recent non-X value for each `stp_*` signal, decodes the first 16 bytes
+  of A-RX / B-TX latches as `dst / src / ethertype`, and prints a one-line
+  **Diagnosis** that selects between five concrete next actions.
+
+## Adding new probes
+
+Adding a new `(* preserve, noprune *)` register in
+[rtl/top/de1_soc_w5500_top.v](../rtl/top/de1_soc_w5500_top.v) is necessary
+but **not sufficient**. The SignalTap II IP is instrumented at fit time, so:
+
+1. Recompile once (so the new register survives synthesis).
+2. Open the `.stp` via `Tools -> SignalTap II Logic Analyzer`.
+3. Use Node Finder (`stp_*` filter) to add the new signals to the signal_set.
+4. Save the `.stp` (Quartus prompts to add it to the project if it isn't
+   already).
+5. **Recompile again** so the new sample widths are baked into the SOF.
+6. Reflash the new SOF.
+
+If you skip step 5, the live probe set on the chip will mismatch what the
+`.stp` claims, and `quartus_stp` will refuse with
+`ERROR: Instance, signal set, or trigger does not exist.`
 
 The packed control buses are:
 

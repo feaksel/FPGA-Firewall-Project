@@ -101,3 +101,27 @@
 - Added `scripts/signaltap_capture_force.tcl` (force-trigger variant) and `scripts/make_anytrig_stp.py` (relax all `level-0` triggers to `dont_care`) so CLI captures still produce a CSV when the configured trigger doesn't fire on hardware.
 - Fixed `scripts/inspect_signaltap_csv.py` to use the most recent non-`X` value per column instead of the literal last row, so trailing-X padded SignalTap exports report the correct counters.
 - Defaulted `scripts/rule_demo_sender.py` to broadcast (`ff:ff:ff:ff:ff:ff`, dst IP `192.168.1.255`) to bypass macOS multicast routing peculiarities. The original multicast IP/MAC remain available via `--dst-mac` and the script still defaults to UDP/80.
+
+## 2026-05-04 (round 4: chip-state hardening)
+- `rtl/eth_if/ethernet_controller_adapter.v`:
+  - Added `SHAR` (Source Hardware Address Register) write to `02:00:00:DE:AD:0A` during init. Some W5500 firmware revisions need a non-zero SHAR for reliable MAC-layer RX even with `MFEN=0`.
+  - New state `ST_WAIT_RECV` polls `S0_CR` until the chip clears it after each `RECV` command. Per W5500 datasheet, accessing the chip while a command is in flight gives undefined results, which can stall RX.
+- `rtl/eth_if/w5500_macraw_tx_adapter.v`: mirrored `SHAR` write to `02:00:00:DE:AD:0B` for symmetry.
+- Hardware result: counters still frozen at the same `3 IPv4 / 2 IPv6 / 0 demo` pattern. SHAR + RECV-clear did not move the needle. Captures preserved in `captures/stp/round4_*.csv`.
+
+## 2026-05-04 (round 5: interrupt-clear hardening)
+- Extended `ST_WAIT_RECV` in `ethernet_controller_adapter.v` to also write `S0_IR=0xFF` after `RECV` clears, clearing every pending socket interrupt bit (RECV, CON, DISCON, etc.) per WIZnet's recommended sequence.
+- Hardware result: still no change. The Sn_IR-pending hypothesis was wrong.
+
+## 2026-05-04 (round 6: visibility expansion)
+- Added SignalTap probes `stp_last_rx_size`, `stp_last_frame_len`, `stp_rx_commit_count`, `stp_rx_stream_byte_count` to distinguish chip-side from adapter-side RX failures.
+
+## 2026-05-04 (round 7: PHY visibility)
+- `rtl/eth_if/ethernet_controller_adapter.v`: added new state `ST_READ_PHY` and outputs `phy_cfgr_value` + `phy_read_count`. Reads `PHYCFGR` (common 0x002E) once at init and re-reads after every successful frame commit. Exposes link, speed, duplex bits.
+- Top-level: added `stp_phy_cfgr` and `stp_phy_read_count` SignalTap probes.
+- Hardware result: `stp_phy_cfgr = 0xBF` -> LNK=1, SPD=1 (100M), DPX=1 (full). The W5500 PHY is fully linked in 100M FDX. PHY layer is *not* the issue.
+- Same capture revealed `rx_commit_count = 159` while `frames_ipv4 + frames_ipv6 = 2` and `rx_stream_byte_count = 199`. 157 of 159 commits were "bad-length" discards. `last_frame_len = 0x3333` matches the first two bytes of an IPv6-multicast destination MAC, suggesting our adapter occasionally read frame data as if it were a length prefix -> alignment was getting flushed by the discard logic.
+
+## 2026-05-05 (round 8: bounded discard)
+- `rtl/eth_if/ethernet_controller_adapter.v`: replaced the "flush entire RX buffer on bad length" path with a bounded `rx_read_ptr + min(rx_size_bytes, 1520)` advance. A single corrupted length header now costs at most one Ethernet frame's worth of buffer, instead of throwing away every valid frame queued behind it. Demo UDP/80 frames buffered behind a single noisy mDNS frame should now survive the discard recovery.
+- Bench protocol updated: after every reflash, **wait at least 30 seconds** before triggering SignalTap. The Mac's `mDNSResponder` floods Bonjour announces every time it sees a link-up event; that flood is what produces ~150 discarded frames in the first few seconds and obscures the real demo traffic.

@@ -47,6 +47,27 @@
     5. Recapture with `quartus_stp.exe -t scripts/signaltap_capture_force.tcl quartus/de1_soc_w5500.stp captures/stp/round3.csv 5`.
     6. Run `py -3 scripts/inspect_signaltap_csv.py captures/stp/round3.csv` and watch for `frames_demo_match > 0` and `stp_a_rx_first16` starting with `FFFFFFFFFFFF...`.
   - Independent check on PC1: `sudo tcpdump -i en0 -nn -e -c 5 udp port 80` while the sender runs. If tcpdump prints zero matches, Scapy's L2 inject is being silently dropped on the Mac side.
+  - 2026-05-04 round 3 (broadcast sender confirmed via tcpdump): all five SignalTap captures over a 30-second window show frozen counters `frames_ipv4=3, frames_ipv6=2, frames_udp_dport80=0, b_tx_count=3`. The exact 3+2 pattern reproduces on every fresh SOF flash, strongly suggesting the W5500 receives a fixed mDNS announce burst at every link-up event and goes silent afterwards.
+  - 2026-05-04 round 4 RTL hardening (suspecting W5500-side state stall):
+    - Added SHAR write to `02:00:00:DE:AD:0A` during RX adapter init (some W5500 firmware needs SHAR to be valid even in MACRAW with `MFEN=0`).
+    - Added `S0_CR` clear poll after every `RECV` command (`ST_WAIT_RECV` state) so we don't read `RSR` while a command is in flight.
+    - Mirrored SHAR write on the TX adapter (`02:00:00:DE:AD:0B`).
+    - Hardware result: counters still frozen at exact same `3/2/0` numbers. SHAR + RECV-clear did not change behaviour.
+  - 2026-05-04 round 5 RTL hardening (suspecting unhandled `Sn_IR.RECV` interrupt stall):
+    - Extended `ST_WAIT_RECV` to also write `S0_IR=0xFF` after `RECV` clears, clearing every socket interrupt bit.
+    - Hardware result: still the same `3/2/0` numbers. Sn_IR clear did not change behaviour either.
+  - 2026-05-04 round 6 visibility (in-flight): added SignalTap probes `stp_last_rx_size`, `stp_last_frame_len`, `stp_rx_commit_count`, `stp_rx_stream_byte_count` to distinguish three remaining possibilities:
+    - Chip reports `RSR=0` continuously after the initial burst -> chip-MAC-level RX is silent (PHY auto-neg quirk, unidirectional cable, or chip stuck).
+    - Chip reports `RSR>0` but our adapter never processes -> RX adapter bug.
+    - Adapter processes more frames than counters reflect -> probe wiring bug.
+  - 2026-05-04 PC1-side verification (cable was PC1 -> W5500 A): `sudo tcpdump -i en0 -nn -e -c 5 udp port 80` captured **5 broadcast UDP/80 packets** with src MAC `1c:f6:4c:44:ff:46`, dst MAC `ff:ff:ff:ff:ff:ff`, dst port 80, payload 23 bytes (matches "FW-DEMO-ALLOW seq=N"). The Mac IS putting the demo on the wire heading into the W5500. Bug is not Mac-side.
+  - 2026-05-04 round 7 RTL (PHY visibility): added `ST_READ_PHY` state and `phy_cfgr_value` / `phy_read_count` outputs from the RX adapter, plus matching `stp_phy_cfgr` / `stp_phy_read_count` SignalTap probes.
+    - Capture shows `stp_phy_cfgr = 0xBF` -> `LNK=1, SPD=1 (100M), DPX=1 (full)`. The W5500 PHY is fully linked at 100 Mbps full-duplex. PHY-layer is not the issue.
+    - Same capture revealed the smoking-gun anomaly: `rx_commit_count = 0x9F = 159` while `frames_ipv4 + frames_ipv6 = 2` and `rx_stream_byte_count = 0xC7 = 199`. So **157 of 159 commit cycles were "bad-length" discards**, only 2 were real frames. `last_frame_len = 0x3333` matches the first two bytes of an IPv6-multicast destination MAC (`33:33:XX:XX:XX:XX`), which means the adapter occasionally read **frame data** as if it were the W5500's 2-byte length prefix. Misalignment was being amplified by the discard logic flushing the entire RX buffer.
+  - 2026-05-05 round 8 RTL fix (bounded discard): replaced "flush entire RX buffer on bad length" with `next_rx_read_ptr <= rx_read_ptr + min(rx_size_bytes, 1520)`. A single corrupted length header now costs at most one Ethernet frame's worth of buffer, instead of throwing away every valid frame queued behind it.
+  - 2026-05-05 bench protocol change: every reflash power-cycles the W5500 PHY, which makes the Mac's `mDNSResponder` flood ~150 Bonjour announces in the first ~2 seconds. **Wait at least 30 seconds after reset/flash before triggering SignalTap** so the burst has settled; the demo at 2 pps will then dominate the rx_frame stream.
+  - Topology confirmed (2026-05-05): PC1 and PC2 are connected directly to W5500 A and W5500 B respectively, with no shared switch or hub. Background broadcast traffic on the W5500 A cable comes only from the Mac's own kernel network stack (mDNS, NDP, ARP).
+  - Open: still need a clean post-burst capture with the bounded-discard SOF to confirm `frames_udp_dport80 > 0` and `b_tx_count > 0` for demo traffic.
 
 - **B-2026-05-03-02: W5500 simulation models are not strong enough evidence for the two-port hardware path.**
   - Status: open.
@@ -72,3 +93,4 @@
 - Fixed a W5500 B TX adapter backpressure bug where normal `frame_valid && !frame_ready` conditions were treated as fatal errors.
 - Changed W5500 B TX free-space handling to wait/retry instead of dropping a pending packet when `S0_TX_FSR` is temporarily too small.
 - Added W5500 `S0_CR` command-clear polling after `SEND`, so TX count now represents command completion instead of merely writing the `SEND` command.
+- 2026-05-04: Round-2 capture & fixes: fixed scripts/inspect_signaltap_csv.py trailing-X logic; added scripts/signaltap_capture_force.tcl and scripts/make_anytrig_stp.py (force/relaxed-capture helpers); defaulted scripts/rule_demo_sender.py to broadcast (192.168.1.255) to avoid macOS multicast routing; added SHAR writes and RECV S0_CR clear-poll in rtl/eth_if/ethernet_controller_adapter.v and mirrored SHAR in rtl/eth_if/w5500_macraw_tx_adapter.v; Questa regression passed for affected tests; Quartus full compile started; conclusion: FPGA pipeline forwards IPv4 end-to-end; remaining blocker is PC1-side delivery of demo UDP/80 (investigate macOS multicast, PF, or interface binding).

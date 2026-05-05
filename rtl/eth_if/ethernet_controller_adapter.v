@@ -35,6 +35,8 @@ module ethernet_controller_adapter #(
     output reg [31:0]  rx_stream_byte_count,
     output reg [15:0]  last_rx_size_bytes,
     output reg [15:0]  last_frame_len_bytes,
+    output reg [7:0]   phy_cfgr_value,
+    output reg [31:0]  phy_read_count,
     output reg [3:0]   debug_state
 );
     localparam ST_IDLE         = 4'd0;
@@ -49,6 +51,7 @@ module ethernet_controller_adapter #(
     localparam ST_STREAM_FRAME = 4'd9;
     localparam ST_COMMIT_RX    = 4'd10;
     localparam ST_WAIT_RECV    = 4'd11;
+    localparam ST_READ_PHY     = 4'd12;
     localparam ST_ERROR        = 4'd15;
 
     localparam [15:0] COMMON_MR         = 16'h0000;
@@ -58,9 +61,11 @@ module ethernet_controller_adapter #(
     localparam [15:0] COMMON_SHAR3      = 16'h000C;
     localparam [15:0] COMMON_SHAR4      = 16'h000D;
     localparam [15:0] COMMON_SHAR5      = 16'h000E;
+    localparam [15:0] COMMON_PHYCFGR    = 16'h002E;
     localparam [15:0] COMMON_VERSIONR   = 16'h0039;
     localparam [15:0] S0_MR             = 16'h0000;
     localparam [15:0] S0_CR             = 16'h0001;
+    localparam [15:0] S0_IR             = 16'h0002;
     localparam [15:0] S0_SR             = 16'h0003;
     localparam [15:0] S0_RXBUF_SIZE     = 16'h001E;
     localparam [15:0] S0_TXBUF_SIZE     = 16'h001F;
@@ -76,7 +81,12 @@ module ethernet_controller_adapter #(
     localparam [7:0] CTRL_S0_RXBUF_READ = 8'h18;
 
     localparam [7:0] W5500_VERSION      = 8'h04;
-    localparam [7:0] S0_MR_MACRAW       = 8'h04;
+    // MACRAW mode with MFEN=1 (bit 7): chip's MAC drops anything that isn't
+    // addressed to SHAR, broadcast, or multicast. Demo (broadcast) and mDNS
+    // (multicast) still pass; line noise / partial-frame fragments with
+    // corrupted dst MACs get filtered at the chip instead of bloating our
+    // bad-length discard count.
+    localparam [7:0] S0_MR_MACRAW       = 8'h84;
     localparam [7:0] S0_CR_OPEN         = 8'h01;
     localparam [7:0] S0_CR_RECV         = 8'h40;
     localparam [7:0] S0_STATUS_MACRAW   = 8'h42;
@@ -211,6 +221,8 @@ module ethernet_controller_adapter #(
             rx_stream_byte_count <= 32'd0;
             last_rx_size_bytes <= 16'd0;
             last_frame_len_bytes <= 16'd0;
+            phy_cfgr_value   <= 8'd0;
+            phy_read_count   <= 32'd0;
             debug_state      <= ST_IDLE;
             rx_size_bytes    <= 16'd0;
             rx_read_ptr      <= 16'd0;
@@ -360,7 +372,7 @@ module ethernet_controller_adapter #(
                                 init_busy      <= 1'b0;
                                 init_done      <= 1'b1;
                                 rx_poll_wait_ctr<= 16'd0;
-                                state          <= ST_RX_POLL;
+                                state          <= ST_READ_PHY;
                                 state_step     <= 3'd0;
                             end
                         endcase
@@ -371,7 +383,7 @@ module ethernet_controller_adapter #(
                             init_busy       <= 1'b0;
                             init_done       <= 1'b1;
                             rx_poll_wait_ctr<= 16'd0;
-                            state           <= ST_RX_POLL;
+                            state           <= ST_READ_PHY;
                             state_step      <= 3'd0;
                         end
                     end
@@ -397,7 +409,21 @@ module ethernet_controller_adapter #(
                             rx_poll_wait_ctr   <= 16'd0;
                             if ({rx_size_bytes[15:8], seq_rx[3]} > 16'd2)
                                 state <= ST_READ_RD_PTR;
+                            else if (rx_commit_count[3:0] != phy_read_count[3:0])
+                                state <= ST_READ_PHY;
                         end
+                    end
+                end
+
+                ST_READ_PHY: begin
+                    if (!seq_active && !seq_done)
+                        start_spi_read(COMMON_PHYCFGR, CTRL_COMMON_READ);
+                    else if (seq_done) begin
+                        phy_cfgr_value   <= seq_rx[3];
+                        phy_read_count   <= rx_commit_count;
+                        rx_poll_wait_ctr <= 16'd0;
+                        state            <= ST_RX_POLL;
+                        state_step       <= 3'd0;
                     end
                 end
 
@@ -440,7 +466,15 @@ module ethernet_controller_adapter #(
                                 next_rx_read_ptr <= rx_read_ptr + {frame_len_bytes[15:8], seq_rx[3]} + 16'd2;
                                 state            <= ST_STREAM_FRAME;
                             end else begin
-                                next_rx_read_ptr <= rx_read_ptr + rx_size_bytes;
+                                // Length is bogus. Advance a bounded amount so we
+                                // don't flush legitimate frames buffered behind a
+                                // single corrupted length header. Cap at one
+                                // max-Ethernet-frame so misalignment recovers
+                                // within a few iterations.
+                                if (rx_size_bytes <= 16'd1520)
+                                    next_rx_read_ptr <= rx_read_ptr + rx_size_bytes;
+                                else
+                                    next_rx_read_ptr <= rx_read_ptr + 16'd1520;
                                 state            <= ST_COMMIT_RX;
                             end
                         end
@@ -495,10 +529,17 @@ module ethernet_controller_adapter #(
                 end
 
                 ST_WAIT_RECV: begin
-                    if (!seq_active && !seq_done)
-                        start_spi_read(S0_CR, CTRL_S0_REG_READ);
-                    else if (seq_done) begin
-                        if (seq_rx[3] == 8'h00) begin
+                    if (!seq_active && !seq_done) begin
+                        if (state_step == 3'd0)
+                            start_spi_read(S0_CR, CTRL_S0_REG_READ);
+                        else
+                            start_spi_write(S0_IR, CTRL_S0_REG_WRITE, 8'hFF);
+                    end else if (seq_done) begin
+                        if (state_step == 3'd0) begin
+                            if (seq_rx[3] == 8'h00) begin
+                                state_step <= 3'd1;
+                            end
+                        end else begin
                             rx_poll_wait_ctr <= 16'd0;
                             state            <= ST_RX_POLL;
                             state_step       <= 3'd0;

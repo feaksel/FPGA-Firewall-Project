@@ -18,6 +18,13 @@ Current status note, 2026-05-03:
   - `SW8` generated rule-demo mode: latest hardware report shows `SW[3:1]=101` stuck at `0000`, so the generated TX trigger is not firing.
 - The next milestone is a real-MAC rule-demo retest plus SignalTap capture if the markers still do not arrive.
 
+Current status note, 2026-05-05 (rounds 4-8 condensed):
+- Demo UDP/80 frames are confirmed leaving PC1's en0 by tcpdump (5 packets captured).
+- W5500 A PHY is confirmed linked at 100M FDX (`stp_phy_cfgr = 0xBF`).
+- PHY is fine, sender is fine, cables are direct point-to-point.
+- The chip's RX buffer is being filled mostly by the Mac's `mDNSResponder` link-up flood, and the previous adapter discard path was flushing the *entire* buffer on a single corrupted length header, taking demo frames with it. Round 8 RTL fix caps each discard to 1520 bytes (one max Ethernet frame). Pending hardware verification.
+- Bench protocol now requires waiting 30 seconds after every reflash before triggering SignalTap, so the post-link-up Bonjour burst settles before we capture.
+
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
 - [x] Add packet memory vectors to `tb/packets/`
@@ -70,17 +77,41 @@ Current status note, 2026-05-03:
 
 ## Current Debug Tasks
 
-- [ ] Add HEX-visible first-byte diagnostics for W5500 A RX:
-  - received frame byte 0..3 should usually be `FF FF FF FF` for the current broadcast demo frames.
-  - received frame bytes 6..11 should include source MAC `00:11:22:33:44:55` for the Scapy sender.
-- [ ] Add HEX-visible first-byte diagnostics for the frame submitted to W5500 B TX.
-- [ ] Add a TX-completion/error page that distinguishes:
-  - frame accepted by TX adapter,
-  - TX buffer write started,
-  - TX buffer write completed,
-  - `S0_TX_WR` updated,
-  - `SEND` command written,
-  - `S0_CR` cleared.
+- [x] Add HEX-visible first-byte diagnostics for W5500 A RX (now `SW9=1, SW5=0, SW4=0`).
+- [x] Add HEX-visible first-byte diagnostics for the frame submitted to W5500 B TX (now `SW9=1, SW5=0, SW4=1`).
+- [x] Add a TX-completion/error page that distinguishes buf-write start/done, `S0_TX_WR` update, `SEND` written, `S0_CR` cleared, and timeout (now `SW9=1, SW5=1, SW4=0` pages 010-101).
+- [x] Add SignalTap II probes for the same signals (`stp_a_rx_first16`, `stp_b_tx_first16`, `stp_b_buf_writes`, `stp_b_send_issued/cleared/timeouts`, `stp_b_tx_count`, etc.) so we can read them via JTAG without depending on the seven-segment display.
+- [x] Add IPv4-only RX shadow `stp_a_rx_ipv4_first16` and per-ethertype frame counters so background IPv6 traffic can no longer hide what's actually arriving.
+- [x] Add `stp_phy_cfgr` SignalTap probe so we can read the W5500 PHY's link/speed/duplex bits (LNK, SPD, DPX). Round 7 capture confirmed PHY is at 100M FDX.
+- [x] Add round 4 chip-state hardening: `SHAR` write at init, `S0_CR` clear poll after `RECV`, `S0_IR` clear after RECV. Did not change observed counters.
+- [x] Round 8 RTL fix: bounded the bad-length discard to 1520 bytes so a single corrupted length header no longer flushes legitimate frames buffered behind it. Pending hardware verification.
 - [ ] Re-test `SW6` after every TX adapter edit as the known-good B-side baseline.
 - [ ] Re-test `SW5=1` raw ingress after every RX adapter edit as the known-good A-side baseline.
 - [ ] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2.
+
+## Bench protocol checklist (2026-05-05)
+
+The hardware-loop iteration that's now working is:
+
+1. PC1 (Mac, en0) <-> direct cable <-> W5500 A.
+2. W5500 B <-> direct cable <-> PC2 (Win NIC for dashboard / Wireshark).
+3. No switches, hubs, or other devices on either link.
+4. Reflash the SOF, press reset (`KEY[0]`), wait for `LEDR0=1`.
+5. **Wait 30 seconds** for the Mac's `mDNSResponder` link-up Bonjour burst to settle.
+6. Start the sender on PC1: `sudo python3 scripts/rule_demo_sender.py --iface en0 --rate 2 --packet-gap 0.05 --no-ssh-allow --no-tcp-drop --verbose-each`.
+7. Verify with `sudo tcpdump -i en0 -nn -e -c 5 udp port 80` that frames are leaving en0.
+8. Capture with `quartus_stp.exe -t scripts/signaltap_capture.tcl quartus/de1_soc_w5500.stp captures/stp/<tag>.csv 30`.
+9. Decode with `py -3 scripts/inspect_signaltap_csv.py captures/stp/<tag>.csv`.
+10. Watch the Diagnosis line for `frames_udp_dport80 > 0` and `b_tx_count > 0`.
+
+## Things adding new SignalTap probes requires
+
+Adding a new `stp_*` register to `rtl/top/de1_soc_w5500_top.v` is **not** enough on its own. The SignalTap II IP is instrumented at fit time. After RTL changes:
+
+1. Open `quartus/de1_soc_w5500.stp` in Quartus Prime SignalTap II.
+2. Add the new signals via Node Finder (filter on `stp_`).
+3. Save the .stp.
+4. Re-run the full Quartus compile so the new sample widths are baked into the SOF.
+5. Reflash.
+
+If you just edit the `.stp` after the SOF was already built, the live probe set on the chip will not match what the .stp claims, and `quartus_stp` will refuse to capture with the error "Instance, signal set, or trigger does not exist."

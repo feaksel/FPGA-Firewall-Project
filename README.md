@@ -82,18 +82,21 @@ The current project phase is:
 - W5500 B can transmit a fixed internally generated test frame in `SW6` mode,
 - real A-to-B forwarding is partially proven by SignalTap and pcap comparison, but the intended rule-demo marker flow is not accepted yet.
 
-### Current hardware truth, 2026-05-03
+### Current hardware truth, 2026-05-05
 
 This is the most important status snapshot:
 
 - `SW6=1` direct B transmit test works: PC2/Wireshark sees the FPGA-generated `FW-DEMO-ALLOW-SSH` frame.
-- W5500 A ingress works: with `SW5=1`, raw receive/commit counters rise and last frame length is around `0x50` to `0x52` for the rule-demo sender.
-- A direct cable from PC1 to PC2 works: `wire_rawPc1traffic.pcapng` contains demo frames from source MAC `00:11:22:33:44:55`.
-- `SW7=1` raw A-to-B bypass is no longer totally dead: SignalTap shows B TX buffer writes/SEND clears with no timeout, and `sw7-0004.pcapng` contains three forwarded Mac-origin multicast frames matching the SignalTap header. The intended demo marker frames still need a clean retest.
-- `SW8=1` generated rule-demo mode was added as a safer demo pivot, but the latest hardware test reported `SW[3:1]=101` stuck at `0000` and no PC2 packets. This means the generated TX trigger did not fire in hardware and still needs debugging.
-- `SW9=1` enables the newer byte/state debug view. Use it to inspect the first bytes seen on W5500 A, the first bytes handed to W5500 B, B TX progress counters, and SW8 parser fields. See `docs/signaltap_debug.md`.
+- W5500 A ingress works: with `SW5=1`, raw receive/commit counters rise.
+- A direct cable from PC1 to PC2 works: `wire_rawPc1traffic.pcapng` contains demo frames.
+- `SW7=1` raw A-to-B bypass is proven for real Mac-origin frames: SignalTap shows B TX buffer writes / SEND clears with no timeout, and `sw7-0004.pcapng` contains forwarded Mac-origin multicast frames matching the SignalTap header.
+- `SW9=1` enables the byte/state debug view. Use it to inspect the first bytes seen on W5500 A, the first bytes handed to W5500 B, B TX progress counters, and SW8 parser fields. See `docs/signaltap_debug.md`.
+- W5500 A PHY confirmed at 100 Mbps full-duplex (`stp_phy_cfgr = 0xBF`).
+- PC1's `en0` confirmed putting demo broadcast UDP/80 frames on the wire toward W5500 A (`tcpdump` capture).
+- The senders now default to PC1's real interface MAC and broadcast destination (`ff:ff:ff:ff:ff:ff`, dst IP `192.168.1.255`).
+- The Mac's `mDNSResponder` floods ~150 Bonjour announces on every link-up event. The previous adapter discard path flushed the *entire* RX buffer on a single corrupted length header, taking legitimate frames with it. RTL round 8 (2026-05-05) caps the discard to 1520 bytes (one Ethernet frame). After every reflash, **wait at least 30 seconds** before triggering SignalTap so the Bonjour burst settles.
 
-So the project is not yet an accepted working inline firewall. It is currently a proven one-port RX path plus a proven B-side fixed TX path, with A-triggered transmit narrowed to a demo-frame/source-MAC retest.
+The forwarding path is proven; the remaining question is whether the bounded-discard adapter lets demo UDP/80 frames survive the chip's RX buffer cleanly. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
 
 ## Current verification status
 

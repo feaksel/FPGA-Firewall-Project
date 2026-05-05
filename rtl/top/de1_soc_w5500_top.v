@@ -55,6 +55,8 @@ module de1_soc_w5500_top (
     wire tx_error_b;
     wire last_action_allow;
     wire [3:0] last_matched_rule_id;
+    wire [7:0] phy_cfgr_a;
+    wire [31:0] phy_read_count_a;
     wire        rx_frame_valid;
     wire [7:0]  rx_frame_data;
     wire        rx_frame_sop;
@@ -172,6 +174,12 @@ module de1_soc_w5500_top (
     (* preserve, noprune *) reg [31:0]  stp_frames_other;
     (* preserve, noprune *) reg [31:0]  stp_frames_udp_dport80;
     (* preserve, noprune *) reg [31:0]  stp_frames_demo_match;
+    (* preserve, noprune *) reg [15:0]  stp_last_rx_size;
+    (* preserve, noprune *) reg [15:0]  stp_last_frame_len;
+    (* preserve, noprune *) reg [31:0]  stp_rx_commit_count;
+    (* preserve, noprune *) reg [31:0]  stp_rx_stream_byte_count;
+    (* preserve, noprune *) reg [7:0]   stp_phy_cfgr;
+    (* preserve, noprune *) reg [31:0]  stp_phy_read_count;
 
     always @(posedge CLOCK_50) begin
         stp_rx_data <= rx_frame_data;
@@ -212,6 +220,12 @@ module de1_soc_w5500_top (
         stp_frames_other       <= frames_other_count;
         stp_frames_udp_dport80 <= frames_udp_dport80_count;
         stp_frames_demo_match  <= frames_demo_match_count;
+        stp_last_rx_size       <= last_rx_size_bytes_a;
+        stp_last_frame_len     <= last_frame_len_bytes_a;
+        stp_rx_commit_count    <= rx_commit_count_a;
+        stp_rx_stream_byte_count <= rx_stream_byte_count_a;
+        stp_phy_cfgr           <= phy_cfgr_a;
+        stp_phy_read_count     <= phy_read_count_a;
     end
 
     always @(posedge CLOCK_50 or negedge KEY[0]) begin
@@ -1008,6 +1022,8 @@ module de1_soc_w5500_top (
         .rx_stream_byte_count(rx_stream_byte_count_a),
         .last_rx_size_bytes(last_rx_size_bytes_a),
         .last_frame_len_bytes(last_frame_len_bytes_a),
+        .phy_cfgr_value(phy_cfgr_a),
+        .phy_read_count(phy_read_count_a),
         .debug_state(adapter_a_debug_state)
     );
 
