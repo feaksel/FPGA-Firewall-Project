@@ -9,16 +9,23 @@ module firewall_telemetry_uart #(
     input  wire [31:0] rx_count,
     input  wire [31:0] allow_count,
     input  wire [31:0] drop_count,
+    input  wire [31:0] rule_allow80_count,
+    input  wire [31:0] rule_allow5001_count,
+    input  wire [31:0] rule_drop5002_count,
+    input  wire [31:0] rule_content_block_count,
+    input  wire [31:0] rule_default_drop_count,
+    input  wire [31:0] sig_file_count,
+    input  wire [31:0] sig_sine_count,
     input  wire [3:0]  last_rule_id,
     input  wire        last_action_allow,
     input  wire        tx_error,
     output wire        uart_tx
 );
-    localparam MSG_LEN = 42;
+    localparam MSG_LEN = 134;
 
     reg [31:0] interval_count;
     reg        sending;
-    reg [5:0]  char_index;
+    reg [7:0]  char_index;
     reg        tx_valid;
     reg [7:0]  tx_data;
     wire       tx_ready;
@@ -59,7 +66,7 @@ module firewall_telemetry_uart #(
     endfunction
 
     function [7:0] message_char;
-        input [5:0] index;
+        input [7:0] index;
         begin
             case (index)
                 6'd0:  message_char = "R";
@@ -97,12 +104,104 @@ module firewall_telemetry_uart #(
                 6'd32: message_char = hex32_char(drop_count, 3'd5);
                 6'd33: message_char = hex32_char(drop_count, 3'd6);
                 6'd34: message_char = hex32_char(drop_count, 3'd7);
-                6'd35: message_char = " ";
-                6'd36: message_char = "R";
-                6'd37: message_char = hex_digit(last_rule_id);
-                6'd38: message_char = last_action_allow ? "A" : "D";
-                6'd39: message_char = tx_error ? "E" : ".";
-                6'd40: message_char = 8'h0D;
+                8'd35: message_char = " ";
+                8'd36: message_char = "R";
+                8'd37: message_char = "=";
+                8'd38: message_char = hex_digit(last_rule_id);
+                8'd39: message_char = last_action_allow ? "A" : "D";
+                8'd40: message_char = tx_error ? "E" : ".";
+                8'd41: message_char = " ";
+                8'd42: message_char = "U";
+                8'd43: message_char = "8";
+                8'd44: message_char = "0";
+                8'd45: message_char = "=";
+                8'd46: message_char = hex32_char(rule_allow80_count, 3'd0);
+                8'd47: message_char = hex32_char(rule_allow80_count, 3'd1);
+                8'd48: message_char = hex32_char(rule_allow80_count, 3'd2);
+                8'd49: message_char = hex32_char(rule_allow80_count, 3'd3);
+                8'd50: message_char = hex32_char(rule_allow80_count, 3'd4);
+                8'd51: message_char = hex32_char(rule_allow80_count, 3'd5);
+                8'd52: message_char = hex32_char(rule_allow80_count, 3'd6);
+                8'd53: message_char = hex32_char(rule_allow80_count, 3'd7);
+                8'd54: message_char = " ";
+                8'd55: message_char = "U";
+                8'd56: message_char = "5";
+                8'd57: message_char = "1";
+                8'd58: message_char = "=";
+                8'd59: message_char = hex32_char(rule_allow5001_count, 3'd0);
+                8'd60: message_char = hex32_char(rule_allow5001_count, 3'd1);
+                8'd61: message_char = hex32_char(rule_allow5001_count, 3'd2);
+                8'd62: message_char = hex32_char(rule_allow5001_count, 3'd3);
+                8'd63: message_char = hex32_char(rule_allow5001_count, 3'd4);
+                8'd64: message_char = hex32_char(rule_allow5001_count, 3'd5);
+                8'd65: message_char = hex32_char(rule_allow5001_count, 3'd6);
+                8'd66: message_char = hex32_char(rule_allow5001_count, 3'd7);
+                8'd67: message_char = " ";
+                8'd68: message_char = "D";
+                8'd69: message_char = "5";
+                8'd70: message_char = "2";
+                8'd71: message_char = "=";
+                8'd72: message_char = hex32_char(rule_drop5002_count, 3'd0);
+                8'd73: message_char = hex32_char(rule_drop5002_count, 3'd1);
+                8'd74: message_char = hex32_char(rule_drop5002_count, 3'd2);
+                8'd75: message_char = hex32_char(rule_drop5002_count, 3'd3);
+                8'd76: message_char = hex32_char(rule_drop5002_count, 3'd4);
+                8'd77: message_char = hex32_char(rule_drop5002_count, 3'd5);
+                8'd78: message_char = hex32_char(rule_drop5002_count, 3'd6);
+                8'd79: message_char = hex32_char(rule_drop5002_count, 3'd7);
+                8'd80: message_char = " ";
+                8'd81: message_char = "S";
+                8'd82: message_char = "I";
+                8'd83: message_char = "G";
+                8'd84: message_char = "=";
+                8'd85: message_char = hex32_char(rule_content_block_count, 3'd0);
+                8'd86: message_char = hex32_char(rule_content_block_count, 3'd1);
+                8'd87: message_char = hex32_char(rule_content_block_count, 3'd2);
+                8'd88: message_char = hex32_char(rule_content_block_count, 3'd3);
+                8'd89: message_char = hex32_char(rule_content_block_count, 3'd4);
+                8'd90: message_char = hex32_char(rule_content_block_count, 3'd5);
+                8'd91: message_char = hex32_char(rule_content_block_count, 3'd6);
+                8'd92: message_char = hex32_char(rule_content_block_count, 3'd7);
+                8'd93: message_char = " ";
+                8'd94: message_char = "D";
+                8'd95: message_char = "E";
+                8'd96: message_char = "F";
+                8'd97: message_char = "=";
+                8'd98: message_char = hex32_char(rule_default_drop_count, 3'd0);
+                8'd99: message_char = hex32_char(rule_default_drop_count, 3'd1);
+                8'd100: message_char = hex32_char(rule_default_drop_count, 3'd2);
+                8'd101: message_char = hex32_char(rule_default_drop_count, 3'd3);
+                8'd102: message_char = hex32_char(rule_default_drop_count, 3'd4);
+                8'd103: message_char = hex32_char(rule_default_drop_count, 3'd5);
+                8'd104: message_char = hex32_char(rule_default_drop_count, 3'd6);
+                8'd105: message_char = hex32_char(rule_default_drop_count, 3'd7);
+                8'd106: message_char = " ";
+                8'd107: message_char = "F";
+                8'd108: message_char = "I";
+                8'd109: message_char = "L";
+                8'd110: message_char = "=";
+                8'd111: message_char = hex32_char(sig_file_count, 3'd0);
+                8'd112: message_char = hex32_char(sig_file_count, 3'd1);
+                8'd113: message_char = hex32_char(sig_file_count, 3'd2);
+                8'd114: message_char = hex32_char(sig_file_count, 3'd3);
+                8'd115: message_char = hex32_char(sig_file_count, 3'd4);
+                8'd116: message_char = hex32_char(sig_file_count, 3'd5);
+                8'd117: message_char = hex32_char(sig_file_count, 3'd6);
+                8'd118: message_char = hex32_char(sig_file_count, 3'd7);
+                8'd119: message_char = " ";
+                8'd120: message_char = "S";
+                8'd121: message_char = "I";
+                8'd122: message_char = "N";
+                8'd123: message_char = "=";
+                8'd124: message_char = hex32_char(sig_sine_count, 3'd0);
+                8'd125: message_char = hex32_char(sig_sine_count, 3'd1);
+                8'd126: message_char = hex32_char(sig_sine_count, 3'd2);
+                8'd127: message_char = hex32_char(sig_sine_count, 3'd3);
+                8'd128: message_char = hex32_char(sig_sine_count, 3'd4);
+                8'd129: message_char = hex32_char(sig_sine_count, 3'd5);
+                8'd130: message_char = hex32_char(sig_sine_count, 3'd6);
+                8'd131: message_char = hex32_char(sig_sine_count, 3'd7);
+                8'd132: message_char = 8'h0D;
                 default: message_char = 8'h0A;
             endcase
         end

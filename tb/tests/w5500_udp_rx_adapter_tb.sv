@@ -83,7 +83,8 @@ module w5500_udp_rx_adapter_tb;
     w5500_udp_rx_model #(
         .PACKET_FILE(UDP_ALLOW_MEM),
         .PACKET_LENGTH(UDP_ALLOW_LEN),
-        .PAYLOAD_LENGTH(0)
+        .PAYLOAD_LENGTH(0),
+        .PACKET_SOCKET(2)
     ) u_w5500_model (
         .rst_n(rst_n),
         .w5500_reset_n(w5500_reset_n),
@@ -142,8 +143,8 @@ module w5500_udp_rx_adapter_tb;
                 33: expected_byte = 8'h01;
                 34: expected_byte = 8'h12;
                 35: expected_byte = 8'h34;
-                36: expected_byte = 8'h00;
-                37: expected_byte = 8'h50;
+                36: expected_byte = 8'h13;
+                37: expected_byte = 8'h8a;
                 38: expected_byte = 8'h00;
                 39: expected_byte = 8'h08;
                 40: expected_byte = 8'h00;

@@ -1,110 +1,118 @@
-# Next Bench Session - Cheat Sheet (2026-05-05)
+# Next Bench Session - UDP Policy Gateway (2026-05-05)
 
-This is the working state after nineteen hardware-debug rounds. The important
-decision is now made: do not keep chasing W5500 A MACRAW for the rule-demo
-ingress. The current RTL checkpoint uses W5500 A normal UDP socket mode and
-synthesizes the Ethernet/IP/UDP stream internally before the existing firewall
-and W5500 B TX path.
+The project has moved from "make W5500 MACRAW behave like a transparent
+Ethernet firewall" to a shippable W5500 UDP packet-policy gateway. MACRAW is
+kept as diagnostic history. The final demo uses W5500 A UDP sockets, FPGA
+stream classification/signature matching, and W5500 B transmit.
 
-## What We Know For Sure
+## What Is Proven
 
 | Layer | Status |
 | --- | --- |
-| PC1 normal UDP sender | OK. Fresh tcpdump showed `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 packets, zero drops. |
-| Cable PC1 -> W5500 A | OK. Direct point-to-point, no switch. |
-| W5500 A PHY | OK. `stp_phy_cfgr = 0xBF` -> link up, 100 Mbps, full duplex. |
-| W5500 A common/register config | OK. Hardware readback proved `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`. |
-| W5500 A MACRAW for background traffic | Partly OK. It surfaces Mac broadcast/multicast background frames such as mDNS UDP/5353. |
-| W5500 A MACRAW for demo UDP/80 | Not OK. It never surfaced the verified unicast UDP/80 demo packet. |
-| FPGA parser/forwarder/B TX for surfaced frames | OK. Mac-origin mDNS frames were forwarded A -> FPGA -> B with zero B SEND timeouts. |
-| W5500 B TX path | OK. Direct SW6 test and forwarded-background captures both prove B can transmit. |
-| PC2 side | OK enough for current diagnosis. It has captured direct/generated/forwarded frames in earlier rounds. |
+| PC1 normal UDP/static-ARP sender | OK. tcpdump repeatedly showed real unicast frames leaving `en0` for `02:00:00:de:ad:0a`. |
+| W5500 A PHY/link | OK. SignalTap readback showed `PHYCFGR=0xBF` -> 100M full duplex. |
+| W5500 A MACRAW for demo UDP/80 | Not reliable on this bench. It surfaced background traffic but not the verified demo unicast. |
+| W5500 A UDP socket ingress | OK. Round 22 proved UDP/80 reaches the FPGA stream path. |
+| FPGA stream path and W5500 B TX | OK. Round 22 showed matching A/B first bytes, B SEND clears, and zero timeouts. |
+| PC2 visibility | OK for the UDP socket path. User confirmed dashboard and Wireshark show packets arriving. |
 
-## Final MACRAW Evidence
+## Final Demo Image
 
-Round 19 ran with the best possible MACRAW setup:
+The current flashed SOF checksum is `0x085DC65F` and includes:
 
-- PC1 sent normal UDP socket traffic to W5500 A:
-  - destination MAC `02:00:00:de:ad:0a`
-  - destination IP/port `192.168.1.1:80`
-  - source `192.168.1.10:4660`
-- W5500 A readbacks from the live chip:
-  - `PHYCFGR=0xBF`
-  - `S0_MR=0x84`
-  - `SHAR=02:00:00:DE:AD:0A`
-  - `SIPR=C0A80101`
-- SignalTap still showed:
-  - `frames_udp_dport80=0`
-  - `frames_demo_match=0`
-  - last IPv4 `dst_port=0x14E9` (UDP/5353 mDNS)
+- W5500 A socket 0: UDP/80 allow/demo service.
+- W5500 A socket 1: UDP/5001 file/sine/data allow service.
+- W5500 A socket 2: UDP/5002 decoy/drop service.
+- FPGA policy counters:
+  - UDP/80 allow,
+  - UDP/5001 allow,
+  - UDP/5002 drop,
+  - content-block drop,
+  - default drop.
+- Streaming payload signatures:
+  - `FWFILE1\0` -> file telemetry,
+  - `FWSINE2\0` -> sine telemetry,
+  - `FW-BLOCK` / `FW-DEMO-DROP` -> content-block override.
 
-Conclusion: the hardware is not failing because of PC1, cable, PHY, SHAR,
-SIPR, MFEN, parser, forwarder, or W5500 B TX. A-side MACRAW is simply not the
-reliable rule-demo ingress path for this bench.
+## Bench Protocol
 
-## Next Implementation Plan
-
-Implement a new W5500 A UDP-socket RX adapter:
-
-1. Program W5500 A common registers:
-   - `SHAR = 02:00:00:DE:AD:0A`
-   - `GAR = 192.168.1.10`
-   - `SUBR = 255.255.255.0`
-   - `SIPR = 192.168.1.1`
-2. Open socket 0 in UDP mode on local port 80.
-3. Poll `S0_RX_RSR`.
-4. Read W5500 UDP RX records from the socket RX buffer.
-5. Reconstruct an internal Ethernet/IP/UDP frame or equivalent parser metadata:
-   - src MAC can be PC1's known MAC for the bench or a synthetic value
-   - dst MAC should be W5500 A SHAR
-   - src IP/port comes from the W5500 UDP record
-   - dst IP/port is W5500 A SIPR / local UDP port 80
-   - payload is the received UDP payload
-6. Feed the reconstructed stream into the existing firewall/forwarder/B-TX path.
-
-Keep W5500 B TX unchanged unless the new path reaches B and exposes a separate
-B-side issue.
-
-## Bench Protocol For The Next Image
-
-1. PC1:
+1. Use the already-flashed `0x085DC65F` image, or recompile/flash `build/quartus/de1_soc_w5500.sof` if RTL changes.
+2. Use normal forwarding mode:
+   - `SW0=1`
+   - `SW5=0`
+   - `SW7=0`
+3. Reset or let the flash reset the board, then wait for:
+   - `LEDR0=1`
+   - `LEDR1=0`
+4. Wait at least 30 seconds after flash/reset.
+5. PC1 setup:
    ```bash
    sudo ifconfig en0 inet 192.168.1.10 netmask 255.255.255.0 up
    sudo arp -d 192.168.1.1 2>/dev/null || true
    sudo arp -s 192.168.1.1 02:00:00:de:ad:0a
-   python3 scripts/rule_demo_udp_socket_sender.py --iface en0 --rate 2 --verbose-each
+   python3 scripts/rule_demo_udp_socket_sender.py --iface en0 --rate 1 --verbose-each
    ```
-2. PC1 tcpdump sanity check:
+6. PC1 sanity capture:
    ```bash
-   sudo tcpdump -i en0 -nn -e -c 10 'udp port 80 or arp'
+   sudo tcpdump -i en0 -nn -e -c 20 'udp port 80 or udp port 5001 or udp port 5002'
    ```
-3. Board:
-   - flash the new SOF
-   - wait for `LEDR0=1`, `LEDR1=0`
-   - wait 30 seconds after flash/reset
-4. Capture:
+7. PC2 dashboard:
    ```powershell
-   & 'C:\altera_lite\25.1std\quartus\bin64\quartus_stp.exe' `
-     -t scripts\signaltap_capture_force.tcl `
-     quartus\de1_soc_w5500.stp `
-     captures\stp\udp_socket_rx.csv 10
-   py -3 scripts\inspect_signaltap_csv.py captures\stp\udp_socket_rx.csv
+   py -3 scripts\rule_demo_receiver_dashboard.py --iface Ethernet --uart COM7 --port 8091
    ```
+   If UART is not wired or the COM port differs, omit `--uart` for packet-only
+   proof and use SignalTap for FPGA counters.
+8. PC2 Wireshark display filters:
+   - allowed traffic: `udp.port == 80 || udp.port == 5001`
+   - decoy leak check: `udp.port == 5002 || frame contains "FW-BLOCK" || frame contains "FW-DEMO-DROP"`
 
-## Acceptance Criteria
+## SignalTap Proof
 
-- W5500 A UDP-mode RX observes PC1 packets at about the sender rate.
-- Internal reconstructed frame/profile counts show UDP destination port 80.
-- Existing B path completes SENDs with `b_send_timeouts=0`.
-- PC2 Wireshark/dashboard sees the allowed demo frame.
+Use force export first because the old trigger setup is still B-TX-oriented:
 
-## Round History
+```powershell
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_stp.exe' `
+  -t scripts\signaltap_capture_force.tcl `
+  quartus\de1_soc_w5500.stp `
+  captures\stp\udp_policy_gateway.csv 10
+py -3 scripts\inspect_signaltap_csv.py captures\stp\udp_policy_gateway.csv
+```
 
-| Rounds | Result |
+Expected high-level evidence:
+
+- `PHYCFGR=0xBF`
+- W5500 A UDP socket status open (`0x22`) while running.
+- UDP/80 and UDP/5001 rule counters rise.
+- UDP/5002 and content-block counters rise when decoys are enabled.
+- B buffer writes, SEND issued, SEND cleared, and B TX count rise for allowed packets.
+- B SEND timeouts stay at zero.
+
+If new `stp_rule_*` nodes are added to the `.stp`, remember that SignalTap
+requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
+
+## Acceptance
+
+- PC2 sees UDP/80 and UDP/5001 allowed packets.
+- PC2 does not see UDP/5002 packets.
+- PC2 does not see packets whose payload contains `FW-BLOCK` or `FW-DEMO-DROP`.
+- UART or SignalTap counters prove the blocked packets were seen and dropped by
+  FPGA policy logic.
+- The file demo reconstructs with matching SHA-256 while decoys are dropped.
+
+## If Something Fails
+
+| Observation | Action |
 | --- | --- |
-| 1-3 | Proved A/B path forwards some Mac-origin IPv4 background traffic, not demo UDP/80. |
-| 4-5 | SHAR, RECV clear-poll, and S0_IR clear did not fix MACRAW. |
-| 6-8 | PHY/read-size probes found bad-length discard churn; bounded discard fixed the worst misalignment behavior. |
-| 9-13 | Faster A SPI drain, MFEN toggles, resync, and parser latches still showed no UDP/80. |
-| 14-16 | Raw Scapy variants and normal UDP socket/static ARP were tested; PC1 was verified clean, but MACRAW still missed UDP/80. |
-| 17-19 | Hardware readback proved W5500 A mode/MAC/IP are correct; MACRAW still missed UDP/80. Pivot to W5500 UDP socket RX. |
+| PC1 tcpdump does not show demo packets | Fix PC1 interface/static ARP/sender first. |
+| FPGA counters do not rise | Debug W5500 A UDP socket status and RX commits. Do not return to MACRAW. |
+| Allow counters rise but B TX does not | Debug FIFO/forwarder/B TX handoff. |
+| B TX rises but PC2 sees nothing | Debug PC2 NIC, cable, Wireshark filter, and dashboard interface selection. |
+| Block counters rise and PC2 also sees blocked traffic | Fix content-block/drop decision in `firewall_forwarder`. |
+
+## Upgrades After Submission
+
+- Runtime rule configuration over UART or a register bus.
+- Larger parallel signature engine.
+- Deterministic latency timestamping from A RX to B TX.
+- Token-bucket rate limiting per rule.
+- Transparent L2/TCP firewalling with a true Ethernet MAC/PHY instead of W5500 sockets.

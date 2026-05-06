@@ -3,7 +3,7 @@
 ## Open Bugs
 
 - **B-2026-05-03-01: A-triggered W5500 B transmit does not reliably show the intended demo frames on PC2.**
-  - Status: open, narrowed by SignalTap; no longer considered a totally dead SW7 path.
+  - Status: resolved for the final demo architecture. MACRAW A ingress is legacy diagnostic evidence; the accepted hardware path is W5500 A UDP sockets -> FPGA policy/signature stream processing -> W5500 B TX. User bench confirmation after round 22 showed the PC2 dashboard and Wireshark receiving forwarded packets.
   - Evidence:
     - `SW6=1` direct B transmit test works; PC2/Wireshark sees the internally generated `FW-DEMO-ALLOW-SSH` frame.
     - `SW5=1` raw A ingress debug works; A-side raw byte/commit counts rise and last frame length is around `0x50` to `0x52`.
@@ -83,8 +83,13 @@
     - Even with correct MAC, IP, PHY, and verified PC1 unicast UDP/80 on the wire, MACRAW A ingress still reported `frames_udp_dport80=0` and only surfaced mDNS/background frames.
   - Current conclusion:
     - W5500 MACRAW on A is not a reliable ingress mode for this project's PC1 demo packet on the current hardware/Mac direct-link setup.
-    - The FPGA parser, forwarder, FIFO/packet-buffer, W5500 B TX path, PC2 path, PC1 sender, cable, PHY, SHAR, SIPR, and MFEN readback have all been narrowed away.
-    - The practical path forward is to stop spending bench cycles on A-side MACRAW and implement W5500 A normal UDP socket receive mode for the rule-demo ingress. The FPGA should then synthesize the Ethernet/IP/UDP frame metadata internally and feed the existing firewall/forwarder path.
+    - The practical fix is W5500 A normal UDP socket receive mode for the rule-demo ingress. The FPGA synthesizes Ethernet/IP/UDP bytes internally and feeds the existing firewall/forwarder path.
+    - Round 20 proved first-pass UDP mode reached `S0_MR=0x02` but had stale PHY visibility and no RX commits.
+    - Round 21 added periodic PHY/status refresh and proved `S0_SR=0x22`, `PHYCFGR=0xBF`, but still no RX.
+    - Round 22 added wait-for-link before opening socket 0 and succeeded: `frames_ipv4=frames_udp_dport80=frames_demo_match=0x74`, `b_tx_count=0x74`, `b_send_timeouts=0`, and A RX/B TX first bytes both `FFFFFFFFFFFF00112233445508004500`.
+    - User bench confirmation after round 22: PC2 dashboard and Wireshark showed packets arriving from the UDP socket path. The remaining work is no longer "make MACRAW work"; it is to ship the UDP policy gateway framing and add FPGA-visible rule/signature features for the final demo.
+    - 2026-05-05 final implementation direction: extended UDP socket ingress to ports 80, 5001, and 5002; added per-rule counters; added a small streaming payload matcher for `FWFILE1\0`, `FWSINE2\0`, `FW-BLOCK`, and `FW-DEMO-DROP`; and updated the demo scripts/dashboard/docs around the UDP policy gateway.
+    - Hardware acceptance for the new image: PC2 sees allowed UDP/80 and UDP/5001; PC2 sees no UDP/5002 or content-blocked payloads; UART/SignalTap counters prove the blocked packets were classified and dropped inside the FPGA.
 
 - **B-2026-05-03-02: W5500 simulation models are not strong enough evidence for the two-port hardware path.**
   - Status: open.

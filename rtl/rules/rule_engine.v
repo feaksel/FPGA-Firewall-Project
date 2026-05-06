@@ -64,10 +64,23 @@ module rule_engine (
     parameter RULE3_DST_PORT_MAX = 16'd5001;
     parameter RULE3_ACTION       = `ACTION_ALLOW;
 
+    parameter RULE4_VALID        = 1;
+    parameter RULE4_SRC_IP       = 32'h00000000;
+    parameter RULE4_SRC_MASK     = 32'h00000000;
+    parameter RULE4_DST_IP       = 32'h00000000;
+    parameter RULE4_DST_MASK     = 32'h00000000;
+    parameter RULE4_PROTOCOL     = `PROTO_UDP;
+    parameter RULE4_SRC_PORT_MIN = 16'd0;
+    parameter RULE4_SRC_PORT_MAX = 16'd65535;
+    parameter RULE4_DST_PORT_MIN = 16'd5002;
+    parameter RULE4_DST_PORT_MAX = 16'd5002;
+    parameter RULE4_ACTION       = `ACTION_DROP;
+
     wire rule0_hit;
     wire rule1_hit;
     wire rule2_hit;
     wire rule3_hit;
+    wire rule4_hit;
 
     assign rule0_hit =
         RULE0_VALID &&
@@ -109,6 +122,16 @@ module rule_engine (
         (dst_port >= RULE3_DST_PORT_MIN) &&
         (dst_port <= RULE3_DST_PORT_MAX);
 
+    assign rule4_hit =
+        RULE4_VALID &&
+        ((src_ip & RULE4_SRC_MASK) == (RULE4_SRC_IP & RULE4_SRC_MASK)) &&
+        ((dst_ip & RULE4_DST_MASK) == (RULE4_DST_IP & RULE4_DST_MASK)) &&
+        ((RULE4_PROTOCOL == 8'h00) || (protocol == RULE4_PROTOCOL)) &&
+        (src_port >= RULE4_SRC_PORT_MIN) &&
+        (src_port <= RULE4_SRC_PORT_MAX) &&
+        (dst_port >= RULE4_DST_PORT_MIN) &&
+        (dst_port <= RULE4_DST_PORT_MAX);
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             decision_valid  <= 1'b0;
@@ -131,6 +154,9 @@ module rule_engine (
                 end else if (rule3_hit) begin
                     action_allow    <= RULE3_ACTION;
                     matched_rule_id <= 4'd3;
+                end else if (rule4_hit) begin
+                    action_allow    <= RULE4_ACTION;
+                    matched_rule_id <= 4'd4;
                 end else begin
                     action_allow    <= `ACTION_DROP;
                     matched_rule_id <= 4'hF;

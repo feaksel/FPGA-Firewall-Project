@@ -9,10 +9,12 @@ except ImportError as exc:
 
 
 MARKERS = [
-    b"FW-DEMO-ALLOW-SSH",
-    b"FW-DEMO-ALLOW",
-    b"FW-DEMO-DROP-TCP23",
-    b"FW-SINE",
+    b"FW-DEMO-ALLOW80",
+    b"FW-DEMO-ALLOW5001",
+    b"FW-DEMO-DROP-UDP5002",
+    b"FW-BLOCK",
+    b"FWFILE1\x00",
+    b"FWSINE2\x00",
 ]
 
 
@@ -59,7 +61,7 @@ def main():
         searchable = payload_bytes(pkt)
         for marker in MARKERS:
             if marker in searchable:
-                markers[marker.decode("ascii")] += 1
+                markers[marker.decode("ascii", errors="replace")] += 1
 
     print(f"pcap={args.pcap}")
     print(f"total={total}")
@@ -80,7 +82,7 @@ def main():
         for marker, count in markers.most_common():
             print(f"  {count:6d}  {marker}")
     else:
-        print("       0  demo markers")
+        print("       0  UDP policy demo markers")
 
 
 if __name__ == "__main__":

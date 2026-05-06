@@ -4,6 +4,36 @@
 
 Use the connected PC as a controlled traffic source during bring-up without requiring a large custom application.
 
+## Current final demo path, 2026-05-05
+
+The hardware demo now uses W5500 A in normal UDP-socket receive mode, not A-side MACRAW. Treat the raw Scapy/TCP phases below as legacy bring-up tools. The final presentation path is:
+
+```text
+PC1 normal UDP sender -> W5500 A UDP sockets -> FPGA policy/signature pipeline -> W5500 B MACRAW TX -> PC2 dashboard/Wireshark
+```
+
+Canonical profiles:
+- UDP `80` allow (`FW-DEMO-ALLOW80`)
+- UDP `5001` allow for file/sine/data (`FWFILE1` / `FWSINE2`)
+- UDP `5002` drop (`FW-DEMO-DROP-UDP5002`)
+- content signature drop (`FW-BLOCK`) even on an otherwise allowed UDP service
+
+Start the PC2 dashboard:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7 --port 8091
+```
+
+Omit `--uart COM7` if FPGA UART is not connected; PC2 packet evidence will still work, but the histogram will not show live FPGA counters.
+
+Start the PC1 sender:
+
+```bash
+sudo python3 scripts/rule_demo_udp_socket_sender.py --iface en0 --rate 1 --verbose-each
+```
+
+Expected PC2 result: UDP `80` and `5001` packets arrive, UDP `5002` and `FW-BLOCK` payloads do not. Expected FPGA result: UART histogram counters `U80`, `U51`, `D52`, and `SIG` rise.
+
 ## Phase A: Standard tools first
 
 Use existing tools to prove link activity and packet arrival:
@@ -18,9 +48,9 @@ This phase is for confirming:
 - visible packet bytes in debug
 - basic counter movement in the FPGA
 
-## Phase B: Deterministic raw packets
+## Phase B: Legacy deterministic raw packets
 
-After SPI reads, initialization, and RX are stable, use [send_test_packets.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/send_test_packets.py).
+After SPI reads, initialization, and RX are stable, use [send_test_packets.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/send_test_packets.py) only for simulation-shaped/raw-packet diagnostics.
 
 That script generates exact frames matching the simulation intent:
 - `udp_allow`
@@ -50,9 +80,9 @@ py -3.9 .\scripts\send_test_packets.py --iface "Ethernet" --packet tcp_allow_ssh
 
 The live viewer is PC-side evidence only. The FPGA decision evidence is still the board LEDs and `HEX3..HEX0` debug pages.
 
-## Phase D: Browser traffic dashboard
+## Phase D: Legacy browser traffic dashboard
 
-Use [traffic_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/traffic_dashboard.py) for a visual view of deterministic test traffic:
+Use [traffic_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/traffic_dashboard.py) for old one-PC deterministic raw traffic tests:
 
 ```powershell
 py -3.9 .\scripts\traffic_dashboard.py --iface "Ethernet" --port 8080
@@ -78,7 +108,7 @@ For the current one-port setup, the dashboard can only compare what the PC sent 
 
 The dashboard now also includes a two-port file-demo preview panel. It is a UX placeholder until the FPGA can transmit on W5500 B and stream UART telemetry.
 
-## Phase E: Two-port file-transfer demo
+## Phase E: Two-port UDP file-transfer demo
 
 The real inline-firewall demo target is:
 
@@ -86,7 +116,7 @@ The real inline-firewall demo target is:
 PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
 ```
 
-PC1 sends allowed file chunks on UDP destination port `5001`, mixed with policy-blocked decoy/error frames such as TCP destination port `23`. PC2 reconstructs only the forwarded allowed chunks and verifies SHA-256.
+PC1 sends allowed file chunks on UDP destination port `5001`, mixed with policy-blocked UDP `5002` and `FW-BLOCK` decoys. PC2 reconstructs only the forwarded allowed chunks and verifies SHA-256.
 
 Sender on PC1:
 
@@ -117,13 +147,10 @@ For the live presentation, use the continuous sine-wave demo before or beside th
 
 Use this demo first when hardware bring-up feels confusing. It avoids waveform/state complexity and is intended to prove packet forwarding plus rule enforcement.
 
-Current status, 2026-05-03:
-- The PC scripts are working.
-- Direct PC1-to-PC2 capture proves PC1 emits the expected demo packets.
-- FPGA `SW6` direct B TX proves PC2 can see W5500 B generated packets.
-- FPGA `SW7` and `SW8` are not yet producing PC2-visible demo packets.
-
-So this demo is currently a hardware-debug target, not a finished demo.
+Current status, 2026-05-05:
+- The PC1 -> W5500 A UDP socket -> FPGA -> W5500 B -> PC2 path is proven.
+- The demo has been reframed as a UDP policy gateway, not a transparent TCP/L2 firewall.
+- The current work adds three W5500 A UDP services, per-rule FPGA counters, and payload signature blocking.
 
 Topology:
 
@@ -154,17 +181,15 @@ http://127.0.0.1:8091
 Start PC1:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX
+sudo python3 scripts/rule_demo_udp_socket_sender.py --iface enX --rate 1 --verbose-each
 ```
 
-The sender defaults are intentionally conservative for hardware reliability: `--rate 1`, `--burst 1`, and `--packet-gap 0.15`. This sends one UDP/80 allow frame, one TCP/22 allow frame, then one TCP/23 decoy/drop frame. After this is stable, try `--rate 2 --packet-gap 0.15`; avoid `--burst` for the normal forwarding demo.
-
-The sender now uses PC1's real Ethernet MAC address and destination MAC `01:00:5e:00:00:fb` by default. That is the main demo path because SignalTap and pcap comparison proved Mac-origin multicast frames cross the hardware path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic.
+The sender defaults are intentionally conservative for hardware reliability. It sends UDP/80 allow, UDP/5001 allow, UDP/5002 drop, and a `FW-BLOCK` content drop. It uses normal UDP sockets plus static ARP to the W5500 A IP/MAC.
 
 Expected result:
 - `UDP allow received` increases because UDP destination port `80` from `192.168.1.10` is forwarded.
-- `SSH allow received` increases because TCP destination port `22` from `10.1.2.3` is forwarded.
-- `Expected drops` increases because each cycle includes a TCP/23 blocked decoy.
+- `UDP/5001` received increases because the data/file service is forwarded.
+- The FPGA UART histogram shows `D52` and `SIG` increasing for dropped profiles.
 - `Drop leaks` stays `0`.
 - FPGA `SW[3:1]=001` RX count, `010` allow count, `011` drop count should increase while the sender runs.
 
@@ -177,11 +202,15 @@ If using the latest debug FPGA image, use these switch modes:
 
 Only one of `SW5`, `SW6`, `SW7`, and `SW8` should be enabled during a test.
 
-Add `--udp-allow` to the sender if you also want to test the UDP/80 allow profile:
+For the final UDP policy gateway demo, use the socket sender instead of the
+legacy raw Scapy sender:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX --udp-allow
+python3 scripts/rule_demo_udp_socket_sender.py --iface enX --rate 1 --verbose-each
 ```
+
+Use `scripts/rule_demo_sender.py` only when intentionally reproducing older
+MACRAW/raw-Ethernet diagnostics.
 
 If forwarding works briefly and then appears to stop, treat that as an overrun/recovery case first: stop PC1 sender, reset/start the FPGA with `SW5=0`, restart the PC2 dashboard, and run the safe default sender again. Use `SW5=1` only for raw ingress-drain debugging; it intentionally disables forwarding to PC2.
 
@@ -319,11 +348,13 @@ This is enough for the first real enforcement demo. UART remains a later conveni
 
 ## Current script map
 
-- [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py): PC1 sender for the simplest rule demo. Sends TCP/22 allow and TCP/23 drop by default, optionally UDP/80 allow with `--udp-allow`.
-- [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for visible allowed frames and drop leaks. It can also inspect `.pcapng` files with `--pcap`.
-- [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): quick pcap summary tool used during debugging. It reports total packets, source MAC counts, demo marker hits, and common IP pairs.
-- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live visualization demo scripts. These are deferred until the simpler rule demo is hardware-stable.
-- [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): final chunked file/video proof scripts. These are deferred until A-triggered TX is proven.
+- [rule_demo_udp_socket_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_udp_socket_sender.py): canonical PC1 final-demo sender. Uses normal UDP sockets plus static ARP and cycles through UDP/80 allow, UDP/5001 allow, UDP/5002 drop, and content-block payload profiles.
+- [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for allowed packets, blocked-packet leak warnings, FPGA UART histograms, and `.pcapng` inspection with `--pcap`.
+- [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with SHA-256 verification and interleaved decoys.
+- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 sine/data visualization with UDP/5002 and/or content-block decoys.
+- [pcap_summary.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/pcap_summary.py): current pcap summary tool for UDP gateway markers.
+- [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): older quick pcap summary tool retained for bring-up/debug captures.
+- [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py): legacy raw-Ethernet/MACRAW diagnostic sender. It is not the final hardware demo path.
 
 ## 2026-05-01 observed result
 

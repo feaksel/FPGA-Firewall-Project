@@ -463,6 +463,19 @@ kept stable, but several meanings return to the B-TX acceptance view:
 - `stp_last_rx_size[15..0]` is now the W5500 UDP socket RX occupancy
   (`8 + UDP payload length` for one packet), and `stp_last_frame_len[15..0]`
   is the synthesized Ethernet frame length (`42 + UDP payload length`).
+
+Round-22 hardware success (`captures/stp/round22_udp_waitlink.csv`):
+
+- `stp_b_status=0x22`
+- `stp_phy_cfgr=0xBF`
+- `stp_frames_udp_dport80=stp_frames_demo_match=0x74`
+- `stp_b_tx_count=stp_b_buf_writes=stp_b_send_issued=stp_b_send_cleared=0x74`
+- `stp_b_send_timeouts=0`
+- `stp_a_rx_first16 == stp_b_tx_first16 == FFFFFFFFFFFF00112233445508004500`
+
+Use `scripts/signaltap_capture_force.tcl` for this image. The older triggered
+B-TX capture condition timed out even while B TX counters were rising, so that
+trigger setup is stale for the UDP-socket image.
 for the current demo packet and motivates the W5500 A UDP-socket RX pivot.
 
 ## Capture flow
@@ -507,3 +520,33 @@ These are also possible over the same USB-Blaster link, but heavier:
 
 For the current bug the SignalTap path above gets us answers in under an
 hour of bench time and does not require any new tooling.
+# UDP Policy Gateway Rule Probes (2026-05-05)
+
+The final demo path is the UDP socket gateway, not A-side MACRAW. The existing
+MACRAW/PHY/commit probes are still useful for diagnosis, but the next useful
+SignalTap additions are the FPGA policy counters exposed from
+`de1_soc_w5500_top`:
+
+- `stp_rule_allow80`
+- `stp_rule_allow5001`
+- `stp_rule_drop5002`
+- `stp_rule_content_block`
+- `stp_rule_default_drop`
+
+These correspond to the dashboard UART histogram fields `U80`, `U51`, `D52`,
+`SIG`, and `DEF`. They prove that blocked traffic was classified by the FPGA
+instead of merely disappearing upstream.
+
+Recommended final-demo capture flow:
+
+```powershell
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_stp.exe' `
+  -t scripts\signaltap_capture_force.tcl `
+  quartus\de1_soc_w5500.stp `
+  captures\stp\udp_policy_gateway.csv 10
+py -3 scripts\inspect_signaltap_csv.py captures\stp\udp_policy_gateway.csv
+```
+
+If the `stp_rule_*` nodes are added to the `.stp`, rebuild the SOF before
+capturing. SignalTap node membership is baked into the fitted image; editing the
+`.stp` after compile is not enough.

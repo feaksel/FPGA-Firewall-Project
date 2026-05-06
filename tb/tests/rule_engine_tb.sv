@@ -103,8 +103,14 @@ module rule_engine_tb;
         drive_header(8'h06, 32'h0A010203, 32'hC0A80163, 16'd2222, 16'd22);
         expect_decision("rule2_ssh_allow", 1'b1, 4'd2);
 
+        drive_header(8'h11, 32'hC0A80155, 32'hC0A80101, 16'd9999, 16'd5001);
+        expect_decision("rule3_udp5001_allow", 1'b1, 4'd3);
+
+        drive_header(8'h11, 32'hC0A80155, 32'hC0A80101, 16'd9999, 16'd5002);
+        expect_decision("rule4_udp5002_drop", 1'b0, 4'd4);
+
         drive_header(8'h11, 32'hAC100001, 32'h08080808, 16'd9999, 16'd53);
-        expect_decision("rule3_udp_default_allow", 1'b1, 4'd3);
+        expect_decision("udp_default_drop", 1'b0, 4'hF);
 
         drive_header(8'h06, 32'hAC100001, 32'h08080808, 16'd9999, 16'd443);
         expect_decision("default_drop", 1'b0, 4'hF);

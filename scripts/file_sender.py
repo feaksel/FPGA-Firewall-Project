@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 import argparse
 import hashlib
+import socket
 import struct
-import sys
 import time
 from pathlib import Path
 
-try:
-    from scapy.all import Ether, IP, TCP, UDP, Raw, get_if_hwaddr, sendp
-except ImportError:
-    print("Scapy is required. Install it with: pip install scapy", file=sys.stderr)
-    sys.exit(1)
-
 
 MAGIC = b"FWFILE1\0"
-DEFAULT_DST_MAC = "ff:ff:ff:ff:ff:ff"
-DEFAULT_SRC_IP = "192.168.50.10"
-DEFAULT_DST_IP = "192.168.50.20"
+DEFAULT_SRC_IP = "192.168.1.10"
+DEFAULT_DST_IP = "192.168.1.1"
+DEFAULT_W5500_A_MAC = "02:00:00:de:ad:0a"
 FILE_UDP_PORT = 5001
+DECOY_UDP_PORT = 5002
 
 
 def build_file_payload(file_id: int, chunk_index: int, total_chunks: int, file_size: int, sha256_hex: str, data: bytes) -> bytes:
@@ -26,57 +21,43 @@ def build_file_payload(file_id: int, chunk_index: int, total_chunks: int, file_s
     return header + data
 
 
-def build_allowed_chunk(args, file_id, chunk_index, total_chunks, file_size, sha256_hex, data):
-    payload = build_file_payload(file_id, chunk_index, total_chunks, file_size, sha256_hex, data)
-    return (
-        Ether(dst=args.dst_mac, src=args.src_mac)
-        / IP(src=args.src_ip, dst=args.dst_ip)
-        / UDP(sport=args.src_port, dport=args.file_port)
-        / Raw(load=payload)
-    )
-
-
-def build_decoy(args, chunk_index):
-    marker = f"FW-DECOY-DROP-{chunk_index}".encode("ascii")
+def build_decoy(chunk_index, file_port, decoy_port):
     if chunk_index % 2 == 0:
-        return (
-            Ether(dst=args.dst_mac, src=args.src_mac)
-            / IP(src=args.blocked_src_ip, dst=args.dst_ip)
-            / TCP(sport=41000 + (chunk_index % 1000), dport=23, flags="S")
-            / Raw(load=marker)
-        )
-
-    return (
-        Ether(dst=args.dst_mac, src=args.src_mac)
-        / IP(src=args.src_ip, dst=args.dst_ip)
-        / UDP(sport=args.src_port, dport=args.decoy_port)
-        / Raw(load=marker)
-    )
+        return decoy_port, f"FW-DEMO-DROP-UDP5002 decoy={chunk_index}".encode("ascii")
+    return file_port, f"FW-BLOCK file-port-content-block decoy={chunk_index}".encode("ascii")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Send a chunked file demo through the inline FPGA firewall.")
-    parser.add_argument("--iface", required=True, help="Scapy interface connected to W5500 A / FPGA ingress.")
+    parser = argparse.ArgumentParser(description="Send a chunked file through the FPGA UDP policy gateway.")
+    parser.add_argument("--iface", default="en0", help="PC1 Ethernet interface used in setup hints.")
     parser.add_argument("--file", required=True, help="File to send.")
     parser.add_argument("--chunk-size", type=int, default=512, help="Payload bytes per allowed file chunk.")
-    parser.add_argument("--interval", type=float, default=0.01, help="Seconds between frames.")
+    parser.add_argument("--interval", type=float, default=0.01, help="Seconds between UDP datagrams.")
     parser.add_argument("--file-id", type=int, default=1, help="16-bit file transfer id.")
-    parser.add_argument("--src-mac", help="Override Ethernet source MAC. Default uses the selected interface's real MAC.")
-    parser.add_argument("--dst-mac", default=DEFAULT_DST_MAC)
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
-    parser.add_argument("--blocked-src-ip", default="10.99.0.42")
     parser.add_argument("--src-port", type=int, default=40000)
     parser.add_argument("--file-port", type=int, default=FILE_UDP_PORT)
-    parser.add_argument("--decoy-port", type=int, default=5002)
-    parser.add_argument("--decoys", type=int, default=1, help="Decoy/drop frames to interleave after each chunk.")
+    parser.add_argument("--decoy-port", type=int, default=DECOY_UDP_PORT)
+    parser.add_argument("--w5500-mac", default=DEFAULT_W5500_A_MAC, help="W5500 A SHAR for setup hints.")
+    parser.add_argument("--decoys", type=int, default=1, help="Decoy/drop datagrams to interleave after each chunk.")
+    parser.add_argument("--print-setup", action="store_true", help="Print PC1 setup commands and exit.")
     args = parser.parse_args()
 
-    if args.src_mac is None:
-        try:
-            args.src_mac = get_if_hwaddr(args.iface)
-        except Exception as exc:
-            parser.error(f"could not read MAC for {args.iface}: {exc}")
+    if args.chunk_size <= 0:
+        parser.error("--chunk-size must be greater than zero")
+    if args.src_port < 1 or args.src_port > 65535:
+        parser.error("--src-port must be 1..65535")
+
+    setup = [
+        f"sudo ifconfig {args.iface} inet {args.src_ip} netmask 255.255.255.0 up",
+        f"sudo arp -d {args.dst_ip} 2>/dev/null || true",
+        f"sudo arp -s {args.dst_ip} {args.w5500_mac}",
+        f"sudo tcpdump -i {args.iface} -nn -e 'host {args.dst_ip} and udp'",
+    ]
+    if args.print_setup:
+        print("\n".join(setup))
+        return
 
     src_path = Path(args.file)
     data = src_path.read_bytes()
@@ -84,23 +65,33 @@ def main():
     chunks = [data[i : i + args.chunk_size] for i in range(0, len(data), args.chunk_size)]
     total_chunks = len(chunks)
 
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((args.src_ip, args.src_port))
+
     print(f"Sending {src_path} ({len(data)} bytes, {total_chunks} chunks)")
     print(f"sha256={sha256_hex}")
-    print(f"src_mac={args.src_mac} dst_mac={args.dst_mac}")
-    print(f"allowed profile: UDP dst port {args.file_port}")
-    print("blocked decoys: TCP dst port 23 and UDP non-file port")
+    print(f"src={args.src_ip}:{args.src_port} dst={args.dst_ip}")
+    print(f"allowed profile: UDP dst port {args.file_port} with {MAGIC!r} marker")
+    print(f"blocked decoys: UDP dst port {args.decoy_port} and FW-BLOCK content override")
+    print("Setup commands:")
+    for cmd in setup:
+        print(f"  {cmd}")
 
     sent_allowed = 0
     sent_decoys = 0
     for chunk_index, chunk in enumerate(chunks):
-        pkt = build_allowed_chunk(args, args.file_id, chunk_index, total_chunks, len(data), sha256_hex, chunk)
-        sendp(pkt, iface=args.iface, verbose=False)
+        payload = build_file_payload(args.file_id, chunk_index, total_chunks, len(data), sha256_hex, chunk)
+        sock.sendto(payload, (args.dst_ip, args.file_port))
         sent_allowed += 1
         time.sleep(args.interval)
 
         for decoy_index in range(args.decoys):
-            decoy = build_decoy(args, chunk_index * max(args.decoys, 1) + decoy_index)
-            sendp(decoy, iface=args.iface, verbose=False)
+            decoy_port, decoy_payload = build_decoy(
+                chunk_index * max(args.decoys, 1) + decoy_index,
+                args.file_port,
+                args.decoy_port,
+            )
+            sock.sendto(decoy_payload, (args.dst_ip, decoy_port))
             sent_decoys += 1
             time.sleep(args.interval)
 

@@ -9,6 +9,10 @@ xsim.dir/
 *.wdb
 dfx_runtime.txt
 
+# Python helper artifacts
+__pycache__/
+*.pyc
+
 # Quartus generated databases and helper dumps
 quartus/db/
 quartus/incremental_db/

@@ -4,6 +4,7 @@ module w5500_udp_rx_model #(
     parameter PACKET_FILE    = "tb/packets/udp_allow.mem",
     parameter PACKET_LENGTH  = 38,
     parameter PAYLOAD_LENGTH = 0,
+    parameter PACKET_SOCKET  = 0,
     parameter REPEAT_PACKETS = 0
 ) (
     input  wire rst_n,
@@ -62,20 +63,20 @@ module w5500_udp_rx_model #(
     localparam [7:0] S0_STATUS_UDP      = 8'h22;
 
     reg [7:0] packet_mem [0:PACKET_LENGTH-1];
-    reg [7:0] rxbuf_mem [0:2047];
+    reg [7:0] rxbuf_mem [0:2][0:2047];
 
     reg [7:0] common_mr;
     reg [7:0] common_gar [0:3];
     reg [7:0] common_subr [0:3];
     reg [7:0] common_shar [0:5];
     reg [7:0] common_sipr [0:3];
-    reg [7:0] s0_mr;
-    reg [7:0] s0_sr;
-    reg [7:0] s0_port [0:1];
-    reg [7:0] s0_rxbuf_size;
-    reg [7:0] s0_txbuf_size;
-    reg [15:0] s0_rx_rsr;
-    reg [15:0] s0_rx_rd;
+    reg [7:0] sock_mr [0:2];
+    reg [7:0] sock_sr [0:2];
+    reg [7:0] sock_port [0:2][0:1];
+    reg [7:0] sock_rxbuf_size [0:2];
+    reg [7:0] sock_txbuf_size [0:2];
+    reg [15:0] sock_rx_rsr [0:2];
+    reg [15:0] sock_rx_rd [0:2];
 
     reg [15:0] trans_addr;
     reg [7:0]  trans_ctrl;
@@ -91,20 +92,61 @@ module w5500_udp_rx_model #(
         $readmemh(PACKET_FILE, packet_mem);
     end
 
+    function automatic int socket_from_ctrl;
+        input [7:0] ctrl;
+        begin
+            case (ctrl)
+                8'h28, 8'h2C, 8'h38: socket_from_ctrl = 1;
+                8'h48, 8'h4C, 8'h58: socket_from_ctrl = 2;
+                default:              socket_from_ctrl = 0;
+            endcase
+        end
+    endfunction
+
+    function automatic bit is_socket_reg_read;
+        input [7:0] ctrl;
+        begin
+            is_socket_reg_read = (ctrl == 8'h08) || (ctrl == 8'h28) || (ctrl == 8'h48);
+        end
+    endfunction
+
+    function automatic bit is_socket_reg_write;
+        input [7:0] ctrl;
+        begin
+            is_socket_reg_write = (ctrl == 8'h0C) || (ctrl == 8'h2C) || (ctrl == 8'h4C);
+        end
+    endfunction
+
+    function automatic bit is_socket_rxbuf_read;
+        input [7:0] ctrl;
+        begin
+            is_socket_rxbuf_read = (ctrl == 8'h18) || (ctrl == 8'h38) || (ctrl == 8'h58);
+        end
+    endfunction
+
+    task update_int_n;
+        begin
+            int_n = !((sock_rx_rsr[0] != 16'd0) ||
+                      (sock_rx_rsr[1] != 16'd0) ||
+                      (sock_rx_rsr[2] != 16'd0));
+        end
+    endtask
+
     task load_udp_record_at;
+        input int sock;
         input [15:0] base_addr;
         integer idx;
         begin
-            rxbuf_mem[base_addr]          = packet_mem[26];
-            rxbuf_mem[base_addr + 16'd1]  = packet_mem[27];
-            rxbuf_mem[base_addr + 16'd2]  = packet_mem[28];
-            rxbuf_mem[base_addr + 16'd3]  = packet_mem[29];
-            rxbuf_mem[base_addr + 16'd4]  = packet_mem[34];
-            rxbuf_mem[base_addr + 16'd5]  = packet_mem[35];
-            rxbuf_mem[base_addr + 16'd6]  = PAYLOAD_LENGTH[15:8];
-            rxbuf_mem[base_addr + 16'd7]  = PAYLOAD_LENGTH[7:0];
+            rxbuf_mem[sock][base_addr]          = packet_mem[26];
+            rxbuf_mem[sock][base_addr + 16'd1]  = packet_mem[27];
+            rxbuf_mem[sock][base_addr + 16'd2]  = packet_mem[28];
+            rxbuf_mem[sock][base_addr + 16'd3]  = packet_mem[29];
+            rxbuf_mem[sock][base_addr + 16'd4]  = packet_mem[34];
+            rxbuf_mem[sock][base_addr + 16'd5]  = packet_mem[35];
+            rxbuf_mem[sock][base_addr + 16'd6]  = PAYLOAD_LENGTH[15:8];
+            rxbuf_mem[sock][base_addr + 16'd7]  = PAYLOAD_LENGTH[7:0];
             for (idx = 0; idx < PAYLOAD_LENGTH; idx = idx + 1)
-                rxbuf_mem[base_addr + 16'd8 + idx[15:0]] = idx[7:0] ^ 8'hA5;
+                rxbuf_mem[sock][base_addr + 16'd8 + idx[15:0]] = idx[7:0] ^ 8'hA5;
         end
     endtask
 
@@ -118,15 +160,17 @@ module w5500_udp_rx_model #(
             end
             for (init_idx = 0; init_idx < 6; init_idx = init_idx + 1)
                 common_shar[init_idx] = 8'h00;
-            s0_mr            = 8'h00;
-            s0_sr            = 8'h00;
-            s0_port[0]       = 8'h00;
-            s0_port[1]       = 8'h00;
-            s0_rxbuf_size    = 8'h00;
-            s0_txbuf_size    = 8'h00;
-            s0_rx_rsr        = 16'd8 + PAYLOAD_LENGTH[15:0];
-            s0_rx_rd         = 16'd0;
-            int_n            = 1'b0;
+            for (init_idx = 0; init_idx < 3; init_idx = init_idx + 1) begin
+                sock_mr[init_idx]         = 8'h00;
+                sock_sr[init_idx]         = 8'h00;
+                sock_port[init_idx][0]    = 8'h00;
+                sock_port[init_idx][1]    = 8'h00;
+                sock_rxbuf_size[init_idx] = 8'h00;
+                sock_txbuf_size[init_idx] = 8'h00;
+                sock_rx_rsr[init_idx]     = 16'd0;
+                sock_rx_rd[init_idx]      = 16'd0;
+            end
+            sock_rx_rsr[PACKET_SOCKET] = 16'd8 + PAYLOAD_LENGTH[15:0];
             saw_version_read = 1'b0;
             saw_open_cmd     = 1'b0;
             saw_recv_cmd     = 1'b0;
@@ -138,7 +182,8 @@ module w5500_udp_rx_model #(
             bit_idx          = 7;
             byte_idx         = 0;
             recv_count       = 0;
-            load_udp_record_at(16'd0);
+            load_udp_record_at(PACKET_SOCKET, 16'd0);
+            update_int_n();
         end
     endtask
 
@@ -174,24 +219,24 @@ module w5500_udp_rx_model #(
                     endcase
                 end
 
-                CTRL_S0_REG_READ: begin
+                CTRL_S0_REG_READ, 8'h28, 8'h48: begin
                     case (addr)
-                        S0_MR:         read_byte = s0_mr;
-                        S0_SR:         read_byte = s0_sr;
-                        S0_PORT0:      read_byte = s0_port[0];
-                        S0_PORT1:      read_byte = s0_port[1];
-                        S0_RXBUF_SIZE: read_byte = s0_rxbuf_size;
-                        S0_TXBUF_SIZE: read_byte = s0_txbuf_size;
-                        S0_RX_RSR_MSB: read_byte = s0_rx_rsr[15:8];
-                        S0_RX_RSR_LSB: read_byte = s0_rx_rsr[7:0];
-                        S0_RX_RD_MSB:  read_byte = s0_rx_rd[15:8];
-                        S0_RX_RD_LSB:  read_byte = s0_rx_rd[7:0];
+                        S0_MR:         read_byte = sock_mr[socket_from_ctrl(ctrl)];
+                        S0_SR:         read_byte = sock_sr[socket_from_ctrl(ctrl)];
+                        S0_PORT0:      read_byte = sock_port[socket_from_ctrl(ctrl)][0];
+                        S0_PORT1:      read_byte = sock_port[socket_from_ctrl(ctrl)][1];
+                        S0_RXBUF_SIZE: read_byte = sock_rxbuf_size[socket_from_ctrl(ctrl)];
+                        S0_TXBUF_SIZE: read_byte = sock_txbuf_size[socket_from_ctrl(ctrl)];
+                        S0_RX_RSR_MSB: read_byte = sock_rx_rsr[socket_from_ctrl(ctrl)][15:8];
+                        S0_RX_RSR_LSB: read_byte = sock_rx_rsr[socket_from_ctrl(ctrl)][7:0];
+                        S0_RX_RD_MSB:  read_byte = sock_rx_rd[socket_from_ctrl(ctrl)][15:8];
+                        S0_RX_RD_LSB:  read_byte = sock_rx_rd[socket_from_ctrl(ctrl)][7:0];
                         default:       read_byte = 8'h00;
                     endcase
                 end
 
-                CTRL_S0_RXBUF_READ: begin
-                    read_byte = rxbuf_mem[addr];
+                CTRL_S0_RXBUF_READ, 8'h38, 8'h58: begin
+                    read_byte = rxbuf_mem[socket_from_ctrl(ctrl)][addr];
                 end
             endcase
         end
@@ -227,30 +272,29 @@ module w5500_udp_rx_model #(
                     endcase
                 end
 
-                CTRL_S0_REG_WRITE: begin
+                CTRL_S0_REG_WRITE, 8'h2C, 8'h4C: begin
                     case (addr)
-                        S0_MR:         s0_mr         = data;
-                        S0_PORT0:      s0_port[0]    = data;
-                        S0_PORT1:      s0_port[1]    = data;
-                        S0_RXBUF_SIZE: s0_rxbuf_size = data;
-                        S0_TXBUF_SIZE: s0_txbuf_size = data;
-                        S0_RX_RD_MSB:  s0_rx_rd[15:8]= data;
-                        S0_RX_RD_LSB:  s0_rx_rd[7:0] = data;
+                        S0_MR:         sock_mr[socket_from_ctrl(ctrl)] = data;
+                        S0_PORT0:      sock_port[socket_from_ctrl(ctrl)][0] = data;
+                        S0_PORT1:      sock_port[socket_from_ctrl(ctrl)][1] = data;
+                        S0_RXBUF_SIZE: sock_rxbuf_size[socket_from_ctrl(ctrl)] = data;
+                        S0_TXBUF_SIZE: sock_txbuf_size[socket_from_ctrl(ctrl)] = data;
+                        S0_RX_RD_MSB:  sock_rx_rd[socket_from_ctrl(ctrl)][15:8]= data;
+                        S0_RX_RD_LSB:  sock_rx_rd[socket_from_ctrl(ctrl)][7:0] = data;
                         S0_CR: begin
                             if (data == S0_CR_OPEN) begin
                                 saw_open_cmd = 1'b1;
-                                s0_sr        = S0_STATUS_UDP;
+                                sock_sr[socket_from_ctrl(ctrl)] = S0_STATUS_UDP;
                             end else if (data == S0_CR_RECV) begin
                                 saw_recv_cmd = 1'b1;
                                 recv_count   = recv_count + 1;
                                 if (REPEAT_PACKETS) begin
-                                    load_udp_record_at(s0_rx_rd);
-                                    s0_rx_rsr = 16'd8 + PAYLOAD_LENGTH[15:0];
-                                    int_n     = 1'b0;
+                                    load_udp_record_at(socket_from_ctrl(ctrl), sock_rx_rd[socket_from_ctrl(ctrl)]);
+                                    sock_rx_rsr[socket_from_ctrl(ctrl)] = 16'd8 + PAYLOAD_LENGTH[15:0];
                                 end else begin
-                                    s0_rx_rsr = 16'd0;
-                                    int_n     = 1'b1;
+                                    sock_rx_rsr[socket_from_ctrl(ctrl)] = 16'd0;
                                 end
+                                update_int_n();
                             end
                         end
                     endcase
@@ -295,7 +339,7 @@ module w5500_udp_rx_model #(
                     end
 
                     default: begin
-                        if (trans_ctrl == CTRL_S0_RXBUF_READ) begin
+                        if (is_socket_rxbuf_read(trans_ctrl)) begin
                             spi_out_shift = read_byte(trans_addr + (byte_idx - 2), trans_ctrl);
                         end else begin
                             if (byte_idx == 3)

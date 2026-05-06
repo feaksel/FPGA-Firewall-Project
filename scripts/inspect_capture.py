@@ -11,7 +11,16 @@ def main() -> int:
         return 2
 
     packets = rdpcap(sys.argv[1])
-    profiles = {"udp_allow": 0, "tcp_drop": 0, "tcp_allow_ssh": 0}
+    profiles = {
+        "allow80": 0,
+        "allow5001": 0,
+        "drop5002_marker": 0,
+        "content_block_marker": 0,
+        "file_marker": 0,
+        "sine_marker": 0,
+        "legacy_tcp_drop": 0,
+        "legacy_tcp_allow_ssh": 0,
+    }
     matches = []
     src_macs = Counter()
     dst_macs = Counter()
@@ -26,24 +35,39 @@ def main() -> int:
             ip_pairs[(pkt[IP].src, pkt[IP].dst)] += 1
         if Raw in pkt:
             payload = bytes(pkt[Raw].load)
-            for marker in (b"FW-UDP-ALLOW", b"FW-TCP-DROP", b"FW-TCP-ALLOW-SSH"):
+            marker_map = {
+                b"FW-DEMO-ALLOW80": "allow80",
+                b"FW-DEMO-ALLOW5001": "allow5001",
+                b"FW-DEMO-DROP-UDP5002": "drop5002_marker",
+                b"FW-BLOCK": "content_block_marker",
+                b"FWFILE1\x00": "file_marker",
+                b"FWSINE2\x00": "sine_marker",
+                b"FW-TCP-DROP": "legacy_tcp_drop",
+                b"FW-TCP-ALLOW-SSH": "legacy_tcp_allow_ssh",
+            }
+            for marker, profile in marker_map.items():
                 if marker in payload:
-                    payload_hits[marker.decode("ascii")] += 1
-
-        if Ether not in pkt or pkt[Ether].src.lower() != "00:11:22:33:44:55":
-            continue
+                    payload_hits[marker.decode("ascii", errors="replace")] += 1
+                    profiles[profile] += 1
 
         payload = bytes(pkt[Raw].load) if Raw in pkt else b""
         name = "unknown"
-        if b"FW-UDP-ALLOW" in payload:
-            name = "udp_allow"
-            profiles[name] += 1
+        if b"FW-DEMO-ALLOW80" in payload:
+            name = "allow80"
+        elif b"FW-DEMO-ALLOW5001" in payload:
+            name = "allow5001"
+        elif b"FW-DEMO-DROP-UDP5002" in payload:
+            name = "drop5002_marker"
+        elif b"FW-BLOCK" in payload:
+            name = "content_block_marker"
+        elif b"FWFILE1\x00" in payload:
+            name = "file_marker"
+        elif b"FWSINE2\x00" in payload:
+            name = "sine_marker"
         elif b"FW-TCP-DROP" in payload:
-            name = "tcp_drop"
-            profiles[name] += 1
+            name = "legacy_tcp_drop"
         elif b"FW-TCP-ALLOW-SSH" in payload:
-            name = "tcp_allow_ssh"
-            profiles[name] += 1
+            name = "legacy_tcp_allow_ssh"
 
         ip_info = ""
         if IP in pkt:
@@ -55,10 +79,11 @@ def main() -> int:
         elif TCP in pkt:
             port_info = f"tcp {pkt[TCP].sport}->{pkt[TCP].dport}"
 
-        matches.append((idx, name, ip_info, port_info, len(pkt)))
+        if name != "unknown":
+            matches.append((idx, name, ip_info, port_info, len(pkt)))
 
     print(f"total_packets={len(packets)}")
-    print(f"src_mac_00_11_22_33_44_55={len(matches)}")
+    print(f"demo_marker_packets={len(matches)}")
     for name, count in profiles.items():
         print(f"{name}={count}")
     print("first_matches:")

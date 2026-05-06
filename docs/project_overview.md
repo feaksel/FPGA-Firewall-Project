@@ -691,3 +691,18 @@ If you are new to the project, the easiest reading order is:
 7. [docs/quartus_learning_guide.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/quartus_learning_guide.md)
 
 After that, move into the RTL and testbench files for the area you will be working on.
+# 2026-05-05 Scope Update: UDP Policy Gateway
+
+The final hardware demo is a W5500-based UDP packet-policy gateway. Earlier
+milestones investigated transparent MACRAW/L2 forwarding, but the bench evidence
+showed W5500 A MACRAW was not reliable for the verified PC1 demo packet on this
+direct-link setup. The shipping path uses W5500 UDP sockets on the ingress side,
+then reconstructs an Ethernet/IPv4/UDP stream inside the FPGA so the parser,
+policy forwarder, counters, signature matcher, packet buffer, and W5500 B TX
+path remain real hardware datapath logic.
+
+This is still an FPGA project: the interesting work is the streaming parser,
+parallel-ish policy classification, deterministic counters, and inline payload
+signature decisions. It is not a transparent TCP/SSH firewall unless the W5500
+socket abstraction is replaced with a true Ethernet MAC/PHY or a TCP proxy mode
+is added later.

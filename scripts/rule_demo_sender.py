@@ -47,7 +47,12 @@ def allowed_ssh(seq, src_mac, dst_mac):
     )
 
 def main():
-    parser = argparse.ArgumentParser(description="Simple continuous FPGA firewall rule demo sender.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "LEGACY raw-Ethernet/MACRAW diagnostic sender. "
+            "Use rule_demo_udp_socket_sender.py for the final UDP policy gateway demo."
+        )
+    )
     parser.add_argument("--iface", required=True, help="Mac Ethernet interface connected to W5500 A.")
     parser.add_argument("--rate", type=float, default=1.0, help="Demo cycles per second. One cycle sends allow + selected decoys.")
     parser.add_argument("--count", type=int, default=0, help="Number of cycles to send; 0 means run forever.")
@@ -89,7 +94,8 @@ def main():
     sent_allow_ssh = 0
     sent_drop = 0
 
-    print("FPGA firewall rule demo sender")
+    print("LEGACY raw-Ethernet/MACRAW diagnostic sender")
+    print("Final hardware demo path: scripts/rule_demo_udp_socket_sender.py")
     print(f"iface={args.iface} rate={args.rate:g} cycles/sec")
     print(f"src_mac={src_mac} dst_mac={args.dst_mac} allow_dst_ip={args.allow_dst_ip}")
     profiles = []

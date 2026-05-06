@@ -5,12 +5,13 @@ This repository is organized so the team can:
 2. isolate hardware-risky parts behind a clean adapter interface,
 3. track bugs, design decisions, and milestone status clearly.
 
-This project builds a simple FPGA-based Ethernet firewall MVP on `DE1-SoC + W5500`. The short version is:
-- packets come in from simulation or from the W5500,
-- the parser extracts IPv4/TCP/UDP header fields,
-- the rule engine decides allow or drop,
+This project began as a simple FPGA-based Ethernet firewall MVP on `DE1-SoC + W5500`. The hardware path has now evolved into a **W5500-based UDP packet-policy gateway** because W5500 UDP sockets are reliable on this bench setup while A-side MACRAW receive was not dependable for the intended PC1 demo traffic. The short version is:
+- UDP datagrams come in from W5500 A sockets or from simulation,
+- the FPGA reconstructs an internal Ethernet/IPv4/UDP byte stream,
+- the parser/forwarder extracts header fields and scans payload markers,
+- the policy engine decides allow or drop,
 - an RX FIFO can absorb backpressure between the adapter and the firewall core,
-- and the firewall core records the result with counters and debug visibility.
+- and the design records aggregate plus per-rule counters for HEX, UART, dashboard, and SignalTap visibility.
 
 If you are new to the repo, start with [project_overview.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/project_overview.md). It explains the goal, architecture, stages, testing flow, deployment path, hardware setup, and which code/files matter at each phase.
 
@@ -35,6 +36,16 @@ Build in this order:
 4. firewall core integration
 5. one Ethernet controller hardware bring-up
 6. optional second-port forwarding
+
+## Scope and Hardware Reality
+
+This repository still keeps the original firewall language because that was the design target and the simulation core still covers TCP/UDP packet parsing. The working hardware demo, however, is more precise:
+
+- **What it is:** a one-way UDP policy gateway from PC1 -> W5500 A -> FPGA stream parser/rules/signature matcher -> W5500 B -> PC2.
+- **What the FPGA does:** reconstructs packet-like streams from W5500 UDP records, classifies UDP services, scans payload bytes for block/file/sine signatures, forwards allowed packets, drops blocked packets, and exposes counters.
+- **What the W5500 enables:** simple SPI bring-up, stable direct-cable UDP socket receive, and a practical two-module demo without writing a full Ethernet MAC.
+- **What the W5500 constrains:** the FPGA is not seeing every raw Ethernet frame in UDP-socket mode. TCP/SSH, ARP, ICMP, arbitrary L2 traffic, and transparent bidirectional firewalling are outside the final hardware demo unless the architecture moves to a real FPGA Ethernet MAC/PHY or a TCP proxy design.
+- **Why this is still an FPGA project:** the classification, counters, buffering, streaming payload matching, and deterministic allow/drop datapath are implemented in hardware and are visible through simulations, UART telemetry, PC2 dashboard, Wireshark, and SignalTap.
 
 ## Main directories
 
@@ -71,16 +82,16 @@ The current implementation includes:
 - a four-rule parameterized rule engine with first-match priority,
 - a single-packet buffer that stores frame bytes and can replay them,
 - a dedicated RX-side frame FIFO between the adapter and firewall core,
-- a W5500-oriented adapter with a MACRAW-mode RX simulation path,
+- a W5500 UDP-socket RX adapter that opens UDP services on ports `80`, `5001`, and `5002`,
+- a streaming policy forwarder with per-rule counters and payload signature blocking,
 - a DE1-SoC board wrapper for first hardware bring-up,
 - dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
 
 The current project phase is:
 - simulation-complete for the original receive/inspect MVP pipeline,
-- one-port hardware bring-up has reached live RX inspection on `DE1-SoC + W5500 A`,
-- W5500 A SPI register access, MACRAW initialization, RX polling, and PC-generated packet reception have been demonstrated on hardware,
-- W5500 B can transmit a fixed internally generated test frame in `SW6` mode,
-- real A-to-B forwarding is partially proven by SignalTap and pcap comparison, but the intended rule-demo marker flow is not accepted yet.
+- two-port UDP policy forwarding is proven through W5500 B SEND completion and PC2 Wireshark/dashboard visibility,
+- A-side MACRAW remains a legacy diagnostic path, not the final demo path,
+- the final demo work is now multi-service UDP policy, per-rule telemetry, signature blocking, and file/sine visualization.
 
 ### Current hardware truth, 2026-05-05
 
@@ -94,10 +105,14 @@ This is the most important status snapshot:
 - W5500 A PHY confirmed at 100 Mbps full-duplex (`stp_phy_cfgr = 0xBF`).
 - PC1's `en0` confirmed putting demo UDP/80 frames on the wire toward W5500 A in both raw Scapy and normal UDP/static-ARP forms.
 - The final PC1 proof was normal unicast Ethernet: `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 tcpdump packets, zero drops.
-- W5500 A hardware readback confirmed the expected identity: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
-- A-side MACRAW still never surfaced the demo UDP/80 frame (`frames_udp_dport80=0`) even with the correct PC1 packet and correct W5500 A MAC/IP/readbacks. It only surfaced broadcast/multicast Mac background frames such as mDNS UDP/5353.
+- W5500 A hardware readback confirmed the expected identity in MACRAW debug images: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
+- A-side MACRAW never surfaced the demo UDP/80 frame (`frames_udp_dport80=0`) even with the correct PC1 packet and correct W5500 A MAC/IP/readbacks. It only surfaced broadcast/multicast Mac background frames such as mDNS UDP/5353.
+- The current working path uses W5500 A UDP socket RX, waits for PHY link, reconstructs an internal Ethernet/IP/UDP stream, and feeds the firewall/forwarder/B-TX path.
+- Round-22 hardware capture proved `S0_SR=0x22`, `PHYCFGR=0xBF`, `frames_udp_dport80=frames_demo_match=0x74`, `b_tx_count=0x74`, and `b_send_timeouts=0`.
+- PC2 Wireshark/dashboard subsequently confirmed forwarded packets arriving.
+- The next image extends W5500 A from one UDP socket to three services: UDP `80` allow, UDP `5001` allow, UDP `5002` drop, plus content-block signature override.
 
-The forwarding path is proven for frames that W5500 A surfaces, but A-side MACRAW is not reliable for the current demo ingress. The code now has a first-pass W5500 A normal UDP socket receive adapter that reconstructs an internal Ethernet/IP/UDP stream for the existing firewall/forwarder/B-TX path. Simulation, Quartus rebuild, and the next SignalTap bench capture are still pending. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
+The PC1-triggered FPGA/W5500 forwarding path is now proven. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
 
 ## Current verification status
 
@@ -116,8 +131,11 @@ Focused Questa tests added during two-port bring-up:
 - `two_port_bypass_tb`
 - `de1_soc_top_bypass_tb`
 - `de1_soc_top_rule_regen_tb`
+- `w5500_udp_rx_adapter_tb`
+- `firewall_forwarder_tb`
+- `de1_soc_top_udp_socket_forward_tb`
 
-These tests prove the intended RTL handshakes against local W5500 models, but the hardware results show that the models are still incomplete for the real two-W5500 path. Passing these tests is necessary but no longer sufficient evidence for the demo.
+These tests prove the intended RTL handshakes against local W5500 models. Hardware acceptance still requires PC2 Wireshark/dashboard visibility plus FPGA counters, because the W5500 modules and direct-link PCs are part of the real system.
 
 Run the full suite with:
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1`
@@ -197,6 +215,12 @@ Install Python dependency:
 py -3.9 -m pip install scapy
 ```
 
+Install `pyserial` too if you want the browser dashboard to read live FPGA UART telemetry:
+
+```powershell
+py -3.9 -m pip install pyserial
+```
+
 Find the Ethernet interface name:
 
 ```powershell
@@ -212,10 +236,16 @@ Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
 For the simplest continuous rule demo, run this first:
 
 ```bash
-sudo python3 scripts/rule_demo_sender.py --iface enX
+sudo python3 scripts/rule_demo_udp_socket_sender.py --iface enX --rate 1 --verbose-each
 ```
 
-This uses the hardware-safe defaults: `1` cycle/sec, `1` copy per profile, and a `0.15 s` gap between packets. It sends known-good deterministic rule profiles every cycle: UDP/80 allow, TCP/22 SSH allow, and TCP/23 drop. By default it uses PC1's real Ethernet MAC address and an IPv4 multicast destination MAC (`01:00:5e:00:00:fb`), because SignalTap/pcap proved that Mac-origin multicast traffic crosses the two-W5500 path. Use `--src-mac 00:11:22:33:44:55` only when intentionally testing spoofed-source traffic. Increase rate only after the FPGA HEX counters and PC2 dashboard are stable, for example `--rate 2 --packet-gap 0.15`.
+This sender uses normal UDP sockets plus the static ARP entry `192.168.1.1 -> 02:00:00:de:ad:0a`. It sends four hardware-accurate profiles every cycle:
+- UDP `80` allow (`FW-DEMO-ALLOW80`)
+- UDP `5001` allow with a file marker (`FWFILE1`)
+- UDP `5002` drop (`FW-DEMO-DROP-UDP5002`)
+- UDP `80` content-block override (`FW-BLOCK`)
+
+The legacy raw sender [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py) is retained for MACRAW diagnostics and simulation-shaped TCP packet experiments. It is not the final hardware demo path.
 
 For the continuous live demo, run:
 
@@ -225,9 +255,8 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 
 This continuously sends:
 - allowed sine-wave packets on UDP destination port `5001`,
-- blocked decoy packets on TCP port `23` by default,
+- blocked decoy packets on UDP destination port `5002` and/or `FW-BLOCK` content markers,
 - a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
-- PC1's real Ethernet MAC address by default,
 - a small default packet shape (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
@@ -252,13 +281,19 @@ For the simplest continuous rule demo, start this browser receiver before PC1 st
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
 ```
 
+If the FPGA UART is wired to a PC COM port, add it for live rule histograms:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7 --port 8091
+```
+
 If the dashboard stays empty, first list the exact Npcap interface names:
 
 ```powershell
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --list-ifaces
 ```
 
-The dashboard now shows `All frames seen` and `Demo frames seen`. If `All frames seen` is `0`, use a different `--iface`. You can also validate a Wireshark capture with:
+The dashboard shows PC2-visible allowed packets, leak warnings, and FPGA UART rule counters when `--uart` is provided. If the PC2 packet counters stay at `0`, use a different `--iface`. You can also validate a Wireshark capture with:
 
 ```powershell
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --pcap C:\Users\furka\Desktop\wire2.pcapng
@@ -270,7 +305,7 @@ Then open:
 http://127.0.0.1:8091
 ```
 
-Expected result: `Total allowed` and `SSH allow received` increase, expected drops increase, and `Drop leaks` stays `0`.
+Expected result: UDP `80` and UDP `5001` allowed counts increase, `Drop leaks` stays `0`, and the FPGA histogram shows `U80`, `U51`, `D52`, and `SIG` counts rising according to the sender profiles.
 
 If `All frames seen` rises but `Demo frames seen` stays `0`, summarize the capture:
 
@@ -278,7 +313,7 @@ If `All frames seen` rises but `Demo frames seen` stays `0`, summarize the captu
 py -3 .\scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng
 ```
 
-If the pcap shows only PC2 background traffic plus occasional real Mac-source frames, restart PC1 with the default sender command above so it uses the real interface MAC. Older commands that forced `--src-mac 00:11:22:33:44:55` are now a spoofed-MAC diagnostic, not the main demo path.
+If the pcap shows only PC2 background traffic, restart PC1 with the UDP-socket sender and re-check the static ARP entry. Older raw/MAC spoofing commands are now diagnostics, not the main demo path.
 
 If packets arrive for a while and then stop, stop the PC1 sender, press reset/start on the FPGA, keep `SW5=0`, and restart the safe sender command above. Avoid burst mode during the reliable demo path; `--burst` is only for short ingress bring-up tests with `SW5=1`.
 
@@ -340,17 +375,17 @@ What PC2 does:
 Optional Wireshark checks on PC2:
 
 ```text
-udp.port == 5001
+udp.port == 80 || udp.port == 5001 || udp.port == 5002
 ```
 
 Blocked traffic should not show up on PC2:
 
 ```text
-tcp.port == 23
+udp.port == 5002
 ```
 
 ```text
-frame contains "FW-DECOY-DROP"
+frame contains "FW-BLOCK" || frame contains "FW-DEMO-DROP"
 ```
 
 For the no-UART version of the demo, PC1 sender output, PC2 receiver output, PC2 Wireshark, and the DE1-SoC HEX/LED counters are the proof sources.

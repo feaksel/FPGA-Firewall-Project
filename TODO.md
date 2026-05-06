@@ -8,7 +8,7 @@
 - [x] M5: SPI master implementation
 - [x] M6: Ethernet controller adapter shell
 - [x] M7: One-port hardware bring-up
-- [ ] M8: Real one-way inline forwarding
+- [x] M8: Real one-way UDP policy forwarding
 - [ ] M9: File/video transfer demo with telemetry dashboard
 
 Current status note, 2026-05-03:
@@ -31,6 +31,19 @@ Current status note, 2026-05-05 (rounds 9-19 condensed):
 - W5500 A readbacks are definitive: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
 - Even with correct PC1 packets and correct W5500 A MAC/IP configuration, MACRAW A ingress never surfaced UDP/80 in SignalTap (`frames_udp_dport80=0`, `frames_demo_match=0`). It only surfaced broadcast/multicast Mac background frames such as UDP/5353.
 - Decision: A-side MACRAW is no longer the main demo path. Move to W5500 A normal UDP socket receive mode, then reconstruct/synthesize the Ethernet/IP/UDP stream inside the FPGA and feed the existing firewall/forwarder/B-TX path.
+
+Current status note, 2026-05-05 (rounds 20-22 condensed):
+- Implemented W5500 A UDP socket RX, internal Ethernet/IP/UDP reconstruction, periodic PHY/socket-status refresh, and wait-for-link before opening socket 0.
+- Questa passed for `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`, `de1_soc_top_bypass_tb`, `de1_soc_top_rule_regen_tb`, `adapter_firewall_integration_tb`, `eth_controller_adapter_tb`, and `two_port_bypass_tb`.
+- Round-22 hardware capture proves the core path: `S0_SR=0x22`, `PHYCFGR=0xBF`, `frames_udp_dport80=frames_demo_match=0x74`, `b_tx_count=0x74`, `b_send_timeouts=0`, and matching A RX/B TX first bytes.
+- PC2 dashboard/Wireshark visibility was confirmed by the user after round 22. The remaining final-demo work is to package this as a UDP policy gateway with multi-service rules, rule histograms, and a small streaming signature matcher.
+
+Current status note, 2026-05-05 (final-demo pivot):
+- Stop treating W5500 A MACRAW as the product path. It remains valuable diagnostic history, but the final demo path is W5500 UDP socket ingress, FPGA stream policy/signature classification, and W5500 B transmit.
+- Implemented the A+C capstone direction: UDP/80 allow, UDP/5001 file/sine/data allow, UDP/5002 decoy drop, and content-block override with `FW-BLOCK` / `FW-DEMO-DROP`.
+- Added per-rule counters and UART telemetry fields for dashboard histograms: `U80`, `U51`, `D52`, `SIG`, `DEF`, `FIL`, and `SIN`.
+- Latest image compiled and flashed successfully with SOF checksum `0x085DC65F`.
+- Post-flash idle SignalTap capture confirmed W5500 A UDP socket status `0x22` and zero B SEND timeouts. Next hardware validation needs the final PC1 UDP policy sender active: allowed traffic must appear on PC2, blocked traffic must not leak, and FPGA counters must prove the drops happened.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -76,11 +89,12 @@ Current status note, 2026-05-05 (rounds 9-19 condensed):
 - [x] Integrate W5500 A RX -> rules -> W5500 B TX in a single hardware top
 - [x] Replace W5500 B byte-at-a-time TX payload writes with burst TX-buffer writes
 - [ ] Use PC2 receiver/Wireshark plus board HEX pages as the first no-UART two-port telemetry path
-- [ ] Add a PC/dashboard UART reader later as an optional live FPGA counter source
+- [x] Add a PC/dashboard UART reader later as an optional live FPGA counter source
 - [ ] Validate W5500 B alone on hardware: reset, `VERSIONR`, MACRAW init
 - [ ] Prove a fixed test frame transmitted from FPGA to PC2
-- [ ] Prove one allowed PC1-to-PC2 forwarded packet and one dropped packet
-- [ ] Run the final file/video transfer and verify PC2 SHA-256 match
+- [x] Prove one allowed PC1-to-PC2 forwarded packet on the UDP socket path
+- [ ] Prove one dropped packet with the final UDP/5002 or content-block policy image
+- [ ] Run the final file transfer and verify PC2 SHA-256 match while decoys are dropped
 
 ## Current Debug Tasks
 
@@ -97,11 +111,15 @@ Current status note, 2026-05-05 (rounds 9-19 condensed):
 - [x] Falsify A-side MACRAW for the current demo packet after correct sender, PHY, SHAR, SIPR, and MFEN readbacks.
 - [x] Add first-pass W5500 A UDP socket receive mode for demo ingress (`w5500_udp_rx_adapter`).
 - [x] Reconstruct an internal Ethernet/IP/UDP byte stream from the UDP socket header/payload so the existing firewall/forwarder/B-TX path can be reused.
-- [ ] Run the new Questa coverage: `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`, `adapter_firewall_integration_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
-- [ ] Recompile Quartus, flash, and repeat the SignalTap force-export capture with the normal UDP socket sender.
+- [x] Run the new Questa coverage: `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`, `adapter_firewall_integration_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
+- [x] Recompile Quartus, flash, and repeat the SignalTap force-export capture with the normal UDP socket sender.
+- [x] Add wait-for-link before opening W5500 A UDP socket 0; round 22 is the first hardware-success capture.
 - [ ] Re-test `SW6` after every TX adapter edit as the known-good B-side baseline.
 - [ ] Re-test `SW5=1` raw ingress after every RX adapter edit as the known-good A-side baseline.
-- [ ] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2.
+- [x] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2. Completed after round 22; PC2 dashboard/Wireshark now see forwarded packets.
+- [x] Compile and flash the multi-socket UDP policy/signature image.
+- [ ] Bench-test the multi-socket UDP policy/signature image with active PC1 sender and PC2 dashboard.
+- [ ] Capture final SignalTap/UART evidence for UDP/80 allow, UDP/5001 allow, UDP/5002 drop, content-block drop, and zero B SEND timeouts.
 
 ## Bench protocol checklist (2026-05-05)
 

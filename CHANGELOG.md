@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 2026-05-05 - UDP Policy Gateway Pivot And FPGA Signature Demo
+- Reframed the hardware demo as a W5500-based UDP packet-policy gateway instead of a transparent L2/TCP firewall. The project name can remain, but the final docs now explicitly explain that the reliable hardware path is W5500 UDP sockets plus FPGA stream processing, while A-side MACRAW is retained as diagnostic history.
+- Extended W5500 A UDP ingress from one socket to three services:
+  - socket 0: UDP/80 allow/demo traffic,
+  - socket 1: UDP/5001 file/sine/data allow traffic,
+  - socket 2: UDP/5002 intentional drop/decoy traffic.
+- Added round-robin W5500 socket polling and internal Ethernet/IPv4/UDP frame synthesis so the existing parser, policy forwarder, packet-buffer, and W5500 B TX path remain the core datapath.
+- Added FPGA-visible policy counters for UDP/80 allow, UDP/5001 allow, UDP/5002 drop, content-block drop, and default drop.
+- Added a small streaming payload signature matcher in the forwarder:
+  - `FWFILE1\0` increments file-demo telemetry,
+  - `FWSINE2\0` increments sine-demo telemetry,
+  - `FW-BLOCK` and `FW-DEMO-DROP` force a content-block drop even on otherwise allowed UDP ports.
+- Extended UART telemetry with compact per-rule histogram fields (`U80`, `U51`, `D52`, `SIG`, `DEF`, `FIL`, `SIN`) for the dashboard.
+- Reworked the canonical PC1 demo senders to use normal UDP sockets and static ARP instead of depending on raw MACRAW behavior:
+  - UDP/80 allow,
+  - UDP/5001 file/sine/data allow,
+  - UDP/5002 drop,
+  - UDP/80 or UDP/5001 with `FW-BLOCK` content-drop override.
+- Updated the PC2 dashboard to show live packet flow, leak warnings, marker classification, UART rule histograms, and file/sine signature evidence.
+- Updated the final bench framing and docs so the nine-round MACRAW investigation remains visible as engineering evidence while the submission path ships the reliable UDP policy engine.
+- Ran the focused verification set after the pivot:
+  - Python compile checks for the updated sender/dashboard/pcap scripts,
+  - `parser_tb`, `rule_engine_tb`, `firewall_core_tb`, `firewall_forwarder_tb`,
+  - `w5500_udp_rx_adapter_tb`, `adapter_firewall_integration_tb`,
+  - `de1_soc_top_udp_socket_forward_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
+- Compiled and flashed the new Quartus image. Programmer reported SOF checksum `0x085DC65F`; the final recompile removed the earlier `ck` latch-inference warning in `de1_soc_w5500_top`.
+- Post-flash idle SignalTap capture `captures/stp/udp_policy_gateway_after_flash.csv` showed W5500 A socket status `0x22`, switches `001`, zero B SEND timeouts, and zero traffic counters; next capture must be run with the final PC1 UDP policy sender active.
+
 ## 2026-04-08
 - Created the repository structure from the project planning document
 - Added project docs, milestone flow, and helper scripts
@@ -154,4 +182,16 @@
 - Added `rtl/eth_if/w5500_udp_rx_adapter.v`, which configures W5500 A as a normal UDP socket on port 80, reads the W5500 UDP RX record, and synthesizes an internal Ethernet/IPv4/UDP byte stream for the existing parser/forwarder/B-TX path.
 - Added `tb/models/w5500_udp_rx_model.sv`, `tb/tests/w5500_udp_rx_adapter_tb.sv`, and `tb/tests/de1_soc_top_udp_socket_forward_tb.sv` to cover the socket RX adapter and the normal top-level A-to-B forwarding path.
 - Switched `de1_soc_w5500_top` A ingress from the MACRAW adapter to the UDP socket adapter, while restoring SignalTap's B-side TX counter packing for the next hardware acceptance capture.
-- Updated simulator and Quartus source lists for the new UDP RX RTL/model. Questa execution is still pending because the command approval layer rejected the simulator run in this session.
+- Updated simulator and Quartus source lists for the new UDP RX RTL/model. Follow-up Questa runs passed before hardware compilation.
+
+## 2026-05-05 (round 22: UDP socket ingress hardware success)
+- Added periodic W5500 A PHY/socket-status refresh and delayed UDP socket open until `PHYCFGR.LNK=1`.
+- Recompiled and flashed SOF checksum `0x0850DD25`.
+- Round-22 SignalTap force capture `captures/stp/round22_udp_waitlink.csv` showed:
+  - `stp_b_status=0x22` (W5500 A socket 0 open in UDP mode)
+  - `stp_phy_cfgr=0xBF` (100M full-duplex link)
+  - `frames_ipv4=frames_udp_dport80=frames_demo_match=0x74`
+  - `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x74`
+  - `b_send_timeouts=0`
+  - A RX and B TX first 16 bytes both `FFFFFFFFFFFF00112233445508004500`
+- This proves the PC1-triggered UDP/80 demo path reaches W5500 A UDP RX, is reconstructed internally, matches the firewall rule, and completes W5500 B SENDs with no timeouts. Remaining validation is PC2 Wireshark/dashboard visibility.

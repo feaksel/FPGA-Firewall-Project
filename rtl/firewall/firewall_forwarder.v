@@ -23,6 +23,13 @@ module firewall_forwarder #(
     output wire [31:0] rx_count,
     output wire [31:0] allow_count,
     output wire [31:0] drop_count,
+    output reg  [31:0] rule_allow80_count,
+    output reg  [31:0] rule_allow5001_count,
+    output reg  [31:0] rule_drop5002_count,
+    output reg  [31:0] rule_content_block_count,
+    output reg  [31:0] rule_default_drop_count,
+    output reg  [31:0] sig_file_count,
+    output reg  [31:0] sig_sine_count,
     output reg         last_action_allow,
     output reg  [3:0]  last_matched_rule_id,
     output wire        buffer_overflow
@@ -30,6 +37,10 @@ module firewall_forwarder #(
     localparam ST_WAIT_PACKET = 2'd0;
     localparam ST_FORWARD     = 2'd1;
     localparam ST_DROP        = 2'd2;
+    localparam [95:0] SIG_FW_DEMO_DROP = 96'h46572D44454D4F2D44524F50;
+    localparam [63:0] SIG_FW_BLOCK     = 64'h46572D424C4F434B;
+    localparam [63:0] SIG_FWFILE       = 64'h465746494C453100;
+    localparam [63:0] SIG_FWSINE       = 64'h465753494E453200;
 
     wire        hdr_valid;
     wire        is_ipv4;
@@ -66,15 +77,25 @@ module firewall_forwarder #(
     reg         fwd_decision_valid;
     reg         fwd_action_allow;
     reg  [3:0]  fwd_rule_id;
+    reg         hdr_seen;
+    reg         header_valid_for_policy;
+    reg         header_action_allow;
+    reg  [3:0]  header_rule_id;
+    reg         content_block_seen;
+    reg         file_sig_seen;
+    reg         sine_sig_seen;
+    reg [95:0]  payload_shift;
 
     wire rx_pkt_pulse;
     wire allow_pulse;
     wire drop_pulse;
+    wire [95:0] payload_shift_next;
 
     assign rx_pkt_pulse   = in_valid && in_ready && in_sop;
     assign allow_pulse    = fwd_decision_valid && fwd_action_allow;
     assign drop_pulse     = fwd_decision_valid && !fwd_action_allow;
     assign buffer_overflow = pktbuf_overflow;
+    assign payload_shift_next = {payload_shift[87:0], in_data};
 
     packet_buffer #(
         .MAX_PKT_BYTES(MAX_PKT_BYTES)
@@ -165,6 +186,21 @@ module firewall_forwarder #(
             fwd_decision_valid   <= 1'b0;
             fwd_action_allow     <= 1'b0;
             fwd_rule_id          <= 4'hF;
+            hdr_seen             <= 1'b0;
+            header_valid_for_policy <= 1'b0;
+            header_action_allow  <= 1'b0;
+            header_rule_id       <= 4'hF;
+            content_block_seen   <= 1'b0;
+            file_sig_seen        <= 1'b0;
+            sine_sig_seen        <= 1'b0;
+            payload_shift        <= 96'd0;
+            rule_allow80_count   <= 32'd0;
+            rule_allow5001_count <= 32'd0;
+            rule_drop5002_count  <= 32'd0;
+            rule_content_block_count <= 32'd0;
+            rule_default_drop_count <= 32'd0;
+            sig_file_count       <= 32'd0;
+            sig_sine_count       <= 32'd0;
         end else begin
             rd_start <= 1'b0;
             discard  <= 1'b0;
@@ -182,11 +218,31 @@ module firewall_forwarder #(
                 fwd_dst_ip        <= 32'd0;
                 fwd_src_port      <= 16'd0;
                 fwd_dst_port      <= 16'd0;
+                hdr_seen          <= 1'b0;
+                header_valid_for_policy <= 1'b0;
+                header_action_allow <= 1'b0;
+                header_rule_id    <= 4'hF;
+                content_block_seen <= 1'b0;
+                file_sig_seen     <= 1'b0;
+                sine_sig_seen     <= 1'b0;
+                payload_shift     <= 96'd0;
             end
 
             if (in_valid && in_ready) begin
                 fwd_current_idx = in_sop ? 8'd0 : (fwd_byte_idx + 8'd1);
                 fwd_byte_idx   <= fwd_current_idx;
+
+                if (fwd_current_idx >= 8'd42) begin
+                    payload_shift <= payload_shift_next;
+                    if (payload_shift_next[63:0] == SIG_FW_BLOCK)
+                        content_block_seen <= 1'b1;
+                    if (payload_shift_next == SIG_FW_DEMO_DROP)
+                        content_block_seen <= 1'b1;
+                    if (payload_shift_next[63:0] == SIG_FWFILE)
+                        file_sig_seen <= 1'b1;
+                    if (payload_shift_next[63:0] == SIG_FWSINE)
+                        sine_sig_seen <= 1'b1;
+                end
 
                 case (fwd_current_idx)
                     8'd12: fwd_ethertype[15:8] <= in_data;
@@ -206,82 +262,94 @@ module firewall_forwarder #(
                     8'd36: fwd_dst_port[15:8]  <= in_data;
                     8'd37: begin
                         fwd_dst_port[7:0] <= in_data;
-                        fwd_decision_valid <= 1'b1;
-                        pkt_decision_seen  <= 1'b1;
+                        hdr_seen           <= 1'b1;
 
                         if ((fwd_ethertype == 16'h0800) &&
                             (fwd_version_ihl == 8'h45) &&
                             ((fwd_protocol == 8'h06) || (fwd_protocol == 8'h11))) begin
+                            header_valid_for_policy <= 1'b1;
                             if ((fwd_protocol == 8'h11) &&
                                 ((fwd_src_ip & 32'hFFFFFF00) == 32'hC0A80100) &&
                                 (fwd_dst_ip == 32'hC0A80101) &&
                                 ({fwd_dst_port[15:8], in_data} == 16'd80)) begin
-                                fwd_action_allow     <= 1'b1;
-                                fwd_rule_id          <= 4'd0;
-                                pkt_action_allow     <= 1'b1;
-                                pkt_rule_id          <= 4'd0;
-                                last_action_allow    <= 1'b1;
-                                last_matched_rule_id <= 4'd0;
+                                header_action_allow <= 1'b1;
+                                header_rule_id      <= 4'd0;
                             end else if ((fwd_protocol == 8'h06) &&
                                          ({fwd_dst_port[15:8], in_data} == 16'd23)) begin
-                                fwd_action_allow     <= 1'b0;
-                                fwd_rule_id          <= 4'd1;
-                                pkt_action_allow     <= 1'b0;
-                                pkt_rule_id          <= 4'd1;
-                                last_action_allow    <= 1'b0;
-                                last_matched_rule_id <= 4'd1;
+                                header_action_allow <= 1'b0;
+                                header_rule_id      <= 4'd1;
                             end else if ((fwd_protocol == 8'h06) &&
                                          ((fwd_src_ip & 32'hFF000000) == 32'h0A000000) &&
                                          ({fwd_dst_port[15:8], in_data} == 16'd22)) begin
-                                fwd_action_allow     <= 1'b1;
-                                fwd_rule_id          <= 4'd2;
-                                pkt_action_allow     <= 1'b1;
-                                pkt_rule_id          <= 4'd2;
-                                last_action_allow    <= 1'b1;
-                                last_matched_rule_id <= 4'd2;
+                                header_action_allow <= 1'b1;
+                                header_rule_id      <= 4'd2;
+                            end else if ((fwd_protocol == 8'h11) &&
+                                         ((fwd_src_ip & 32'hFFFFFF00) == 32'hC0A80100) &&
+                                         (fwd_dst_ip == 32'hC0A80101) &&
+                                         ({fwd_dst_port[15:8], in_data} == 16'd5001)) begin
+                                header_action_allow <= 1'b1;
+                                header_rule_id      <= 4'd3;
                             end else if ((fwd_protocol == 8'h11) &&
                                          ({fwd_dst_port[15:8], in_data} == 16'd5002)) begin
-                                fwd_action_allow     <= 1'b0;
-                                fwd_rule_id          <= 4'd4;
-                                pkt_action_allow     <= 1'b0;
-                                pkt_rule_id          <= 4'd4;
-                                last_action_allow    <= 1'b0;
-                                last_matched_rule_id <= 4'd4;
-                            end else if (fwd_protocol == 8'h11) begin
-                                fwd_action_allow     <= 1'b1;
-                                fwd_rule_id          <= 4'd3;
-                                pkt_action_allow     <= 1'b1;
-                                pkt_rule_id          <= 4'd3;
-                                last_action_allow    <= 1'b1;
-                                last_matched_rule_id <= 4'd3;
+                                header_action_allow <= 1'b0;
+                                header_rule_id      <= 4'd4;
                             end else begin
-                                fwd_action_allow     <= 1'b0;
-                                fwd_rule_id          <= 4'hF;
-                                pkt_action_allow     <= 1'b0;
-                                pkt_rule_id          <= 4'hF;
-                                last_action_allow    <= 1'b0;
-                                last_matched_rule_id <= 4'hF;
+                                header_action_allow <= 1'b0;
+                                header_rule_id      <= 4'hF;
                             end
                         end else begin
-                            fwd_action_allow     <= 1'b0;
-                            fwd_rule_id          <= 4'hE;
-                            pkt_action_allow     <= 1'b0;
-                            pkt_rule_id          <= 4'hE;
-                            last_action_allow    <= 1'b0;
-                            last_matched_rule_id <= 4'hE;
+                            header_valid_for_policy <= 1'b0;
+                            header_action_allow <= 1'b0;
+                            header_rule_id      <= 4'hE;
                         end
                     end
                 endcase
 
-                if (in_eop && (fwd_current_idx < 8'd37)) begin
+                if (in_eop) begin
                     fwd_decision_valid   <= 1'b1;
-                    fwd_action_allow     <= 1'b0;
-                    fwd_rule_id          <= 4'hE;
                     pkt_decision_seen    <= 1'b1;
-                    pkt_action_allow     <= 1'b0;
-                    pkt_rule_id          <= 4'hE;
-                    last_action_allow    <= 1'b0;
-                    last_matched_rule_id <= 4'hE;
+
+                    if ((fwd_current_idx < 8'd37) || !hdr_seen || !header_valid_for_policy) begin
+                        fwd_action_allow     <= 1'b0;
+                        fwd_rule_id          <= 4'hE;
+                        pkt_action_allow     <= 1'b0;
+                        pkt_rule_id          <= 4'hE;
+                        last_action_allow    <= 1'b0;
+                        last_matched_rule_id <= 4'hE;
+                        rule_default_drop_count <= rule_default_drop_count + 32'd1;
+                    end else if (content_block_seen ||
+                                 ((fwd_current_idx >= 8'd42) &&
+                                  ((payload_shift_next[63:0] == SIG_FW_BLOCK) ||
+                                   (payload_shift_next == SIG_FW_DEMO_DROP)))) begin
+                        fwd_action_allow     <= 1'b0;
+                        fwd_rule_id          <= 4'd5;
+                        pkt_action_allow     <= 1'b0;
+                        pkt_rule_id          <= 4'd5;
+                        last_action_allow    <= 1'b0;
+                        last_matched_rule_id <= 4'd5;
+                        rule_content_block_count <= rule_content_block_count + 32'd1;
+                    end else begin
+                        fwd_action_allow     <= header_action_allow;
+                        fwd_rule_id          <= header_rule_id;
+                        pkt_action_allow     <= header_action_allow;
+                        pkt_rule_id          <= header_rule_id;
+                        last_action_allow    <= header_action_allow;
+                        last_matched_rule_id <= header_rule_id;
+                        case (header_rule_id)
+                            4'd0: rule_allow80_count <= rule_allow80_count + 32'd1;
+                            4'd3: rule_allow5001_count <= rule_allow5001_count + 32'd1;
+                            4'd4: rule_drop5002_count <= rule_drop5002_count + 32'd1;
+                            4'hF: rule_default_drop_count <= rule_default_drop_count + 32'd1;
+                            default: begin end
+                        endcase
+                    end
+
+                    if (file_sig_seen ||
+                        ((fwd_current_idx >= 8'd42) && (payload_shift_next[63:0] == SIG_FWFILE)))
+                        sig_file_count <= sig_file_count + 32'd1;
+                    if (sine_sig_seen ||
+                        ((fwd_current_idx >= 8'd42) && (payload_shift_next[63:0] == SIG_FWSINE)))
+                        sig_sine_count <= sig_sine_count + 32'd1;
                 end
             end
 
@@ -291,7 +359,7 @@ module firewall_forwarder #(
                 pkt_rule_id          <= matched_rule_id;
                 last_action_allow    <= action_allow;
                 last_matched_rule_id <= matched_rule_id;
-            end else if (parse_error) begin
+            end else if (1'b0 && parse_error) begin
                 pkt_decision_seen    <= 1'b1;
                 pkt_action_allow     <= 1'b0;
                 pkt_rule_id          <= 4'hE;

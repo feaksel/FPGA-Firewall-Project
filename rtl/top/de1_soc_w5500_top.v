@@ -36,6 +36,13 @@ module de1_soc_w5500_top (
     wire [15:0] last_frame_len_bytes_a;
     wire [31:0] allow_count;
     wire [31:0] drop_count;
+    wire [31:0] rule_allow80_count;
+    wire [31:0] rule_allow5001_count;
+    wire [31:0] rule_drop5002_count;
+    wire [31:0] rule_content_block_count;
+    wire [31:0] rule_default_drop_count;
+    wire [31:0] sig_file_count;
+    wire [31:0] sig_sine_count;
     wire init_done_a;
     wire init_done_b;
     wire init_error_a;
@@ -187,6 +194,11 @@ module de1_soc_w5500_top (
     (* preserve, noprune *) reg [31:0]  stp_rx_stream_byte_count;
     (* preserve, noprune *) reg [7:0]   stp_phy_cfgr;
     (* preserve, noprune *) reg [31:0]  stp_phy_read_count;
+    (* preserve, noprune *) reg [31:0]  stp_rule_allow80;
+    (* preserve, noprune *) reg [31:0]  stp_rule_allow5001;
+    (* preserve, noprune *) reg [31:0]  stp_rule_drop5002;
+    (* preserve, noprune *) reg [31:0]  stp_rule_content_block;
+    (* preserve, noprune *) reg [31:0]  stp_rule_default_drop;
 
     always @(posedge CLOCK_50) begin
         stp_rx_data <= rx_frame_data;
@@ -233,6 +245,11 @@ module de1_soc_w5500_top (
         stp_rx_stream_byte_count <= rx_stream_byte_count_a;
         stp_phy_cfgr           <= phy_cfgr_a;
         stp_phy_read_count     <= phy_read_count_a;
+        stp_rule_allow80       <= rule_allow80_count;
+        stp_rule_allow5001     <= rule_allow5001_count;
+        stp_rule_drop5002      <= rule_drop5002_count;
+        stp_rule_content_block <= rule_content_block_count;
+        stp_rule_default_drop  <= rule_default_drop_count;
     end
 
     always @(posedge CLOCK_50 or negedge KEY[0]) begin
@@ -686,7 +703,6 @@ module de1_soc_w5500_top (
         end
     end
 
-    integer ck;
     always @(posedge CLOCK_50 or negedge rst_n) begin
         if (!rst_n) begin
             regen_frames_seen        <= 32'd0;
@@ -706,9 +722,22 @@ module de1_soc_w5500_top (
             frames_other_count       <= 32'd0;
             frames_udp_dport80_count <= 32'd0;
             frames_demo_match_count  <= 32'd0;
-            for (ck = 0; ck < 16; ck = ck + 1) begin
-                a_rx_ipv4_shadow[ck] <= 8'h00;
-            end
+            a_rx_ipv4_shadow[0]  <= 8'h00;
+            a_rx_ipv4_shadow[1]  <= 8'h00;
+            a_rx_ipv4_shadow[2]  <= 8'h00;
+            a_rx_ipv4_shadow[3]  <= 8'h00;
+            a_rx_ipv4_shadow[4]  <= 8'h00;
+            a_rx_ipv4_shadow[5]  <= 8'h00;
+            a_rx_ipv4_shadow[6]  <= 8'h00;
+            a_rx_ipv4_shadow[7]  <= 8'h00;
+            a_rx_ipv4_shadow[8]  <= 8'h00;
+            a_rx_ipv4_shadow[9]  <= 8'h00;
+            a_rx_ipv4_shadow[10] <= 8'h00;
+            a_rx_ipv4_shadow[11] <= 8'h00;
+            a_rx_ipv4_shadow[12] <= 8'h00;
+            a_rx_ipv4_shadow[13] <= 8'h00;
+            a_rx_ipv4_shadow[14] <= 8'h00;
+            a_rx_ipv4_shadow[15] <= 8'h00;
         end else if (rx_frame_valid && rx_frame_ready) begin
             if (rx_frame_sop)
                 rx_per_frame_byte_idx <= 16'd1;
@@ -998,6 +1027,13 @@ module de1_soc_w5500_top (
         .rx_count(rx_count),
         .allow_count(allow_count),
         .drop_count(drop_count),
+        .rule_allow80_count(rule_allow80_count),
+        .rule_allow5001_count(rule_allow5001_count),
+        .rule_drop5002_count(rule_drop5002_count),
+        .rule_content_block_count(rule_content_block_count),
+        .rule_default_drop_count(rule_default_drop_count),
+        .sig_file_count(sig_file_count),
+        .sig_sine_count(sig_sine_count),
         .last_rule_id(last_matched_rule_id),
         .last_action_allow(last_action_allow),
         .tx_error(1'b0),
@@ -1085,6 +1121,13 @@ module de1_soc_w5500_top (
         .rx_count(rx_count),
         .allow_count(allow_count),
         .drop_count(drop_count),
+        .rule_allow80_count(rule_allow80_count),
+        .rule_allow5001_count(rule_allow5001_count),
+        .rule_drop5002_count(rule_drop5002_count),
+        .rule_content_block_count(rule_content_block_count),
+        .rule_default_drop_count(rule_default_drop_count),
+        .sig_file_count(sig_file_count),
+        .sig_sine_count(sig_sine_count),
         .last_action_allow(last_action_allow),
         .last_matched_rule_id(last_matched_rule_id),
         .buffer_overflow(forwarder_overflow)

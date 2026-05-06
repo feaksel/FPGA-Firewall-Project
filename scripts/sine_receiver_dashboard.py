@@ -112,6 +112,14 @@ class SineState:
     def record_packet(self, pkt):
         now = time.time()
         with self.lock:
+            if Raw in pkt:
+                payload = bytes(pkt[Raw].load)
+                if b"FW-BLOCK" in payload or b"FW-DEMO-DROP" in payload:
+                    self.decoy_leaks += 1
+                    self.packet_marks.append({"kind": "leak", "seq": self.last_seq, "time": now})
+                    self.events.appendleft({"time": now, "kind": "LEAK", "detail": "blocked UDP marker reached PC2"})
+                    return
+
             if UDP in pkt and pkt[UDP].dport == self.file_port and Raw in pkt:
                 parsed = parse_sine_payload(bytes(pkt[Raw].load))
                 if parsed is None:
