@@ -2,8 +2,8 @@
 
 ## Open Bugs
 
-- **B-2026-05-06-01: File demo forwards only the final short chunk when using 512-byte file chunks.**
-  - Status: mitigated in scripts/docs; needs hardware re-test with the new safe sender default.
+- **B-2026-05-06-01: File demo forwards only the final short chunk, then no safe-size chunks, before forwarder byte-index fix.**
+  - Status: resolved in RTL and hardware on 2026-05-07.
   - Evidence:
     - PC1 tcpdump during the transfer showed the sender correctly emitted `84` UDP packets: `63` to UDP/5001 and `21` to UDP/5002.
     - PC2 capture `C:\Users\furka\Desktop\filesending1chunk.pcapng` contains only one UDP/5001 `FWFILE1\0` packet from the demo path.
@@ -28,6 +28,17 @@
     - User confirmed the new sender emits 348-byte UDP/5001 frames and short UDP/5002/content-block decoys on PC1 `en0`, but the slow `--decoys 0 --limit-chunks 4` PC2 probe still shows no UDP at all.
     - This rules out PC1 egress, oversized 604-byte chunks, and decoy/content-block side effects for the no-PC2 symptom.
     - Next split is hardware-internal: socket 1/UDP5001 A ingress versus parser/rule/forwarder/B-TX. Run continuous `file_sender.py --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0` and inspect UART/SignalTap counters.
+  - 2026-05-07 hardware root cause and fix:
+    - Clean post-reflash SignalTap before the fix showed W5500 A receiving the safe-size file chunks (`stp_regen_dst_port=0x1389`, `stp_last_frame_len=0x015C`, `rx_commit_count=0x81`) while W5500 B stayed at `b_buf_writes=b_send_issued=b_tx_count=0`.
+    - The break was inside `firewall_forwarder`: its rule-decision byte index was only 8 bits wide. A 348-byte synthesized file frame wraps that index after byte 255, so later payload bytes overwrite the saved Ethernet/IP/UDP header fields and the EOP decision drops an otherwise allowed UDP/5001 packet.
+    - Widened `fwd_byte_idx` and `fwd_current_idx` to 16 bits in `rtl/firewall/firewall_forwarder.v`.
+    - Expanded `w5500_udp_rx_adapter_tb` and `de1_soc_top_udp_socket_forward_tb` to the real file-demo payload size: `306` UDP payload bytes, `348` synthesized frame bytes.
+    - Recompiled and flashed SOF checksum `0x085D8724`.
+    - Post-fix SignalTap `captures/stp/file_probe_after_index_fix.csv` proved forwarding: `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x7D`, `b_send_timeouts=0`, `b_last_pkt_len=stp_last_frame_len=0x015C`, and A/B first 16 bytes matched.
+    - PC2-side Scapy/Npcap sniff on `Ethernet` captured `30` UDP/5001 packets in `12 s`, each with `306` payload bytes and the `FWFILE1\0` marker. This confirms the fixed image reaches PC2, not only W5500 B's internal SEND counter.
+  - Remaining validation:
+    - The continuous probe currently repeats the first selected chunks, so full SHA-256 completion still requires restarting PC1 with the full sender profile.
+    - Run the full `file_sender.py --decoys 1 --interval 0.10` proof and confirm PC2 reconstructs every allowed chunk while UDP/5002 and `FW-BLOCK` decoys do not leak.
 
 - **B-2026-05-03-01: A-triggered W5500 B transmit does not reliably show the intended demo frames on PC2.**
   - Status: resolved for the final demo architecture. MACRAW A ingress is legacy diagnostic evidence; the accepted hardware path is W5500 A UDP sockets -> FPGA policy/signature stream processing -> W5500 B TX. User bench confirmation after round 22 showed the PC2 dashboard and Wireshark receiving forwarded packets.

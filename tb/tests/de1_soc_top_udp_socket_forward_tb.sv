@@ -3,7 +3,7 @@
 module de1_soc_top_udp_socket_forward_tb;
     import fw_tb_pkg::*;
 
-    localparam int PAYLOAD_LEN = 64;
+    localparam int PAYLOAD_LEN = 306;
     localparam int EXPECTED_FRAME_LEN = 42 + PAYLOAD_LEN;
 
     logic clk;

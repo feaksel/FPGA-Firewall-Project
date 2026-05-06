@@ -35,6 +35,17 @@ INTERESTING = (
     "stp_frames_other",
     "stp_frames_udp_dport80",
     "stp_frames_demo_match",
+    "stp_last_rx_size",
+    "stp_last_frame_len",
+    "stp_rx_commit_count",
+    "stp_rx_stream_byte_count",
+    "stp_phy_cfgr",
+    "stp_phy_read_count",
+    "stp_rule_allow80",
+    "stp_rule_allow5001",
+    "stp_rule_drop5002",
+    "stp_rule_content_block",
+    "stp_rule_default_drop",
 )
 
 SUMMARY_SIGNALS = (
@@ -64,6 +75,17 @@ SUMMARY_SIGNALS = (
     "stp_frames_other[31..0]",
     "stp_frames_udp_dport80[31..0]",
     "stp_frames_demo_match[31..0]",
+    "stp_last_rx_size[15..0]",
+    "stp_last_frame_len[15..0]",
+    "stp_rx_commit_count[31..0]",
+    "stp_rx_stream_byte_count[31..0]",
+    "stp_phy_cfgr[7..0]",
+    "stp_phy_read_count[31..0]",
+    "stp_rule_allow80[31..0]",
+    "stp_rule_allow5001[31..0]",
+    "stp_rule_drop5002[31..0]",
+    "stp_rule_content_block[31..0]",
+    "stp_rule_default_drop[31..0]",
 )
 
 
@@ -244,10 +266,22 @@ def print_diagnosis(last: dict[str, str]) -> None:
         "IPv4 UDP dst=80 frames": "stp_frames_udp_dport80[31..0]",
         "Demo-match frames":      "stp_frames_demo_match[31..0]",
         "B TX count":             "stp_b_tx_count[31..0]",
+        "B last packet len":      "stp_b_last_pkt_len[15..0]",
         "B buf-writes":           "stp_b_buf_writes[31..0]",
         "B SEND issued":          "stp_b_send_issued[31..0]",
         "B SEND cleared":         "stp_b_send_cleared[31..0]",
         "B SEND timeouts":        "stp_b_send_timeouts[31..0]",
+        "Last RX size":           "stp_last_rx_size[15..0]",
+        "Last frame len":         "stp_last_frame_len[15..0]",
+        "RX commits":             "stp_rx_commit_count[31..0]",
+        "RX streamed bytes":      "stp_rx_stream_byte_count[31..0]",
+        "PHYCFGR":                "stp_phy_cfgr[7..0]",
+        "Observed UDP dst port":  "stp_regen_dst_port[15..0]",
+        "Rule UDP/80 allow":      "stp_rule_allow80[31..0]",
+        "Rule UDP/5001 allow":    "stp_rule_allow5001[31..0]",
+        "Rule UDP/5002 drop":     "stp_rule_drop5002[31..0]",
+        "Rule content block":     "stp_rule_content_block[31..0]",
+        "Rule default drop":      "stp_rule_default_drop[31..0]",
     }
     values: dict[str, int] = {}
     for label, key in counters.items():
@@ -264,13 +298,28 @@ def print_diagnosis(last: dict[str, str]) -> None:
     ipv6 = values.get("IPv6 frames")
     demo = values.get("Demo-match frames")
     btx = values.get("B TX count")
+    b_len = values.get("B last packet len")
     btw = values.get("B buf-writes")
+    last_len = values.get("Last frame len")
+    dst_port = values.get("Observed UDP dst port")
     if ipv4 == 0 and ipv6 and ipv6 > 0:
         print("  CONCLUSION: A is receiving IPv6 only. PC1 demo IPv4 frames are not reaching the W5500.")
         print("  Action: tcpdump on PC1 iface; confirm Mac is sending the demo frame and binding the right NIC.")
+    elif ipv4 and ipv4 > 0 and dst_port == 5001 and btx and btx > 0:
+        if last_len is not None and b_len is not None and last_len == b_len:
+            print("  CONCLUSION: UDP/5001 file/data frames are reaching A and B is sending the full frame length.")
+        else:
+            print("  CONCLUSION: UDP/5001 file/data frames are reaching A and B is sending, but length should be checked.")
+        print("  Action: if PC2 still sees nothing, debug PC2 capture interface, cable/link, or W5500-B PHY side.")
+    elif ipv4 and ipv4 > 0 and dst_port == 5001 and (not btx or btx == 0):
+        print("  CONCLUSION: UDP/5001 file/data frames are reaching A, but B never sends them.")
+        print("  Action: debug the forwarder/rule decision path; long-packet header state may be getting corrupted.")
     elif ipv4 and ipv4 > 0 and demo == 0:
-        print("  CONCLUSION: IPv4 frames are reaching A, but NONE match the demo profile (UDP dst=80).")
-        print("  Action: check sender script's dst port/proto; check W5500 isn't truncating header bytes.")
+        if dst_port is not None:
+            print(f"  CONCLUSION: IPv4 frames are reaching A. Observed UDP dst port is {dst_port}, not the legacy UDP/80 demo counter.")
+        else:
+            print("  CONCLUSION: IPv4 frames are reaching A, but NONE match the legacy UDP/80 demo counter.")
+        print("  Action: use B TX counters and rule counters, not only the UDP/80 demo counter, for UDP policy-gateway demos.")
     elif demo and demo > 0 and btw == 0:
         print("  CONCLUSION: demo IPv4/UDP-dst-80 frames seen at A, but B never started a TX-buffer write.")
         print("  Action: the gap is fifo / forwarder / packet_buffer. Trigger SignalTap on tx_to_b_valid edge.")

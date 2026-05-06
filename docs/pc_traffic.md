@@ -161,6 +161,36 @@ For SignalTap or UART debugging, keep the same probe alive continuously:
 sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0
 ```
 
+No-UART hardware check:
+
+Use normal mode first: `SW0=1`, `SW5=0`, `SW7=0`, `SW8=0`, `SW9=0`.
+
+| `SW[3:1]` | `HEX3..HEX0` | Expected during continuous 4-chunk probe |
+| --- | --- | --- |
+| `001` | `rx_count[15:0]` | rises if packets reach parser/forwarder |
+| `010` | `allow_count[15:0]` | rises for UDP/5001 allow |
+| `011` | `drop_count[15:0]` | stays flat for `--decoys 0` |
+| `101` | `tx_count_b[15:0]` | rises if W5500 B SEND completes |
+| `110` | last A RX size | `013A` for default file chunks |
+| `111` | last synthesized frame length | `015C` for default file chunks |
+
+If all normal-mode counters stay flat, switch briefly to A-ingress drain mode:
+`SW5=1`, `SW9=0`. This disables forwarding, so PC2 will not receive packets;
+use it only to prove W5500 A/socket 1 ingress.
+
+| `SW[3:1]` | `HEX3..HEX0` | Expected |
+| --- | --- | --- |
+| `001` | A streamed byte count | rises if A streams packet bytes |
+| `010` | A RX commit count | rises if socket packets are committed |
+| `011` | last RX size | `013A` |
+| `100` | last frame length | `015C` |
+
+Interpretation:
+- A-ingress drain counts stay flat: socket 1/UDP5001 is not receiving or not being polled.
+- A-ingress rises but normal `rx_count` stays flat: FIFO/forwarder ingress issue.
+- Normal `rx_count` and `allow_count` rise but `tx_count_b` stays flat: B TX handoff/SEND issue.
+- `tx_count_b` rises but PC2 sees nothing: PC2 interface/filter/cable or W5500-B PHY side.
+
 Then run the full proof:
 
 ```bash
@@ -409,6 +439,7 @@ Without UART, use three evidence sources:
 - PC1 sender counters from [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py)
 - PC2 receiver counters, missing-chunk report, and SHA-256 result from [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py)
 - FPGA board `HEX3..HEX0` and `LEDR` counters for RX/allow/drop state
+- SignalTap over USB-Blaster for internal W5500/socket/forwarder counters
 
 Wireshark on PC2 is the backup proof:
 
@@ -419,16 +450,32 @@ udp.port == 5001
 Blocked decoys should be absent on PC2:
 
 ```text
-tcp.port == 23
+udp.port == 5002
 ```
 
 ```text
-frame contains "FW-DECOY-DROP"
+frame contains "FW-BLOCK" || frame contains "FW-DEMO-DROP"
 ```
 
-This is enough for a packet-visible enforcement demo. For the strongest final
-demo, add UART so the browser dashboard can prove that UDP/5002 and content
-blocked packets were classified and dropped inside the FPGA.
+This is enough for a packet-visible enforcement demo. Without UART, SignalTap is
+the FPGA-side proof that UDP/5002 and content-blocked packets were classified
+and dropped inside the FPGA:
+
+```powershell
+cd C:\Users\furka\Projects\ELE432_ethernet
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_stp.exe' `
+  -t scripts\signaltap_capture_force.tcl `
+  quartus\de1_soc_w5500.stp `
+  captures\stp\file_probe_no_uart.csv 5
+py -3 scripts\inspect_signaltap_csv.py captures\stp\file_probe_no_uart.csv
+```
+
+The currently-fitted `.stp` already includes the essential no-UART debug nodes:
+`stp_last_rx_size`, `stp_last_frame_len`, `stp_rx_commit_count`,
+`stp_rx_stream_byte_count`, `stp_phy_cfgr`, and the B TX counters. If the newer
+`stp_rule_*` counters are added in the SignalTap GUI, rebuild Quartus and flash
+that matching SOF before capturing; SignalTap node membership is baked into the
+compiled image.
 
 ## Recommended sequence on bring-up day
 

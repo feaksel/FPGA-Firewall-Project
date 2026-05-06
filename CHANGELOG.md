@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 2026-05-07
+- Fixed the file-demo hardware forwarding failure for 348-byte UDP/5001 chunks.
+  - SignalTap before the fix showed W5500 A receiving UDP/5001 frames (`last_frame_len=0x015C`) while W5500 B stayed at `0` buffer writes/SENDs after a clean reflash.
+  - Root cause was an 8-bit byte index in `rtl/firewall/firewall_forwarder.v`; file-demo frames are longer than 255 bytes, so payload bytes after byte 255 wrapped the index and overwrote the saved Ethernet/IP/UDP header fields before the EOP rule decision.
+  - Widened the forwarder byte index/current-index registers to 16 bits so long packets keep their original parsed header state through EOP.
+- Expanded the UDP socket regression tests to use the real file-demo payload size:
+  - `w5500_udp_rx_adapter_tb`: socket 1 / UDP5001 with `306` payload bytes (`348` synthesized frame bytes).
+  - `de1_soc_top_udp_socket_forward_tb`: end-to-end UDP5001 forwarding with the same `306` payload bytes.
+- Verification after the fix:
+  - `w5500_udp_rx_adapter_tb`
+  - `de1_soc_top_udp_socket_forward_tb`
+  - `firewall_forwarder_tb`
+  - `adapter_firewall_integration_tb`
+  - `de1_soc_top_bypass_tb`
+  - `de1_soc_top_rule_regen_tb`
+- Recompiled Quartus successfully (`0` errors, `75` warnings, positive timing slack) and flashed SOF checksum `0x085D8724`.
+- Post-flash SignalTap `captures/stp/file_probe_after_index_fix.csv` proved the hardware path now forwards the file chunks:
+  - UDP dst port observed: `5001`
+  - `last_frame_len=0x015C`
+  - `b_last_pkt_len=0x015C`
+  - `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x7D`
+  - `b_send_timeouts=0`
+- PC2-side Npcap sniff on interface `Ethernet` captured `30` UDP/5001 packets in `12 s`; each had a `306`-byte `FWFILE1\0` payload, confirming the fixed image is visible to PC2.
+- Updated `scripts/inspect_signaltap_csv.py` so UDP/5001 file/data captures no longer get mislabeled as failing the legacy UDP/80 demo counter.
+
 ## 2026-05-06
 - Reworked `scripts/file_receiver.py` into a visual PC2 browser dashboard on port `8092` while preserving terminal-only mode via `--no-dashboard`.
   - Shows chunk progress, chunk-map buckets, missing chunk preview, duplicate count, leak count, expected/actual SHA-256, output path, and recent events.

@@ -65,8 +65,8 @@ module firewall_forwarder #(
     reg  [1:0]  state;
     reg         rd_start;
     reg         discard;
-    reg  [7:0]  fwd_byte_idx;
-    reg  [7:0]  fwd_current_idx;
+    reg  [15:0] fwd_byte_idx;
+    reg  [15:0] fwd_current_idx;
     reg  [15:0] fwd_ethertype;
     reg  [7:0]  fwd_version_ihl;
     reg  [7:0]  fwd_protocol;
@@ -210,7 +210,7 @@ module firewall_forwarder #(
                 pkt_decision_seen <= 1'b0;
                 pkt_action_allow  <= 1'b0;
                 pkt_rule_id       <= 4'hF;
-                fwd_byte_idx      <= 8'd0;
+                fwd_byte_idx      <= 16'd0;
                 fwd_ethertype     <= 16'd0;
                 fwd_version_ihl   <= 8'd0;
                 fwd_protocol      <= 8'd0;
@@ -229,10 +229,10 @@ module firewall_forwarder #(
             end
 
             if (in_valid && in_ready) begin
-                fwd_current_idx = in_sop ? 8'd0 : (fwd_byte_idx + 8'd1);
+                fwd_current_idx = in_sop ? 16'd0 : (fwd_byte_idx + 16'd1);
                 fwd_byte_idx   <= fwd_current_idx;
 
-                if (fwd_current_idx >= 8'd42) begin
+                if (fwd_current_idx >= 16'd42) begin
                     payload_shift <= payload_shift_next;
                     if (payload_shift_next[63:0] == SIG_FW_BLOCK)
                         content_block_seen <= 1'b1;
@@ -245,22 +245,22 @@ module firewall_forwarder #(
                 end
 
                 case (fwd_current_idx)
-                    8'd12: fwd_ethertype[15:8] <= in_data;
-                    8'd13: fwd_ethertype[7:0]  <= in_data;
-                    8'd14: fwd_version_ihl     <= in_data;
-                    8'd23: fwd_protocol        <= in_data;
-                    8'd26: fwd_src_ip[31:24]   <= in_data;
-                    8'd27: fwd_src_ip[23:16]   <= in_data;
-                    8'd28: fwd_src_ip[15:8]    <= in_data;
-                    8'd29: fwd_src_ip[7:0]     <= in_data;
-                    8'd30: fwd_dst_ip[31:24]   <= in_data;
-                    8'd31: fwd_dst_ip[23:16]   <= in_data;
-                    8'd32: fwd_dst_ip[15:8]    <= in_data;
-                    8'd33: fwd_dst_ip[7:0]     <= in_data;
-                    8'd34: fwd_src_port[15:8]  <= in_data;
-                    8'd35: fwd_src_port[7:0]   <= in_data;
-                    8'd36: fwd_dst_port[15:8]  <= in_data;
-                    8'd37: begin
+                    16'd12: fwd_ethertype[15:8] <= in_data;
+                    16'd13: fwd_ethertype[7:0]  <= in_data;
+                    16'd14: fwd_version_ihl     <= in_data;
+                    16'd23: fwd_protocol        <= in_data;
+                    16'd26: fwd_src_ip[31:24]   <= in_data;
+                    16'd27: fwd_src_ip[23:16]   <= in_data;
+                    16'd28: fwd_src_ip[15:8]    <= in_data;
+                    16'd29: fwd_src_ip[7:0]     <= in_data;
+                    16'd30: fwd_dst_ip[31:24]   <= in_data;
+                    16'd31: fwd_dst_ip[23:16]   <= in_data;
+                    16'd32: fwd_dst_ip[15:8]    <= in_data;
+                    16'd33: fwd_dst_ip[7:0]     <= in_data;
+                    16'd34: fwd_src_port[15:8]  <= in_data;
+                    16'd35: fwd_src_port[7:0]   <= in_data;
+                    16'd36: fwd_dst_port[15:8]  <= in_data;
+                    16'd37: begin
                         fwd_dst_port[7:0] <= in_data;
                         hdr_seen           <= 1'b1;
 
@@ -309,7 +309,7 @@ module firewall_forwarder #(
                     fwd_decision_valid   <= 1'b1;
                     pkt_decision_seen    <= 1'b1;
 
-                    if ((fwd_current_idx < 8'd37) || !hdr_seen || !header_valid_for_policy) begin
+                    if ((fwd_current_idx < 16'd37) || !hdr_seen || !header_valid_for_policy) begin
                         fwd_action_allow     <= 1'b0;
                         fwd_rule_id          <= 4'hE;
                         pkt_action_allow     <= 1'b0;
@@ -318,7 +318,7 @@ module firewall_forwarder #(
                         last_matched_rule_id <= 4'hE;
                         rule_default_drop_count <= rule_default_drop_count + 32'd1;
                     end else if (content_block_seen ||
-                                 ((fwd_current_idx >= 8'd42) &&
+                                 ((fwd_current_idx >= 16'd42) &&
                                   ((payload_shift_next[63:0] == SIG_FW_BLOCK) ||
                                    (payload_shift_next == SIG_FW_DEMO_DROP)))) begin
                         fwd_action_allow     <= 1'b0;
@@ -345,10 +345,10 @@ module firewall_forwarder #(
                     end
 
                     if (file_sig_seen ||
-                        ((fwd_current_idx >= 8'd42) && (payload_shift_next[63:0] == SIG_FWFILE)))
+                        ((fwd_current_idx >= 16'd42) && (payload_shift_next[63:0] == SIG_FWFILE)))
                         sig_file_count <= sig_file_count + 32'd1;
                     if (sine_sig_seen ||
-                        ((fwd_current_idx >= 8'd42) && (payload_shift_next[63:0] == SIG_FWSINE)))
+                        ((fwd_current_idx >= 16'd42) && (payload_shift_next[63:0] == SIG_FWSINE)))
                         sig_sine_count <= sig_sine_count + 32'd1;
                 end
             end

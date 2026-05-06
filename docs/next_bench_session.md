@@ -12,13 +12,13 @@ stream classification/signature matching, and W5500 B transmit.
 | PC1 normal UDP/static-ARP sender | OK. tcpdump repeatedly showed real unicast frames leaving `en0` for `02:00:00:de:ad:0a`. |
 | W5500 A PHY/link | OK. SignalTap readback showed `PHYCFGR=0xBF` -> 100M full duplex. |
 | W5500 A MACRAW for demo UDP/80 | Not reliable on this bench. It surfaced background traffic but not the verified demo unicast. |
-| W5500 A UDP socket ingress | OK. Round 22 proved UDP/80 reaches the FPGA stream path. |
-| FPGA stream path and W5500 B TX | OK. Round 22 showed matching A/B first bytes, B SEND clears, and zero timeouts. |
-| PC2 visibility | OK for the UDP socket path. User confirmed dashboard and Wireshark show packets arriving. |
+| W5500 A UDP socket ingress | OK. Round 22 proved UDP/80; 2026-05-07 SignalTap proved UDP/5001 file chunks with `last_frame_len=0x015C`. |
+| FPGA stream path and W5500 B TX | OK. Round 22 showed UDP/80 forwarding; 2026-05-07 fixed long UDP/5001 frames and proved B sends full `0x015C` chunks with zero timeouts. |
+| PC2 visibility | OK for the UDP socket path. User confirmed dashboard/Wireshark for UDP/80; 2026-05-07 Npcap sniff saw UDP/5001 `FWFILE1\0` chunks on PC2. |
 
 ## Final Demo Image
 
-The current flashed SOF checksum is `0x085DC65F` and includes:
+The current flashed SOF checksum is `0x085D8724` and includes:
 
 - W5500 A socket 0: UDP/80 allow/demo service.
 - W5500 A socket 1: UDP/5001 file/sine/data allow service.
@@ -33,10 +33,13 @@ The current flashed SOF checksum is `0x085DC65F` and includes:
   - `FWFILE1\0` -> file telemetry,
   - `FWSINE2\0` -> sine telemetry,
   - `FW-BLOCK` / `FW-DEMO-DROP` -> content-block override.
+- Forwarder long-frame fix: the policy byte index is 16 bits wide, so
+  file-demo frames longer than 255 bytes no longer corrupt the saved header
+  state before the EOP rule decision.
 
 ## Bench Protocol
 
-1. Use the already-flashed `0x085DC65F` image, or recompile/flash `build/quartus/de1_soc_w5500.sof` if RTL changes.
+1. Use the already-flashed `0x085D8724` image, or recompile/flash `build/quartus/de1_soc_w5500.sof` if RTL changes.
 2. Use normal forwarding mode:
    - `SW0=1`
    - `SW5=0`
@@ -106,6 +109,14 @@ Expected high-level evidence:
 - B buffer writes, SEND issued, SEND cleared, and B TX count rise for allowed packets.
 - B SEND timeouts stay at zero.
 
+No-UART note: the DE1-SoC USB-Blaster is enough for SignalTap, but it is not a
+USB serial bridge. If no TTL USB-UART adapter is available, leave dashboard
+`--uart` off and use this SignalTap capture plus the board HEX pages as the
+FPGA-side proof. The currently-fitted `.stp` may not include the newest
+`stp_rule_*` counters; it still includes the essential no-UART split points:
+`stp_last_rx_size`, `stp_last_frame_len`, `stp_rx_commit_count`,
+`stp_rx_stream_byte_count`, `stp_phy_cfgr`, and B TX counters.
+
 If new `stp_rule_*` nodes are added to the `.stp`, remember that SignalTap
 requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
 
@@ -133,6 +144,30 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   `--repeat 0` and capture UART/SignalTap. The key split is whether `rx_commit`
   and `U51`/`FIL` rise while B TX remains zero, or whether socket 1 never
   receives/commits at all.
+- If no USB-UART adapter is available, use the board HEX pages and SignalTap:
+  - Keep PC1 probe running:
+    `sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0`
+  - Normal mode: `SW0=1`, `SW5=0`, `SW7=0`, `SW8=0`, `SW9=0`.
+    - `SW[3:1]=001`: `rx_count[15:0]`; should rise if packets reach the parser/forwarder.
+    - `SW[3:1]=010`: `allow_count[15:0]`; should rise for UDP/5001 allow.
+    - `SW[3:1]=011`: `drop_count[15:0]`; should stay flat for the no-decoy probe.
+    - `SW[3:1]=101`: `tx_count_b[15:0]`; should rise if W5500 B completes SEND.
+    - `SW[3:1]=110`: last W5500 A RX size. For default file chunks expect `0x013A`
+      (`8 + 306` UDP socket record bytes).
+    - `SW[3:1]=111`: last synthesized frame length. For default file chunks expect
+      `0x015C` (`42 + 306` internal Ethernet/IPv4/UDP frame bytes).
+  - A-ingress-only mode: set `SW5=1` after the normal-mode check. This drains A
+    RX and disables forwarding, so PC2 will not see packets in this mode. Use it
+    only to prove whether W5500 A/socket 1 is receiving.
+    - `SW[3:1]=001`: A streamed byte count.
+    - `SW[3:1]=010`: A RX commit count.
+    - `SW[3:1]=011`: last RX size; expect `0x013A`.
+    - `SW[3:1]=100`: last frame length; expect `0x015C`.
+  - Interpretation:
+    - A-ingress counts stay flat: W5500 A socket 1 is not receiving/polling UDP/5001.
+    - A-ingress counts rise but normal `rx_count` stays flat: FIFO/forwarder ingress issue.
+    - `rx_count`/`allow_count` rise but `tx_count_b` stays flat: B TX handoff/SEND issue.
+    - `tx_count_b` rises but PC2/Wireshark sees nothing: PC2 NIC/filter/cable/B PHY side.
 - The payload waveform dashboard on `http://127.0.0.1:8090` shows the signed
   int16 sample values carried in UDP/5001 packets as dots on a moving time
   axis; missing packets leave visible blank intervals instead of being

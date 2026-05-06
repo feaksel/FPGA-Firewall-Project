@@ -346,7 +346,7 @@ Then open:
 http://127.0.0.1:8091
 ```
 
-Expected result: UDP `80` and UDP `5001` allowed counts increase, `Drop leaks` stays `0`, and the FPGA histogram shows `U80`, `U51`, `D52`, and `SIG` counts rising according to the sender profiles.
+Expected result: UDP `80` and UDP `5001` allowed counts increase, and `Drop leaks` stays `0`. If a TTL USB-UART adapter is connected, the FPGA histogram also shows `U80`, `U51`, `D52`, and `SIG` counts rising according to the sender profiles. Without UART, use the board `HEX3..HEX0` pages plus SignalTap over USB-Blaster for FPGA-side counters.
 
 If `All frames seen` rises but `Demo frames seen` stays `0`, summarize the capture:
 
