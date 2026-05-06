@@ -3,7 +3,8 @@
 module w5500_udp_rx_adapter_tb;
     import fw_tb_pkg::*;
 
-    localparam int SYNTH_FRAME_LEN = 42;
+    localparam int PAYLOAD_LEN = 64;
+    localparam int SYNTH_FRAME_LEN = 42 + PAYLOAD_LEN;
 
     logic clk;
     logic rst_n;
@@ -46,7 +47,7 @@ module w5500_udp_rx_adapter_tb;
         .RESET_RELEASE_CYCLES(4),
         .RX_POLL_WAIT_CYCLES(2),
         .SPI_CLK_DIV(2),
-        .MAX_FRAME_BYTES(128)
+        .MAX_FRAME_BYTES(512)
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
@@ -83,8 +84,8 @@ module w5500_udp_rx_adapter_tb;
     w5500_udp_rx_model #(
         .PACKET_FILE(UDP_ALLOW_MEM),
         .PACKET_LENGTH(UDP_ALLOW_LEN),
-        .PAYLOAD_LENGTH(0),
-        .PACKET_SOCKET(2)
+        .PAYLOAD_LENGTH(PAYLOAD_LEN),
+        .PACKET_SOCKET(1)
     ) u_w5500_model (
         .rst_n(rst_n),
         .w5500_reset_n(w5500_reset_n),
@@ -98,22 +99,26 @@ module w5500_udp_rx_adapter_tb;
         .saw_recv_cmd(saw_recv_cmd)
     );
 
-    function automatic [15:0] ipv4_check_zero_payload();
+    function automatic [15:0] ipv4_check(input int payload_len);
         logic [31:0] sum;
         logic [31:0] folded;
         begin
-            sum = 32'h00004500 + 32'h0000001c + 32'h00004011 +
+            sum = 32'h00004500 + {16'd0, 16'(28 + payload_len)} + 32'h00004011 +
                   32'h0000c0a8 + 32'h0000010a + 32'h0000c0a8 + 32'h00000101;
             folded = {16'd0, sum[15:0]} + {16'd0, sum[31:16]};
             folded = {16'd0, folded[15:0]} + {16'd0, folded[31:16]};
-            ipv4_check_zero_payload = ~folded[15:0];
+            ipv4_check = ~folded[15:0];
         end
     endfunction
 
     function automatic [7:0] expected_byte(input int idx);
         logic [15:0] ip_check;
+        logic [15:0] ip_total_len;
+        logic [15:0] udp_len;
         begin
-            ip_check = ipv4_check_zero_payload();
+            ip_check = ipv4_check(PAYLOAD_LEN);
+            ip_total_len = 16'(28 + PAYLOAD_LEN);
+            udp_len = 16'(8 + PAYLOAD_LEN);
             case (idx)
                 0, 1, 2, 3, 4, 5: expected_byte = 8'hff;
                 6:  expected_byte = 8'h00;
@@ -126,8 +131,8 @@ module w5500_udp_rx_adapter_tb;
                 13: expected_byte = 8'h00;
                 14: expected_byte = 8'h45;
                 15: expected_byte = 8'h00;
-                16: expected_byte = 8'h00;
-                17: expected_byte = 8'h1c;
+                16: expected_byte = ip_total_len[15:8];
+                17: expected_byte = ip_total_len[7:0];
                 18, 19, 20, 21: expected_byte = 8'h00;
                 22: expected_byte = 8'h40;
                 23: expected_byte = 8'h11;
@@ -144,12 +149,12 @@ module w5500_udp_rx_adapter_tb;
                 34: expected_byte = 8'h12;
                 35: expected_byte = 8'h34;
                 36: expected_byte = 8'h13;
-                37: expected_byte = 8'h8a;
-                38: expected_byte = 8'h00;
-                39: expected_byte = 8'h08;
+                37: expected_byte = 8'h89;
+                38: expected_byte = udp_len[15:8];
+                39: expected_byte = udp_len[7:0];
                 40: expected_byte = 8'h00;
                 41: expected_byte = 8'h00;
-                default: expected_byte = 8'h00;
+                default: expected_byte = ((idx - 42) & 8'hff) ^ 8'ha5;
             endcase
         end
     endfunction
@@ -204,13 +209,13 @@ module w5500_udp_rx_adapter_tb;
         expect_u32("udp_adapter.frame_count", frame_count, SYNTH_FRAME_LEN);
         expect_u32("udp_adapter.rx_commit_count", rx_commit_count, 32'd1);
         expect_u32("udp_adapter.rx_stream_byte_count", rx_stream_byte_count, SYNTH_FRAME_LEN);
-        expect_u16("udp_adapter.last_rx_size", last_rx_size_bytes, 16'd8);
+        expect_u16("udp_adapter.last_rx_size", last_rx_size_bytes, 16'(8 + PAYLOAD_LEN));
         expect_u16("udp_adapter.last_frame_len", last_frame_len_bytes, SYNTH_FRAME_LEN);
         expect_u8("udp_adapter.phy_cfgr", phy_cfgr_value, 8'hbf);
         expect_u8("udp_adapter.socket_mode", socket_mode_value, 8'h02);
         expect_u8("udp_adapter.socket_status", socket_status_value, 8'h22);
         expect_u32("udp_adapter.sipr", sipr_value, 32'hc0a80101);
-        expect_bit("udp_adapter.frame_src_port", frame_src_port, 1'b0);
+        expect_bit("udp_adapter.frame_src_port", frame_src_port, 1'b1);
 
         $display("PASS: w5500_udp_rx_adapter_tb");
         $finish;

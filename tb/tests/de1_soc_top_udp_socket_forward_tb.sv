@@ -3,6 +3,9 @@
 module de1_soc_top_udp_socket_forward_tb;
     import fw_tb_pkg::*;
 
+    localparam int PAYLOAD_LEN = 64;
+    localparam int EXPECTED_FRAME_LEN = 42 + PAYLOAD_LEN;
+
     logic clk;
     logic [3:0] key;
     logic [9:0] sw;
@@ -37,7 +40,8 @@ module de1_soc_top_udp_socket_forward_tb;
     w5500_udp_rx_model #(
         .PACKET_FILE(UDP_ALLOW_MEM),
         .PACKET_LENGTH(UDP_ALLOW_LEN),
-        .PAYLOAD_LENGTH(0)
+        .PAYLOAD_LENGTH(PAYLOAD_LEN),
+        .PACKET_SOCKET(1)
     ) u_a_model (
         .rst_n(key[0]),
         .w5500_reset_n(gpio_0[3]),
@@ -86,7 +90,7 @@ module de1_soc_top_udp_socket_forward_tb;
         expect_bit("top_udp_forward.init_error", ledr[1], 1'b0);
         expect_bit("top_udp_forward.saw_recv_a", saw_recv_cmd_a, 1'b1);
         expect_bit("top_udp_forward.saw_send_b", saw_send_cmd_b, 1'b1);
-        expect_u16("top_udp_forward.tx_frame_len", tx_frame_len_b, 16'd42);
+        expect_u16("top_udp_forward.tx_frame_len", tx_frame_len_b, EXPECTED_FRAME_LEN);
         expect_u32("top_udp_forward.tx_send_count", tx_send_count_b, 32'd1);
 
         u_b_model.expect_sent_byte(0, 8'hff);
@@ -97,7 +101,9 @@ module de1_soc_top_udp_socket_forward_tb;
         u_b_model.expect_sent_byte(30, 8'hc0);
         u_b_model.expect_sent_byte(33, 8'h01);
         u_b_model.expect_sent_byte(34, 8'h12);
-        u_b_model.expect_sent_byte(37, 8'h50);
+        u_b_model.expect_sent_byte(37, 8'h89);
+        u_b_model.expect_sent_byte(42, 8'ha5);
+        u_b_model.expect_sent_byte(43, 8'ha4);
 
         $display("PASS: de1_soc_top_udp_socket_forward_tb");
         $finish;

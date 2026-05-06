@@ -293,6 +293,12 @@ a probe. Then run the full proof with decoys:
 sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10
 ```
 
+For SignalTap or UART debugging, keep the small probe running continuously:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0
+```
+
 ### PC2: receiver side
 
 Connect W5500 B, the FPGA egress module, to PC2 Ethernet.

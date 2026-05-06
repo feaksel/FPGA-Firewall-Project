@@ -48,6 +48,8 @@ def main():
     )
     parser.add_argument("--interval", type=float, default=SAFE_INTERVAL_SEC, help="Seconds between UDP datagrams. Default is hardware-safe for the W5500/FPGA path.")
     parser.add_argument("--limit-chunks", type=int, default=0, help="Send only the first N file chunks; 0 sends the whole file.")
+    parser.add_argument("--repeat", type=int, default=1, help="Repeat the selected chunk set this many times; 0 repeats until Ctrl+C.")
+    parser.add_argument("--repeat-delay", type=float, default=0.5, help="Seconds to wait between repeated passes.")
     parser.add_argument("--file-id", type=int, default=1, help="16-bit file transfer id.")
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
@@ -67,6 +69,10 @@ def main():
         parser.error("--limit-chunks must be non-negative")
     if args.decoys < 0:
         parser.error("--decoys must be non-negative")
+    if args.repeat < 0:
+        parser.error("--repeat must be non-negative")
+    if args.repeat_delay < 0:
+        parser.error("--repeat-delay must be non-negative")
     if args.src_port < 1 or args.src_port > 65535:
         parser.error("--src-port must be 1..65535")
 
@@ -90,7 +96,8 @@ def main():
     max_synth_frame = synthesized_frame_len(max((len(chunk) for chunk in chunks), default=0))
     conservative_max_chunk = CONSERVATIVE_FPGA_FRAME_LIMIT - SYNTH_ETH_IPV4_UDP_BYTES - FILE_HEADER_BYTES
     total_datagrams = send_chunk_count * (1 + args.decoys)
-    estimated_duration = total_datagrams * args.interval
+    pass_duration = total_datagrams * args.interval
+    estimated_duration = None if args.repeat == 0 else (args.repeat * pass_duration) + max(args.repeat - 1, 0) * args.repeat_delay
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.src_ip, args.src_port))
@@ -99,7 +106,9 @@ def main():
     print(f"sha256={sha256_hex}")
     print(f"src={args.src_ip}:{args.src_port} dst={args.dst_ip}")
     print(f"chunk_size={args.chunk_size} synthesized_frame_max={max_synth_frame} bytes")
-    print(f"send_chunks={send_chunk_count}/{total_chunks} decoys_per_chunk={args.decoys} interval={args.interval:g}s estimated_duration={estimated_duration:.1f}s")
+    duration_text = "continuous" if estimated_duration is None else f"{estimated_duration:.1f}s"
+    repeat_text = "forever" if args.repeat == 0 else str(args.repeat)
+    print(f"send_chunks={send_chunk_count}/{total_chunks} decoys_per_chunk={args.decoys} interval={args.interval:g}s repeat={repeat_text} estimated_duration={duration_text}")
     if max_synth_frame > CONSERVATIVE_FPGA_FRAME_LIMIT:
         print(
             "WARNING: synthesized frames exceed the conservative 512-byte FPGA ingress limit. "
@@ -121,23 +130,32 @@ def main():
 
     sent_allowed = 0
     sent_decoys = 0
-    for chunk_index, chunk in enumerate(send_chunks):
-        payload = build_file_payload(args.file_id, chunk_index, total_chunks, len(data), sha256_hex, chunk)
-        sock.sendto(payload, (args.dst_ip, args.file_port))
-        sent_allowed += 1
-        time.sleep(args.interval)
+    pass_index = 0
+    try:
+        while args.repeat == 0 or pass_index < args.repeat:
+            for chunk_index, chunk in enumerate(send_chunks):
+                payload = build_file_payload(args.file_id, chunk_index, total_chunks, len(data), sha256_hex, chunk)
+                sock.sendto(payload, (args.dst_ip, args.file_port))
+                sent_allowed += 1
+                time.sleep(args.interval)
 
-        for decoy_index in range(args.decoys):
-            decoy_port, decoy_payload = build_decoy(
-                chunk_index * max(args.decoys, 1) + decoy_index,
-                args.file_port,
-                args.decoy_port,
-            )
-            sock.sendto(decoy_payload, (args.dst_ip, decoy_port))
-            sent_decoys += 1
-            time.sleep(args.interval)
+                for decoy_index in range(args.decoys):
+                    decoy_port, decoy_payload = build_decoy(
+                        chunk_index * max(args.decoys, 1) + decoy_index,
+                        args.file_port,
+                        args.decoy_port,
+                    )
+                    sock.sendto(decoy_payload, (args.dst_ip, decoy_port))
+                    sent_decoys += 1
+                    time.sleep(args.interval)
 
-    print(f"done: allowed_chunks={sent_allowed} decoys={sent_decoys}")
+            pass_index += 1
+            if args.repeat == 0 or pass_index < args.repeat:
+                time.sleep(args.repeat_delay)
+    except KeyboardInterrupt:
+        print()
+
+    print(f"done: passes={pass_index} allowed_chunks={sent_allowed} decoys={sent_decoys}")
 
 
 if __name__ == "__main__":

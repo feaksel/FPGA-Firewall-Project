@@ -24,6 +24,10 @@
     - Then run the full `--decoys 1 --interval 0.10` proof. Avoid the old `--interval 0.01` until the full path is shown stable.
     - Expected PC2 result: all chunks arrive, SHA-256 passes, UDP/5002 and `FW-BLOCK` decoys still do not leak.
     - If 512-byte chunks are desired for the final image, recompile/flash a proven 2048-byte ingress/FIFO/forwarder path and capture SignalTap counters for `last_frame_len`, `rx_commit_count`, `rule_allow5001`, and `b_tx_count`.
+  - 2026-05-06 follow-up:
+    - User confirmed the new sender emits 348-byte UDP/5001 frames and short UDP/5002/content-block decoys on PC1 `en0`, but the slow `--decoys 0 --limit-chunks 4` PC2 probe still shows no UDP at all.
+    - This rules out PC1 egress, oversized 604-byte chunks, and decoy/content-block side effects for the no-PC2 symptom.
+    - Next split is hardware-internal: socket 1/UDP5001 A ingress versus parser/rule/forwarder/B-TX. Run continuous `file_sender.py --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0` and inspect UART/SignalTap counters.
 
 - **B-2026-05-03-01: A-triggered W5500 B transmit does not reliably show the intended demo frames on PC2.**
   - Status: resolved for the final demo architecture. MACRAW A ingress is legacy diagnostic evidence; the accepted hardware path is W5500 A UDP sockets -> FPGA policy/signature stream processing -> W5500 B TX. User bench confirmation after round 22 showed the PC2 dashboard and Wireshark receiving forwarded packets.

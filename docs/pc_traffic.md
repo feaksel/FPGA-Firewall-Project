@@ -155,6 +155,12 @@ sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --lim
 Expected: PC2 shows four chunks and no leaks. SHA will not pass because this is
 only an allow-path probe.
 
+For SignalTap or UART debugging, keep the same probe alive continuously:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0
+```
+
 Then run the full proof:
 
 ```bash

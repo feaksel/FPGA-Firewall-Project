@@ -18,6 +18,8 @@
 - Changed `scripts/file_sender.py` default pacing from `0.01 s` to hardware-safe `0.10 s` per datagram and added `--limit-chunks` for staged PC2 bring-up.
   - Recommended first probe: `--decoys 0 --limit-chunks 4 --interval 0.10`.
   - Recommended full proof: `--decoys 1 --interval 0.10`.
+- Added `scripts/file_sender.py --repeat` / `--repeat-delay`; `--repeat 0` keeps the selected chunk probe running continuously for UART/SignalTap captures.
+- Updated `w5500_udp_rx_adapter_tb` and `de1_soc_top_udp_socket_forward_tb` to exercise socket 1 / UDP5001 with a non-empty payload instead of covering only the UDP80/zero-payload path.
 - Fixed the payload waveform dashboard x-axis so the live graph defaults to real packet-arrival time instead of drifting by mismatched payload sample-rate metadata.
   - One vertical waveform grid column is one wall-clock second.
   - Removed the fake green zero line when no samples are visible.
