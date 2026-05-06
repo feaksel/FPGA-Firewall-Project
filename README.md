@@ -254,10 +254,10 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
 This continuously sends:
-- allowed sine-wave packets on UDP destination port `5001`,
+- allowed payload-sample packets on UDP destination port `5001`,
 - blocked decoy packets on UDP destination port `5002` and/or `FW-BLOCK` content markers,
 - a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
-- a small default packet shape (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
+- a small default sine-shaped packet stream (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
 
 Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
 
@@ -345,7 +345,7 @@ http://127.0.0.1:8090
 ```
 
 The dashboard shows:
-- received sine samples as dots on a rolling wall-clock time axis,
+- received signed int16 payload samples as dots on a rolling wall-clock time axis,
 - packet-by-packet decision strip,
 - allowed packet count,
 - expected drop count,
@@ -360,6 +360,24 @@ allowed packets are missing, and `Leaks = 0`. The graph does not connect across
 missing packets, so dropped/missed intervals stay visually empty until the next
 allowed packet arrives at its later timestamp.
 
+The graph is payload-driven. The PC2 dashboard does not synthesize a sine wave;
+it decodes the signed 16-bit sample values carried inside each forwarded UDP
+`5001` packet and plots those values. That means the same dashboard can show a
+sine, square, triangle, saw, step pattern, noise, a custom value sequence, or
+5x7 text encoded as sample positions:
+
+```bash
+sudo python3 scripts/sine_sender.py --iface enX --wave sine --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave square --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave values --values "-28000 -28000 28000 28000 0 12000 24000 12000" --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave text --text "FPGA UDP" --sample-rate 210 --samples-per-packet 21 --packets-per-second 10
+```
+
+This is also the right foundation for a future FPGA value-threshold rule: the
+hardware can scan these sample bytes before forwarding and drop whole packets
+whose payload samples exceed a configured limit. PC2 would then show real blank
+intervals where those packets were cut by the FPGA policy engine.
+
 Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, event log, and rate graph without restarting the receiver process.
 
 If the button is not visible, stop and restart `sine_receiver_dashboard.py` once. The dashboard HTML is embedded in the Python process, so an already-running dashboard will keep serving the old page until the process restarts.
@@ -373,7 +391,7 @@ py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090 --lo
 ```
 
 ```bash
-sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --packets-per-second 5 --samples-per-packet 16 --sine-hz 1
+sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --wave sine --wave-hz 1 --packets-per-second 5 --samples-per-packet 16
 ```
 
 For the file/video checksum demo, start the receiver before PC1 starts sending:

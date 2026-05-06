@@ -8,6 +8,11 @@
   - Sample timestamps are reconstructed from packet sequence, sample rate, and samples per packet.
   - Missing packets leave visible empty time intervals; resumed packets appear at their later stream time rather than being connected across the gap.
   - The packets/sec chart now uses the same wall-clock sampling model.
+- Generalized `scripts/sine_sender.py` into a payload-waveform sender while keeping the existing `FWSINE2\0` marker for FPGA signature telemetry.
+  - Added `--wave sine|square|triangle|saw|step|noise|values|text`.
+  - Added `--values` / `--values-file` so the PC1 stream can carry arbitrary signed int16 sample sequences.
+  - Kept `--sine-hz` as a compatibility alias for `--wave-hz`.
+- Updated the sine dashboard wording and docs to state explicitly that PC2 plots the received payload sample values only. A square-wave packet stream now renders as a square wave, and missing/dropped packets produce real blank intervals.
 - Python compile checks pass for `file_receiver.py`, `sine_receiver_dashboard.py`, `file_sender.py`, and `sine_sender.py`.
 
 ## 2026-05-05 - UDP Policy Gateway Pivot And FPGA Signature Demo

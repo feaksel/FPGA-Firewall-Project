@@ -32,14 +32,14 @@ def parse_sine_payload(payload):
     if payload.startswith(MAGIC_V2):
         if len(payload) < HEADER_V2_LEN:
             return None
-        run_id, seq, sample_rate, sine_hz, sample_count = struct.unpack(
+        run_id, seq, sample_rate, wave_hz, sample_count = struct.unpack(
             "!IIHHH", payload[len(MAGIC_V2):HEADER_V2_LEN]
         )
         header_len = HEADER_V2_LEN
     elif payload.startswith(MAGIC_V1):
         if len(payload) < HEADER_V1_LEN:
             return None
-        seq, sample_rate, sine_hz, sample_count = struct.unpack("!IHHH", payload[len(MAGIC_V1):HEADER_V1_LEN])
+        seq, sample_rate, wave_hz, sample_count = struct.unpack("!IHHH", payload[len(MAGIC_V1):HEADER_V1_LEN])
         run_id = 0
         header_len = HEADER_V1_LEN
         legacy = True
@@ -57,7 +57,7 @@ def parse_sine_payload(payload):
         "legacy": legacy,
         "seq": seq,
         "sample_rate": sample_rate,
-        "sine_hz": sine_hz,
+        "wave_hz": wave_hz,
         "samples": samples,
     }
 
@@ -89,7 +89,7 @@ class SineState:
         self.last_seq = None
         self.last_seen = None
         self.sample_rate = 0
-        self.sine_hz = 0
+        self.wave_hz = 0
         self.sniff_error = ""
         self.last_rate_time = time.time()
         self.last_rate_packets = 0
@@ -186,7 +186,7 @@ class SineState:
                 self.allowed_packets += 1
                 self.last_seen = now
                 self.sample_rate = parsed["sample_rate"]
-                self.sine_hz = parsed["sine_hz"]
+                self.wave_hz = parsed["wave_hz"]
                 sample_count = max(len(parsed["samples"]), 1)
                 sample_rate = max(parsed["sample_rate"], 1)
                 if self.stream_epoch_anchor is None:
@@ -255,7 +255,7 @@ class SineState:
                 "last_age": last_age,
                 "packets_per_second": self.allowed_packets / elapsed,
                 "sample_rate": self.sample_rate,
-                "sine_hz": self.sine_hz,
+                "wave_hz": self.wave_hz,
                 "now": now,
                 "wave_window_sec": WAVE_WINDOW_SEC,
                 "rate_window_sec": RATE_WINDOW_SEC,
@@ -279,7 +279,7 @@ HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FPGA Firewall Sine Demo</title>
+<title>FPGA Payload Waveform Demo</title>
 <style>
 :root {
   --bg: #f4f6f8;
@@ -360,15 +360,15 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
 <header>
   <div class="head-row">
     <div>
-      <h1>FPGA Firewall Continuous Sine Demo</h1>
-      <div class="sub">PC1 sends an allowed sine stream plus blocked decoys. PC2 should see a clean live waveform and zero decoy leaks.</div>
+      <h1>FPGA Payload Waveform Demo</h1>
+      <div class="sub">PC1 sends signed int16 samples plus blocked decoys. PC2 plots only the sample values that survive the FPGA policy engine.</div>
     </div>
     <button id="resetButton" type="button">Restart dashboard</button>
   </div>
 </header>
 <main>
   <section class="flow">
-    <div class="node"><div class="label">PC1</div><div class="value">Sine + decoys</div></div>
+    <div class="node"><div class="label">PC1</div><div class="value">Samples + decoys</div></div>
     <div class="link"></div>
     <div class="node"><div class="label">W5500 A</div><div class="value">Ingress</div></div>
     <div class="link"></div>
@@ -376,7 +376,7 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
     <div class="link"></div>
     <div class="node"><div class="label">W5500 B</div><div class="value">Egress</div></div>
     <div class="link"></div>
-    <div class="node"><div class="label">PC2</div><div class="value">Waveform</div></div>
+    <div class="node"><div class="label">PC2</div><div class="value">Payload plot</div></div>
   </section>
   <section class="metrics">
     <div class="metric good"><div class="label">Allowed packets</div><div class="value" id="allowed">0</div></div>
@@ -390,7 +390,7 @@ canvas { width: 100%; display: block; border: 1px solid var(--line); border-radi
   </section>
   <section class="grid">
     <div class="panel">
-      <h2>Received Sine Wave</h2>
+      <h2>Received Payload Values</h2>
       <canvas id="wave" width="1200" height="360"></canvas>
       <div class="packet-strip" id="packetStrip"></div>
       <div class="decision-legend"><span class="allow-key">Allowed arrived</span><span class="drop-key">Expected decoy drop</span><span class="leak-key">Blocked traffic leaked</span><span class="miss-key">Sequence gap</span></div>
@@ -458,7 +458,7 @@ function drawWave(samples, now, windowSec) {
   }
   ctx.fillStyle = "#9eb3ca";
   ctx.font = "16px Segoe UI";
-  ctx.fillText("received sine samples over last " + Math.round(span) + " s", 12, 24);
+  ctx.fillText("received payload samples over last " + Math.round(span) + " s", 12, 24);
   ctx.fillText("-" + Math.round(span) + "s", 12, h - 10);
   ctx.fillText("now", w - 42, h - 10);
 }
@@ -523,7 +523,7 @@ async function refresh() {
   fields.lastSeq.textContent = data.last_seq;
   fields.runId.textContent = data.run_id;
   fields.ignored.textContent = data.ignored_packets;
-  fields.status.textContent = data.sample_rate ? `${data.sine_hz} Hz sine, sample rate ${data.sample_rate} Hz` : "Waiting for packets...";
+  fields.status.textContent = data.sample_rate ? `payload metadata ${data.wave_hz} Hz, sample rate ${data.sample_rate} Hz` : "Waiting for packets...";
   fields.error.textContent = data.sniff_error || "";
   fields.events.innerHTML = data.events.map(ev => {
     const cls = ev.kind === "LEAK" ? "leak" : "allow";
@@ -588,7 +588,7 @@ def sniff_worker(state, iface):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PC2 browser dashboard for the continuous sine-wave firewall demo.")
+    parser = argparse.ArgumentParser(description="PC2 browser dashboard for the FPGA payload-waveform demo.")
     parser.add_argument("--iface", required=True, help="Scapy interface connected to W5500 B / FPGA egress.")
     parser.add_argument("--file-port", type=int, default=DEFAULT_FILE_PORT)
     parser.add_argument("--decoy-every", type=int, default=4, help="Sender decoy cadence used to draw expected drop markers.")
@@ -607,7 +607,7 @@ def main():
     thread.start()
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"Sine receiver dashboard running at http://{args.host}:{args.port}")
+    print(f"Payload waveform dashboard running at http://{args.host}:{args.port}")
     print("Stop with Ctrl+C.")
     try:
         server.serve_forever()

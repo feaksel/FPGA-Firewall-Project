@@ -160,9 +160,9 @@ The receiver dashboard reports:
 
 The video version is chunked file transfer, not live streaming. The intentionally dropped frames are decoy/error traffic, not required media chunks, so the received video should play if every allowed chunk arrives.
 
-## Phase F: Continuous sine-wave demo
+## Phase F: Continuous payload-waveform demo
 
-For the live presentation, use the continuous sine-wave demo before or beside the file-transfer proof.
+For the live presentation, use the continuous payload-waveform demo before or beside the file-transfer proof.
 
 ## Phase F0: Simple continuous rule demo
 
@@ -254,7 +254,7 @@ py -3 .\scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng
 Topology:
 
 ```text
-PC1 sine sender -> W5500 A -> FPGA allow/drop -> W5500 B -> PC2 browser dashboard
+PC1 sample sender -> W5500 A -> FPGA allow/drop -> W5500 B -> PC2 browser dashboard
 ```
 
 Start PC2 first:
@@ -275,20 +275,42 @@ Start PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
-The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
+The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine-shaped sample values, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
 
 Expected result:
-- PC2 shows received sine samples as dots on a continuously moving time axis,
+- PC2 shows received signed int16 payload samples as dots on a continuously moving time axis,
 - allowed packet count increases,
 - the packet strip shows green allowed arrivals and faded red expected decoy drops,
 - packets/sec is nonzero,
 - missing sequence count stays low,
 - leak count stays `0`.
 
-The sine graph is intentionally point-based rather than line-connected. If an
+The waveform graph is intentionally point-based rather than line-connected. If an
 allowed packet is missed, that time interval has no dots. When packets resume,
 new dots appear at their later reconstructed stream time, so gaps stay visible
 instead of being hidden by a line drawn across the missing samples.
+
+This dashboard is not locally drawing a sine function. It plots only the signed
+16-bit values carried by received UDP/5001 payloads. The sender can therefore
+produce different shapes without changing the receiver:
+
+```bash
+sudo python3 scripts/sine_sender.py --iface enX --wave sine --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave square --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave triangle --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave saw --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave step --wave-hz 1 --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave values --values "-28000 -28000 28000 28000 0 12000 24000 12000" --packets-per-second 5
+sudo python3 scripts/sine_sender.py --iface enX --wave text --text "FPGA UDP" --sample-rate 210 --samples-per-packet 21 --packets-per-second 10
+```
+
+`--wave values` repeats the literal int16 sequence from `--values` or
+`--values-file`, so the demo can send arbitrary sample streams. `--wave text`
+encodes a 5x7 message as sample positions on the same value graph; it is still
+just signed int16 payload data, not a special receiver drawing mode. A later
+hardware threshold rule can scan these payload bytes before forwarding and drop
+packets containing samples above a configured value. In the browser this would
+show as real missing packet intervals, not a dashboard-side visual trick.
 
 The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings. By default the dashboard locks onto the first `FWSINE2` run it sees and ignores older `FWSINE1` packets or packets from a different run ID. This prevents mixed sender processes from repeatedly resetting the waveform.
 
@@ -309,7 +331,7 @@ py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090 --lo
 ```
 
 ```bash
-sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --packets-per-second 5 --samples-per-packet 16 --sine-hz 1
+sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --wave sine --wave-hz 1 --packets-per-second 5 --samples-per-packet 16
 ```
 
 With `--lock-run-id`, the dashboard ignores every other stream, including old `FWSINE1` packets and accidental extra senders.
@@ -320,10 +342,10 @@ The sender continuously interleaves blocked decoys:
 
 The allowed stream uses UDP destination port `5001`, matching the file-transfer allow rule.
 
-If the sine wave is too dense or too slow, tune PC1:
+If the waveform is too dense or too slow, tune PC1:
 
 ```powershell
-py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --sine-hz 1 --packets-per-second 3 --samples-per-packet 16
+py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --wave sine --wave-hz 1 --packets-per-second 3 --samples-per-packet 16
 ```
 
 Increase `--packets-per-second` gradually after the stable case works. W5500 B TX now uses burst TX-buffer writes in RTL, which removes the old byte-at-a-time payload-write bottleneck. The PC2 receiver can still show gaps if PC1 is sending multiple streams, if the sender rate is too high for the current full path, or if packet capture misses frames.
@@ -380,7 +402,7 @@ blocked packets were classified and dropped inside the FPGA.
 - [rule_demo_udp_socket_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_udp_socket_sender.py): canonical PC1 final-demo sender. Uses normal UDP sockets plus static ARP and cycles through UDP/80 allow, UDP/5001 allow, UDP/5002 drop, and content-block payload profiles.
 - [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for allowed packets, blocked-packet leak warnings, FPGA UART histograms, and `.pcapng` inspection with `--pcap`.
 - [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with visual browser dashboard, SHA-256 verification, completed-file preview, and interleaved decoys.
-- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 sine/data visualization with wall-clock sample dots, visible drop gaps, UDP/5002 decoys, and content-block decoys.
+- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 payload-sample visualization with sine/square/triangle/saw/step/noise/custom-value/text modes, wall-clock sample dots, visible drop gaps, UDP/5002 decoys, and content-block decoys.
 - [pcap_summary.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/pcap_summary.py): current pcap summary tool for UDP gateway markers.
 - [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): older quick pcap summary tool retained for bring-up/debug captures.
 - [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py): legacy raw-Ethernet/MACRAW diagnostic sender. It is not the final hardware demo path.

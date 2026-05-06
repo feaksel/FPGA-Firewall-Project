@@ -120,9 +120,15 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   shows chunk progress/missing chunks/leaks, previews the completed file when the
   browser supports the MIME type, and reports matching SHA-256 while decoys are
   dropped.
-- The sine dashboard on `http://127.0.0.1:8090` shows sample dots on a moving
-  time axis; missing packets leave visible blank intervals instead of being
+- The payload waveform dashboard on `http://127.0.0.1:8090` shows the signed
+  int16 sample values carried in UDP/5001 packets as dots on a moving time
+  axis; missing packets leave visible blank intervals instead of being
   connected across.
+- `scripts/sine_sender.py` can now generate `sine`, `square`, `triangle`,
+  `saw`, `step`, `noise`, literal `--wave values`, or 5x7 `--wave text`
+  streams. The receiver plots the received payload values only, so a square-wave
+  packet stream renders as a square wave and arbitrary values render as
+  themselves.
 
 ## If Something Fails
 
