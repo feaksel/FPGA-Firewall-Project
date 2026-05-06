@@ -283,7 +283,7 @@ Start PC1:
 py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 ```
 
-The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine-shaped sample values, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
+The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine-shaped sample values, `16` samples per packet, and `5` allowed packets/sec. The sender derives the default payload sample rate from the actual outgoing sample cadence, so the default is `80 Hz`. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
 
 Expected result:
 - PC2 shows received signed int16 payload samples as dots on a continuously moving time axis,
@@ -319,6 +319,13 @@ just signed int16 payload data, not a special receiver drawing mode. A later
 hardware threshold rule can scan these payload bytes before forwarding and drop
 packets containing samples above a configured value. In the browser this would
 show as real missing packet intervals, not a dashboard-side visual trick.
+
+The receiver's default `--time-mode arrival` uses real packet arrival cadence
+for the x-axis. One vertical grid column is one second, so a sample dot takes
+exactly one wall-clock second to move by one grid column. `--time-mode payload`
+is available for debugging payload metadata, but the live demo should use the
+default arrival mode because it stays visually correct even when packet rate and
+declared sample rate are not perfectly matched.
 
 The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings. By default the dashboard locks onto the first `FWSINE2` run it sees and ignores older `FWSINE1` packets or packets from a different run ID. This prevents mixed sender processes from repeatedly resetting the waveform.
 

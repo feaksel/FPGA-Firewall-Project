@@ -180,7 +180,7 @@ def main():
     parser.add_argument("--port", type=int, default=DEFAULT_FILE_PORT, help="Allowed UDP destination port.")
     parser.add_argument("--decoy-port", type=int, default=DEFAULT_DECOY_PORT)
     parser.add_argument("--w5500-mac", default=DEFAULT_W5500_A_MAC, help="W5500 A SHAR for setup hints.")
-    parser.add_argument("--sample-rate", type=int, default=200)
+    parser.add_argument("--sample-rate", type=int, default=None, help="Payload sample rate in Hz. Default is packets/sec * samples/packet so the dashboard time axis matches real time.")
     parser.add_argument("--wave", choices=WAVE_CHOICES, default="sine", help="Payload sample pattern to transmit.")
     parser.add_argument("--wave-hz", "--sine-hz", dest="wave_hz", type=int, default=1, help="Pattern frequency in Hz; --sine-hz is kept as a compatibility alias.")
     parser.add_argument("--amplitude", type=int, default=28000, help="Peak amplitude for generated waveforms, in signed int16 units.")
@@ -203,6 +203,8 @@ def main():
         parser.error("--packets-per-second must be greater than 0")
     if args.samples_per_packet <= 0 or args.samples_per_packet > 65535:
         parser.error("--samples-per-packet must be 1..65535")
+    if args.sample_rate is None:
+        args.sample_rate = int(round(args.packets_per_second * args.samples_per_packet))
     if args.sample_rate <= 0 or args.sample_rate > 65535:
         parser.error("--sample-rate must be 1..65535")
     if args.wave_hz < 0 or args.wave_hz > 65535:

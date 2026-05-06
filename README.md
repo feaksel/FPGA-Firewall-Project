@@ -381,6 +381,12 @@ sudo python3 scripts/sine_sender.py --iface enX --wave values --values "-28000 -
 sudo python3 scripts/sine_sender.py --iface enX --wave text --text "FPGA UDP" --sample-rate 210 --samples-per-packet 21 --packets-per-second 10
 ```
 
+The waveform x-axis defaults to real wall-clock packet cadence. One vertical
+grid column is one second, and the sender now defaults its payload sample rate
+to `packets-per-second * samples-per-packet` so the payload metadata also
+matches real time. The receiver no longer draws a fake green zero line when no
+samples are visible.
+
 This is also the right foundation for a future FPGA value-threshold rule: the
 hardware can scan these sample bytes before forwarding and drop whole packets
 whose payload samples exceed a configured limit. PC2 would then show real blank

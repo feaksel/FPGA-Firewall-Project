@@ -129,6 +129,9 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   int16 sample values carried in UDP/5001 packets as dots on a moving time
   axis; missing packets leave visible blank intervals instead of being
   connected across.
+- The waveform x-axis defaults to real packet-arrival time. One vertical grid
+  column is one second, and no fake zero line is drawn when samples are absent.
+  Keep receiver `--time-mode arrival` for the live demo.
 - `scripts/sine_sender.py` can now generate `sine`, `square`, `triangle`,
   `saw`, `step`, `noise`, literal `--wave values`, or 5x7 `--wave text`
   streams. The receiver plots the received payload values only, so a square-wave

@@ -24,7 +24,7 @@ HEADER_V2_LEN = len(MAGIC_V2) + 4 + 4 + 2 + 2 + 2
 DEFAULT_FILE_PORT = 5001
 RATE_SAMPLE_SEC = 0.5
 RATE_WINDOW_SEC = 30.0
-WAVE_WINDOW_SEC = 12.0
+WAVE_WINDOW_SEC = 10.0
 MAX_SAMPLE_POINTS = 6000
 
 
@@ -63,13 +63,25 @@ def parse_sine_payload(payload):
 
 
 class SineState:
-    def __init__(self, file_port, decoy_every, run_switch_idle_sec, accept_legacy, follow_new_runs, lock_run_id):
+    def __init__(
+        self,
+        file_port,
+        decoy_every,
+        run_switch_idle_sec,
+        accept_legacy,
+        follow_new_runs,
+        lock_run_id,
+        time_mode,
+        fallback_packets_per_second,
+    ):
         self.file_port = file_port
         self.decoy_every = decoy_every
         self.run_switch_idle_sec = run_switch_idle_sec
         self.accept_legacy = accept_legacy
         self.follow_new_runs = follow_new_runs
         self.lock_run_id = lock_run_id
+        self.time_mode = time_mode
+        self.fallback_packets_per_second = fallback_packets_per_second
         self.lock = threading.Lock()
         self.reset_unlocked()
 
@@ -94,6 +106,7 @@ class SineState:
         self.last_rate_time = time.time()
         self.last_rate_packets = 0
         self.stream_epoch_anchor = None
+        self.packet_interval_estimate = None
 
     def reset_stream_unlocked(self, now, run_id, reason):
         self.started_at = now
@@ -108,8 +121,39 @@ class SineState:
         self.last_rate_time = now
         self.last_rate_packets = 0
         self.stream_epoch_anchor = None
+        self.packet_interval_estimate = None
         self.run_id = run_id
         self.events.appendleft({"time": now, "kind": "SYNC", "detail": reason})
+
+    def update_packet_interval_unlocked(self, now, seq):
+        if self.last_seq is None or self.last_seen is None or seq <= self.last_seq:
+            return
+        seq_delta = seq - self.last_seq
+        observed = (now - self.last_seen) / max(seq_delta, 1)
+        if observed <= 0.001 or observed > 5.0:
+            return
+        if self.packet_interval_estimate is None:
+            self.packet_interval_estimate = observed
+        else:
+            self.packet_interval_estimate = (self.packet_interval_estimate * 0.85) + (observed * 0.15)
+
+    def sample_timestamps_unlocked(self, now, seq, sample_count, sample_rate):
+        sample_count = max(sample_count, 1)
+        sample_rate = max(sample_rate, 1)
+        payload_interval = sample_count / sample_rate
+
+        if self.time_mode == "payload":
+            if self.stream_epoch_anchor is None:
+                self.stream_epoch_anchor = now - (seq * payload_interval)
+            packet_time = self.stream_epoch_anchor + (seq * payload_interval)
+            return [packet_time + (sample_index / sample_rate) for sample_index in range(sample_count)]
+
+        fallback_interval = 1.0 / max(self.fallback_packets_per_second, 0.001)
+        packet_interval = self.packet_interval_estimate or fallback_interval
+        packet_interval = max(0.001, min(packet_interval, 5.0))
+        sample_spacing = packet_interval / sample_count
+        packet_start = now - packet_interval
+        return [packet_start + ((sample_index + 0.5) * sample_spacing) for sample_index in range(sample_count)]
 
     def reset(self):
         with self.lock:
@@ -177,24 +221,24 @@ class SineState:
                     self.events.appendleft({"time": now, "kind": "OLD", "detail": f"ignored seq {seq} after {self.last_seq}"})
                     return
 
+                self.update_packet_interval_unlocked(now, seq)
+
                 if self.last_seq is not None and seq > self.last_seq + 1:
                     missing = seq - self.last_seq - 1
                     self.missing_packets += missing
                     self.packet_marks.append({"kind": "miss", "seq": seq, "time": now})
                     self.events.appendleft({"time": now, "kind": "MISS", "detail": f"{missing} sequence gap(s)"})
-                self.last_seq = seq
                 self.allowed_packets += 1
-                self.last_seen = now
                 self.sample_rate = parsed["sample_rate"]
                 self.wave_hz = parsed["wave_hz"]
                 sample_count = max(len(parsed["samples"]), 1)
                 sample_rate = max(parsed["sample_rate"], 1)
-                if self.stream_epoch_anchor is None:
-                    self.stream_epoch_anchor = now - ((seq * sample_count) / sample_rate)
-                packet_time = self.stream_epoch_anchor + ((seq * sample_count) / sample_rate)
-                for sample_index, sample in enumerate(parsed["samples"]):
+                timestamps = self.sample_timestamps_unlocked(now, seq, sample_count, sample_rate)
+                self.last_seq = seq
+                self.last_seen = now
+                for sample_time, sample in zip(timestamps, parsed["samples"]):
                     self.samples.append({
-                        "t": packet_time + (sample_index / sample_rate),
+                        "t": sample_time,
                         "v": sample,
                     })
                 self.packet_marks.append({"kind": "allow", "seq": seq, "time": now})
@@ -256,6 +300,8 @@ class SineState:
                 "packets_per_second": self.allowed_packets / elapsed,
                 "sample_rate": self.sample_rate,
                 "wave_hz": self.wave_hz,
+                "time_mode": self.time_mode,
+                "packet_interval_sec": self.packet_interval_estimate,
                 "now": now,
                 "wave_window_sec": WAVE_WINDOW_SEC,
                 "rate_window_sec": RATE_WINDOW_SEC,
@@ -430,17 +476,26 @@ function drawWave(samples, now, windowSec) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "#08111f";
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "#1a2d46";
+  const right = now || Date.now() / 1000;
+  const span = windowSec || 10;
+  const left = right - span;
   ctx.lineWidth = 1;
+  ctx.strokeStyle = "#1a2d46";
   for (let y = 0; y <= h; y += h / 4) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
     ctx.stroke();
   }
-  const right = now || Date.now() / 1000;
-  const span = windowSec || 12;
-  const left = right - span;
+  ctx.strokeStyle = "#223a5a";
+  const firstTick = Math.ceil(left);
+  for (let tick = firstTick; tick <= right; tick += 1) {
+    const x = ((tick - left) / span) * w;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
   const visible = (samples || []).filter(s => s.t >= left && s.t <= right);
   ctx.fillStyle = "#4fd1a5";
   visible.forEach(sample => {
@@ -449,16 +504,13 @@ function drawWave(samples, now, windowSec) {
     ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
   });
   if (!visible.length) {
-    ctx.strokeStyle = "#4fd1a5";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, h / 2);
-    ctx.lineTo(w, h / 2);
-    ctx.stroke();
+    ctx.fillStyle = "#9eb3ca";
+    ctx.font = "16px Segoe UI";
+    ctx.fillText("no received samples in this time window", 12, h / 2 - 8);
   }
   ctx.fillStyle = "#9eb3ca";
   ctx.font = "16px Segoe UI";
-  ctx.fillText("received payload samples over last " + Math.round(span) + " s", 12, 24);
+  ctx.fillText("received payload samples, 1 grid column = 1 s", 12, 24);
   ctx.fillText("-" + Math.round(span) + "s", 12, h - 10);
   ctx.fillText("now", w - 42, h - 10);
 }
@@ -523,7 +575,8 @@ async function refresh() {
   fields.lastSeq.textContent = data.last_seq;
   fields.runId.textContent = data.run_id;
   fields.ignored.textContent = data.ignored_packets;
-  fields.status.textContent = data.sample_rate ? `payload metadata ${data.wave_hz} Hz, sample rate ${data.sample_rate} Hz` : "Waiting for packets...";
+  const interval = data.packet_interval_sec ? `, packet interval ${data.packet_interval_sec.toFixed(3)} s` : "";
+  fields.status.textContent = data.sample_rate ? `payload metadata ${data.wave_hz} Hz, sample rate ${data.sample_rate} Hz, x-axis ${data.time_mode}${interval}` : "Waiting for packets...";
   fields.error.textContent = data.sniff_error || "";
   fields.events.innerHTML = data.events.map(ev => {
     const cls = ev.kind === "LEAK" ? "leak" : "allow";
@@ -596,12 +649,26 @@ def main():
     parser.add_argument("--follow-new-runs", action="store_true", help="Allow the dashboard to switch to another run ID after the idle timeout.")
     parser.add_argument("--lock-run-id", type=lambda value: int(value, 0), default=None, help="Only accept this 32-bit run ID, for example 0x4321.")
     parser.add_argument("--accept-legacy", action="store_true", help="Accept older FWSINE1 packets that do not carry a run ID.")
+    parser.add_argument("--time-mode", choices=["arrival", "payload"], default="arrival", help="arrival plots samples on real wall-clock packet cadence; payload uses declared sample_rate.")
+    parser.add_argument("--fallback-packets-per-second", type=float, default=5.0, help="Initial x-axis packet cadence before two packets have arrived.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8090)
     args = parser.parse_args()
 
+    if args.fallback_packets_per_second <= 0:
+        parser.error("--fallback-packets-per-second must be greater than 0")
+
     lock_run_id = None if args.lock_run_id is None else (args.lock_run_id & 0xFFFFFFFF)
-    state = SineState(args.file_port, args.decoy_every, args.run_switch_idle_sec, args.accept_legacy, args.follow_new_runs, lock_run_id)
+    state = SineState(
+        args.file_port,
+        args.decoy_every,
+        args.run_switch_idle_sec,
+        args.accept_legacy,
+        args.follow_new_runs,
+        lock_run_id,
+        args.time_mode,
+        args.fallback_packets_per_second,
+    )
     Handler.state = state
     thread = threading.Thread(target=sniff_worker, args=(state, args.iface), daemon=True)
     thread.start()
