@@ -44,6 +44,8 @@ Current status note, 2026-05-05 (final-demo pivot):
 - Added per-rule counters and UART telemetry fields for dashboard histograms: `U80`, `U51`, `D52`, `SIG`, `DEF`, `FIL`, and `SIN`.
 - Latest image compiled and flashed successfully with SOF checksum `0x085DC65F`.
 - Post-flash idle SignalTap capture confirmed W5500 A UDP socket status `0x22` and zero B SEND timeouts. Next hardware validation needs the final PC1 UDP policy sender active: allowed traffic must appear on PC2, blocked traffic must not leak, and FPGA counters must prove the drops happened.
+- UART dashboard wiring is now documented: `GPIO_0_D6` -> USB-UART `RXD`, ground -> ground, `115200 8N1`, dashboard `--uart COMx`. The dashboard rate graph now uses a wall-clock rolling window so it continues moving when traffic stops.
+- File receiver now has a visual browser dashboard with chunk map, SHA-256 status, leak count, and completed-file preview. Sine dashboard now plots sample dots on a rolling time axis so packet gaps remain visible.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -94,7 +96,7 @@ Current status note, 2026-05-05 (final-demo pivot):
 - [ ] Prove a fixed test frame transmitted from FPGA to PC2
 - [x] Prove one allowed PC1-to-PC2 forwarded packet on the UDP socket path
 - [ ] Prove one dropped packet with the final UDP/5002 or content-block policy image
-- [ ] Run the final file transfer and verify PC2 SHA-256 match while decoys are dropped
+- [ ] Run the final visual file transfer dashboard and verify PC2 SHA-256 match while decoys are dropped
 
 ## Current Debug Tasks
 

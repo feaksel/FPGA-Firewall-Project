@@ -71,26 +71,57 @@ Quartus pins now reserved for `GPIO_1[0..5]`:
 
 ## UART telemetry wiring
 
-The debug image now drives a transmit-only UART telemetry line:
+The final UDP policy gateway image drives a transmit-only UART telemetry line:
 
 - `GPIO_0[6]` / `GPIO_0_D6` = FPGA `UART_TX`
+- Quartus location: `PIN_AK19`
+- I/O standard: `3.3-V LVTTL`
 
-Wire this to a 3.3 V USB-UART adapter:
+Wire this to a **3.3 V TTL USB-UART adapter**:
 - FPGA `GPIO_0_D6` -> USB-UART `RX`
 - FPGA/DE1-SoC ground -> USB-UART `GND`
+
+Do not connect the USB-UART adapter's `5V` pin to the board. Do not use an
+old RS-232 serial cable; RS-232 voltage levels are not compatible with the
+FPGA GPIO header. The adapter's `TXD` pin is optional and is not used by the
+current design because telemetry is transmit-only from FPGA to PC.
 
 Default serial format:
 - `115200` baud
 - `8N1`
+- no flow control
 - transmit-only from FPGA
 
-Telemetry line format is compact ASCII:
+On Windows, plug in the USB-UART adapter and check Device Manager under
+`Ports (COM & LPT)` for the assigned port, for example `COM7`. The PC2
+dashboard reads the line stream with:
 
-```text
-RX=00000000 AL=00000000 DR=00000000 RFDA.
+```powershell
+py -3 scripts\rule_demo_receiver_dashboard.py --iface Ethernet --uart COM7 --port 8091
 ```
 
-Where `RX`, `AL`, and `DR` are receive/allow/drop counters, `R` is the last rule nibble, `A`/`D` is the last action, and the final character is `E` when the TX/error flag is asserted or `.` when clear.
+For a direct sanity check before starting the dashboard, open the COM port in
+PuTTY, TeraTerm, or `pyserial`'s miniterm at `115200 8N1`. The FPGA should print
+one compact ASCII telemetry line roughly every `0.5 s`.
+
+Current telemetry line format:
+
+```text
+RX=00000010 AL=00000008 DR=00000002 R=0A. U80=00000004 U51=00000004 D52=00000002 SIG=00000001 DEF=00000000 FIL=00000003 SIN=00000000
+```
+
+Field meanings:
+- `RX`: FPGA receive counter.
+- `AL`: aggregate allowed counter.
+- `DR`: aggregate dropped counter.
+- `R=<rule><action><status>`: last rule nibble, `A`/`D` action, and `E`/`.` status.
+- `U80`: UDP/80 allow hits.
+- `U51`: UDP/5001 allow hits.
+- `D52`: UDP/5002 drop hits.
+- `SIG`: payload-signature block hits (`FW-BLOCK` / `FW-DEMO-DROP`).
+- `DEF`: default-drop hits.
+- `FIL`: file marker hits (`FWFILE1\0`).
+- `SIN`: sine marker hits (`FWSINE2\0`).
 
 ## LED debug contract
 

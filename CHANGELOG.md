@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-05-06
+- Reworked `scripts/file_receiver.py` into a visual PC2 browser dashboard on port `8092` while preserving terminal-only mode via `--no-dashboard`.
+  - Shows chunk progress, chunk-map buckets, missing chunk preview, duplicate count, leak count, expected/actual SHA-256, output path, and recent events.
+  - Serves the reconstructed file at `/file` after completion and previews image/video/audio/text files in the browser when supported.
+- Reworked `scripts/sine_receiver_dashboard.py` so the sine display uses timestamped sample dots on a rolling wall-clock axis instead of plotting samples by array index.
+  - Sample timestamps are reconstructed from packet sequence, sample rate, and samples per packet.
+  - Missing packets leave visible empty time intervals; resumed packets appear at their later stream time rather than being connected across the gap.
+  - The packets/sec chart now uses the same wall-clock sampling model.
+- Python compile checks pass for `file_receiver.py`, `sine_receiver_dashboard.py`, `file_sender.py`, and `sine_sender.py`.
+
 ## 2026-05-05 - UDP Policy Gateway Pivot And FPGA Signature Demo
 - Reframed the hardware demo as a W5500-based UDP packet-policy gateway instead of a transparent L2/TCP firewall. The project name can remain, but the final docs now explicitly explain that the reliable hardware path is W5500 UDP sockets plus FPGA stream processing, while A-side MACRAW is retained as diagnostic history.
 - Extended W5500 A UDP ingress from one socket to three services:
@@ -27,6 +37,8 @@
   - `de1_soc_top_udp_socket_forward_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
 - Compiled and flashed the new Quartus image. Programmer reported SOF checksum `0x085DC65F`; the final recompile removed the earlier `ck` latch-inference warning in `de1_soc_w5500_top`.
 - Post-flash idle SignalTap capture `captures/stp/udp_policy_gateway_after_flash.csv` showed W5500 A socket status `0x22`, switches `001`, zero B SEND timeouts, and zero traffic counters; next capture must be run with the final PC1 UDP policy sender active.
+- Documented the live UART wiring path end to end: `GPIO_0_D6` / `GPIO_0[6]` FPGA `UART_TX` to a 3.3 V TTL USB-UART adapter `RXD`, common ground, `115200 8N1`, dashboard `--uart COMx`.
+- Changed and documented the rule dashboard rate graph so its x-axis is a real rolling time window instead of advancing only when allowed packets arrive.
 
 ## 2026-04-08
 - Created the repository structure from the project planning document

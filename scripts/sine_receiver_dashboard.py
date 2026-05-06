@@ -22,6 +22,10 @@ MAGIC_V2 = b"FWSINE2\0"
 HEADER_V1_LEN = len(MAGIC_V1) + 4 + 2 + 2 + 2
 HEADER_V2_LEN = len(MAGIC_V2) + 4 + 4 + 2 + 2 + 2
 DEFAULT_FILE_PORT = 5001
+RATE_SAMPLE_SEC = 0.5
+RATE_WINDOW_SEC = 30.0
+WAVE_WINDOW_SEC = 12.0
+MAX_SAMPLE_POINTS = 6000
 
 
 def parse_sine_payload(payload):
@@ -71,10 +75,10 @@ class SineState:
 
     def reset_unlocked(self):
         self.started_at = time.time()
-        self.samples = deque(maxlen=1024)
+        self.samples = deque(maxlen=MAX_SAMPLE_POINTS)
         self.events = deque(maxlen=80)
         self.packet_marks = deque(maxlen=120)
-        self.rate_history = deque(maxlen=120)
+        self.rate_history = deque(maxlen=int(RATE_WINDOW_SEC / RATE_SAMPLE_SEC) + 8)
         self.allowed_packets = 0
         self.expected_drops = 0
         self.decoy_leaks = 0
@@ -89,6 +93,7 @@ class SineState:
         self.sniff_error = ""
         self.last_rate_time = time.time()
         self.last_rate_packets = 0
+        self.stream_epoch_anchor = None
 
     def reset_stream_unlocked(self, now, run_id, reason):
         self.started_at = now
@@ -102,6 +107,7 @@ class SineState:
         self.last_seen = None
         self.last_rate_time = now
         self.last_rate_packets = 0
+        self.stream_epoch_anchor = None
         self.run_id = run_id
         self.events.appendleft({"time": now, "kind": "SYNC", "detail": reason})
 
@@ -181,7 +187,16 @@ class SineState:
                 self.last_seen = now
                 self.sample_rate = parsed["sample_rate"]
                 self.sine_hz = parsed["sine_hz"]
-                self.samples.extend(parsed["samples"])
+                sample_count = max(len(parsed["samples"]), 1)
+                sample_rate = max(parsed["sample_rate"], 1)
+                if self.stream_epoch_anchor is None:
+                    self.stream_epoch_anchor = now - ((seq * sample_count) / sample_rate)
+                packet_time = self.stream_epoch_anchor + ((seq * sample_count) / sample_rate)
+                for sample_index, sample in enumerate(parsed["samples"]):
+                    self.samples.append({
+                        "t": packet_time + (sample_index / sample_rate),
+                        "v": sample,
+                    })
                 self.packet_marks.append({"kind": "allow", "seq": seq, "time": now})
                 self.events.appendleft({"time": now, "kind": "ALLOW", "detail": f"seq {seq}"})
                 if self.decoy_every > 0 and seq % self.decoy_every == 0:
@@ -208,10 +223,13 @@ class SineState:
             self.other_packets += 1
 
     def update_rate(self, now):
-        if now - self.last_rate_time >= 0.5:
+        if now - self.last_rate_time >= RATE_SAMPLE_SEC:
             delta_packets = self.allowed_packets - self.last_rate_packets
             delta_time = now - self.last_rate_time
-            self.rate_history.append(delta_packets / max(delta_time, 0.001))
+            self.rate_history.append({
+                "t": now,
+                "v": delta_packets / max(delta_time, 0.001),
+            })
             self.last_rate_packets = self.allowed_packets
             self.last_rate_time = now
 
@@ -221,8 +239,10 @@ class SineState:
 
     def snapshot(self):
         with self.lock:
-            elapsed = max(time.time() - self.started_at, 0.001)
-            last_age = None if self.last_seen is None else time.time() - self.last_seen
+            now = time.time()
+            self.update_rate(now)
+            elapsed = max(now - self.started_at, 0.001)
+            last_age = None if self.last_seen is None else now - self.last_seen
             return {
                 "allowed_packets": self.allowed_packets,
                 "expected_drops": self.expected_drops,
@@ -236,6 +256,9 @@ class SineState:
                 "packets_per_second": self.allowed_packets / elapsed,
                 "sample_rate": self.sample_rate,
                 "sine_hz": self.sine_hz,
+                "now": now,
+                "wave_window_sec": WAVE_WINDOW_SEC,
+                "rate_window_sec": RATE_WINDOW_SEC,
                 "samples": list(self.samples),
                 "packet_marks": list(self.packet_marks),
                 "rate_history": list(self.rate_history),
@@ -401,7 +424,7 @@ const fields = {
   packetStrip: document.getElementById("packetStrip"),
 };
 
-function drawWave(samples) {
+function drawWave(samples, now, windowSec) {
   const w = canvas.width;
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
@@ -415,24 +438,32 @@ function drawWave(samples) {
     ctx.lineTo(w, y);
     ctx.stroke();
   }
-  ctx.strokeStyle = "#4fd1a5";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  if (!samples.length) {
+  const right = now || Date.now() / 1000;
+  const span = windowSec || 12;
+  const left = right - span;
+  const visible = (samples || []).filter(s => s.t >= left && s.t <= right);
+  ctx.fillStyle = "#4fd1a5";
+  visible.forEach(sample => {
+    const x = ((sample.t - left) / span) * w;
+    const y = h / 2 - (sample.v / 32768) * (h * 0.42);
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+  });
+  if (!visible.length) {
+    ctx.strokeStyle = "#4fd1a5";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
     ctx.moveTo(0, h / 2);
     ctx.lineTo(w, h / 2);
-  } else {
-    samples.forEach((sample, i) => {
-      const x = (i / Math.max(samples.length - 1, 1)) * w;
-      const y = h / 2 - (sample / 32768) * (h * 0.42);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
+    ctx.stroke();
   }
-  ctx.stroke();
+  ctx.fillStyle = "#9eb3ca";
+  ctx.font = "16px Segoe UI";
+  ctx.fillText("received sine samples over last " + Math.round(span) + " s", 12, 24);
+  ctx.fillText("-" + Math.round(span) + "s", 12, h - 10);
+  ctx.fillText("now", w - 42, h - 10);
 }
 
-function drawRate(history) {
+function drawRate(history, now, windowSec) {
   const w = rateCanvas.width;
   const h = rateCanvas.height;
   rateCtx.clearRect(0, 0, w, h);
@@ -446,17 +477,21 @@ function drawRate(history) {
     rateCtx.lineTo(w, y);
     rateCtx.stroke();
   }
-  const maxVal = Math.max(5, ...history);
+  const right = now || Date.now() / 1000;
+  const span = windowSec || 30;
+  const left = right - span;
+  const visible = (history || []).filter(s => s.t >= left && s.t <= right);
+  const maxVal = Math.max(5, ...visible.map(s => s.v));
   rateCtx.strokeStyle = "#66a7ff";
   rateCtx.lineWidth = 2;
   rateCtx.beginPath();
-  if (!history.length) {
+  if (!visible.length) {
     rateCtx.moveTo(0, h - 8);
     rateCtx.lineTo(w, h - 8);
   } else {
-    history.forEach((value, i) => {
-      const x = (i / Math.max(history.length - 1, 1)) * w;
-      const y = h - 10 - (value / maxVal) * (h - 24);
+    visible.forEach((sample, i) => {
+      const x = ((sample.t - left) / span) * w;
+      const y = h - 10 - (sample.v / maxVal) * (h - 24);
       if (i === 0) rateCtx.moveTo(x, y);
       else rateCtx.lineTo(x, y);
     });
@@ -464,7 +499,9 @@ function drawRate(history) {
   rateCtx.stroke();
   rateCtx.fillStyle = "#9eb3ca";
   rateCtx.font = "16px Segoe UI";
-  rateCtx.fillText("packets/sec", 12, 24);
+  rateCtx.fillText("packets/sec over last " + Math.round(span) + " s", 12, 24);
+  rateCtx.fillText("-" + Math.round(span) + "s", 12, h - 10);
+  rateCtx.fillText("now", w - 42, h - 10);
 }
 
 function renderPacketStrip(marks) {
@@ -492,8 +529,8 @@ async function refresh() {
     const cls = ev.kind === "LEAK" ? "leak" : "allow";
     return `<div class="event"><div class="note">${ev.time}</div><div class="kind ${cls}">${ev.kind}</div><div>${ev.detail}</div></div>`;
   }).join("") || `<p class="note">No packets yet.</p>`;
-  drawWave(data.samples);
-  drawRate(data.rate_history);
+  drawWave(data.samples, data.now, data.wave_window_sec);
+  drawRate(data.rate_history, data.now, data.rate_window_sec);
   renderPacketStrip(data.packet_marks);
 }
 

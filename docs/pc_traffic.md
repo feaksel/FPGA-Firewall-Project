@@ -26,6 +26,18 @@ py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7
 
 Omit `--uart COM7` if FPGA UART is not connected; PC2 packet evidence will still work, but the histogram will not show live FPGA counters.
 
+UART requires a separate 3.3 V TTL USB-UART adapter:
+
+```text
+DE1-SoC GPIO_0_D6 / GPIO_0[6]  ->  USB-UART RXD
+DE1-SoC GND                    ->  USB-UART GND
+```
+
+Use `115200 8N1`, no flow control. Do not connect adapter `5V`, and do not use
+RS-232 voltage levels. The dashboard's Live Result graph is time-based: it
+samples every `0.5 s` over a rolling `30 s` window, so the x-axis keeps moving
+even when no packets arrive.
+
 Start the PC1 sender:
 
 ```bash
@@ -127,15 +139,24 @@ py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
 Receiver on PC2:
 
 ```powershell
-py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4 --port 8092
 ```
 
-The receiver script reports:
+Open:
+
+```text
+http://127.0.0.1:8092
+```
+
+The receiver dashboard reports:
 - chunk progress,
+- a live chunk-map visualization,
 - missing chunks,
+- decoy/content-block leaks,
 - reconstructed file size,
 - expected and actual SHA-256,
-- final pass/fail.
+- final pass/fail,
+- and a browser preview for completed image/video/audio/text files when the MIME type is supported.
 
 The video version is chunked file transfer, not live streaming. The intentionally dropped frames are decoy/error traffic, not required media chunks, so the received video should play if every allowed chunk arrives.
 
@@ -257,12 +278,17 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
 The current default is tuned for consistency on the FPGA TX path: `1 Hz` sine, `200 Hz` sample rate, `16` samples per packet, and `5` allowed packets/sec. The sender saves `.sine_sender_state.json` by default, so stopping and restarting it continues the same run ID, sequence, and waveform phase. Use `--fresh-run` only when you intentionally want a new run.
 
 Expected result:
-- PC2 shows a continuously moving sine wave,
+- PC2 shows received sine samples as dots on a continuously moving time axis,
 - allowed packet count increases,
 - the packet strip shows green allowed arrivals and faded red expected decoy drops,
 - packets/sec is nonzero,
 - missing sequence count stays low,
 - leak count stays `0`.
+
+The sine graph is intentionally point-based rather than line-connected. If an
+allowed packet is missed, that time interval has no dots. When packets resume,
+new dots appear at their later reconstructed stream time, so gaps stay visible
+instead of being hidden by a line drawn across the missing samples.
 
 The **Restart dashboard** button clears the PC2-side view without restarting the sniffer process. Use it right before a recorded demo take or after changing sender settings. By default the dashboard locks onto the first `FWSINE2` run it sees and ignores older `FWSINE1` packets or packets from a different run ID. This prevents mixed sender processes from repeatedly resetting the waveform.
 
@@ -313,7 +339,8 @@ py -3.9 .\scripts\sine_sender.py --iface "Ethernet" --decoy-every 4
 
 ## No-UART telemetry option
 
-A USB-UART adapter is useful later, but it is not required for the next two-PC demo.
+A USB-UART adapter is useful for the final rule histogram, but it is not
+required for packet-only proof.
 
 Without UART, use three evidence sources:
 - PC1 sender counters from [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py)
@@ -336,7 +363,9 @@ tcp.port == 23
 frame contains "FW-DECOY-DROP"
 ```
 
-This is enough for the first real enforcement demo. UART remains a later convenience for making the browser dashboard read FPGA counters directly.
+This is enough for a packet-visible enforcement demo. For the strongest final
+demo, add UART so the browser dashboard can prove that UDP/5002 and content
+blocked packets were classified and dropped inside the FPGA.
 
 ## Recommended sequence on bring-up day
 
@@ -350,8 +379,8 @@ This is enough for the first real enforcement demo. UART remains a later conveni
 
 - [rule_demo_udp_socket_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_udp_socket_sender.py): canonical PC1 final-demo sender. Uses normal UDP sockets plus static ARP and cycles through UDP/80 allow, UDP/5001 allow, UDP/5002 drop, and content-block payload profiles.
 - [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for allowed packets, blocked-packet leak warnings, FPGA UART histograms, and `.pcapng` inspection with `--pcap`.
-- [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with SHA-256 verification and interleaved decoys.
-- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 sine/data visualization with UDP/5002 and/or content-block decoys.
+- [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with visual browser dashboard, SHA-256 verification, completed-file preview, and interleaved decoys.
+- [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 sine/data visualization with wall-clock sample dots, visible drop gaps, UDP/5002 decoys, and content-block decoys.
 - [pcap_summary.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/pcap_summary.py): current pcap summary tool for UDP gateway markers.
 - [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): older quick pcap summary tool retained for bring-up/debug captures.
 - [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py): legacy raw-Ethernet/MACRAW diagnostic sender. It is not the final hardware demo path.

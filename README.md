@@ -287,13 +287,26 @@ If the FPGA UART is wired to a PC COM port, add it for live rule histograms:
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7 --port 8091
 ```
 
+UART wiring uses a 3.3 V TTL USB-UART adapter:
+
+```text
+DE1-SoC GPIO_0_D6 / GPIO_0[6]  ->  USB-UART RXD
+DE1-SoC GND                    ->  USB-UART GND
+```
+
+Use `115200 8N1`, no flow control. Do not connect the adapter's `5V` pin and do
+not use an RS-232 serial cable. Windows shows the adapter as a `COM` port in
+Device Manager; replace `COM7` with the actual port. The FPGA sends one compact
+ASCII line about every `0.5 s` with `RX`, `AL`, `DR`, `U80`, `U51`, `D52`,
+`SIG`, `DEF`, `FIL`, and `SIN` fields for the dashboard histogram.
+
 If the dashboard stays empty, first list the exact Npcap interface names:
 
 ```powershell
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --list-ifaces
 ```
 
-The dashboard shows PC2-visible allowed packets, leak warnings, and FPGA UART rule counters when `--uart` is provided. If the PC2 packet counters stay at `0`, use a different `--iface`. You can also validate a Wireshark capture with:
+The dashboard shows PC2-visible allowed packets, leak warnings, and FPGA UART rule counters when `--uart` is provided. Its Live Result rate graph uses a real rolling time window, so the x-axis advances with wall-clock time and decays to zero when packets stop. If the PC2 packet counters stay at `0`, use a different `--iface`. You can also validate a Wireshark capture with:
 
 ```powershell
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --pcap C:\Users\furka\Desktop\wire2.pcapng
@@ -332,7 +345,7 @@ http://127.0.0.1:8090
 ```
 
 The dashboard shows:
-- received sine waveform,
+- received sine samples as dots on a rolling wall-clock time axis,
 - packet-by-packet decision strip,
 - allowed packet count,
 - expected drop count,
@@ -341,7 +354,11 @@ The dashboard shows:
 - run ID and ignored stale packet count,
 - decoy leak count.
 
-The expected result is a moving sine wave, green allowed packet marks, faded red expected-drop marks, and `Leaks = 0`.
+The expected result is a constantly moving time window with green sample dots,
+green allowed packet marks, faded red expected-drop marks, visible blank gaps if
+allowed packets are missing, and `Leaks = 0`. The graph does not connect across
+missing packets, so dropped/missed intervals stay visually empty until the next
+allowed packet arrives at its later timestamp.
 
 Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, event log, and rate graph without restarting the receiver process.
 
@@ -362,15 +379,24 @@ sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --packets-per-se
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
 ```powershell
-py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4 --port 8092
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8092
 ```
 
 What PC2 does:
 - listens for forwarded UDP port `5001` chunks,
 - reconstructs the file,
-- reports missing chunks,
+- shows a live chunk map and progress bar,
+- reports missing chunks and decoy leaks,
 - verifies SHA-256,
-- prints `PASS` when the reconstructed file matches PC1's original file.
+- writes the completed file to disk,
+- previews completed images/video/audio/text in the browser when the file type is supported,
+- reports `PASS` when the reconstructed file matches PC1's original file.
 
 Optional Wireshark checks on PC2:
 

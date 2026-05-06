@@ -66,6 +66,25 @@ The current flashed SOF checksum is `0x085DC65F` and includes:
    - allowed traffic: `udp.port == 80 || udp.port == 5001`
    - decoy leak check: `udp.port == 5002 || frame contains "FW-BLOCK" || frame contains "FW-DEMO-DROP"`
 
+## UART Adapter Wiring
+
+The dashboard's FPGA histogram needs a separate 3.3 V TTL USB-UART adapter.
+The DE1-SoC USB-Blaster/JTAG cable does not carry this UART.
+
+```text
+DE1-SoC GPIO_0_D6 / GPIO_0[6]  ->  USB-UART RXD
+DE1-SoC GND                    ->  USB-UART GND
+```
+
+Use `115200 8N1`, no flow control. Do not connect USB-UART `5V` to the board,
+and do not use an RS-232 serial adapter. The FPGA UART is transmit-only, so
+USB-UART `TXD` is not needed. In Windows Device Manager, use the assigned COM
+port in the dashboard command, for example `--uart COM7`.
+
+The dashboard line chart in the Live Result panel uses a rolling wall-clock
+window, not packet index. If traffic stops, the graph keeps moving and falls to
+zero instead of freezing on the last packet.
+
 ## SignalTap Proof
 
 Use force export first because the old trigger setup is still B-TX-oriented:
@@ -97,7 +116,13 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
 - PC2 does not see packets whose payload contains `FW-BLOCK` or `FW-DEMO-DROP`.
 - UART or SignalTap counters prove the blocked packets were seen and dropped by
   FPGA policy logic.
-- The file demo reconstructs with matching SHA-256 while decoys are dropped.
+- The file demo dashboard on `http://127.0.0.1:8092` reconstructs the real file,
+  shows chunk progress/missing chunks/leaks, previews the completed file when the
+  browser supports the MIME type, and reports matching SHA-256 while decoys are
+  dropped.
+- The sine dashboard on `http://127.0.0.1:8090` shows sample dots on a moving
+  time axis; missing packets leave visible blank intervals instead of being
+  connected across.
 
 ## If Something Fails
 
