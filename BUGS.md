@@ -20,6 +20,8 @@
     - Documented that `--chunk-size 420` is the largest safe file data size for a 512-byte internal-frame guard (`512 - 42 - 50`).
   - Next validation:
     - Re-run PC2 `file_receiver.py`, then PC1 `file_sender.py` with the new default or explicit `--chunk-size 256`.
+    - Start with `--decoys 0 --limit-chunks 4 --interval 0.10` to prove the allowed UDP/5001 path without burst pressure.
+    - Then run the full `--decoys 1 --interval 0.10` proof. Avoid the old `--interval 0.01` until the full path is shown stable.
     - Expected PC2 result: all chunks arrive, SHA-256 passes, UDP/5002 and `FW-BLOCK` decoys still do not leak.
     - If 512-byte chunks are desired for the final image, recompile/flash a proven 2048-byte ingress/FIFO/forwarder path and capture SignalTap counters for `last_frame_len`, `rx_commit_count`, `rule_allow5001`, and `b_tx_count`.
 

@@ -125,6 +125,10 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   and synthesized Ethernet/IP/UDP wrapper. If the flashed image/path still has a
   512-byte frame guard, full chunks are discarded and only the final short chunk
   reaches PC2.
+- Use file sender default `--interval 0.10` for hardware bring-up. First run
+  `--decoys 0 --limit-chunks 4` to prove allowed UDP/5001 chunks reach PC2,
+  then run the full `--decoys 1` checksum proof. The old `--interval 0.01` burst
+  can overrun the two-W5500 path and make PC2 appear silent.
 - The payload waveform dashboard on `http://127.0.0.1:8090` shows the signed
   int16 sample values carried in UDP/5001 packets as dots on a moving time
   axis; missing packets leave visible blank intervals instead of being

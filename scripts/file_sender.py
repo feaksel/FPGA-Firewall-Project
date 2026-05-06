@@ -12,6 +12,7 @@ FILE_HEADER_BYTES = len(MAGIC) + 2 + 2 + 2 + 4 + 32
 SYNTH_ETH_IPV4_UDP_BYTES = 42
 CONSERVATIVE_FPGA_FRAME_LIMIT = 512
 CONSERVATIVE_CHUNK_SIZE = 256
+SAFE_INTERVAL_SEC = 0.10
 DEFAULT_SRC_IP = "192.168.1.10"
 DEFAULT_DST_IP = "192.168.1.1"
 DEFAULT_W5500_A_MAC = "02:00:00:de:ad:0a"
@@ -45,7 +46,8 @@ def main():
         default=CONSERVATIVE_CHUNK_SIZE,
         help="Payload bytes per allowed file chunk. Default keeps synthesized FPGA frames below 512 bytes.",
     )
-    parser.add_argument("--interval", type=float, default=0.01, help="Seconds between UDP datagrams.")
+    parser.add_argument("--interval", type=float, default=SAFE_INTERVAL_SEC, help="Seconds between UDP datagrams. Default is hardware-safe for the W5500/FPGA path.")
+    parser.add_argument("--limit-chunks", type=int, default=0, help="Send only the first N file chunks; 0 sends the whole file.")
     parser.add_argument("--file-id", type=int, default=1, help="16-bit file transfer id.")
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
@@ -59,6 +61,12 @@ def main():
 
     if args.chunk_size <= 0:
         parser.error("--chunk-size must be greater than zero")
+    if args.interval < 0:
+        parser.error("--interval must be non-negative")
+    if args.limit_chunks < 0:
+        parser.error("--limit-chunks must be non-negative")
+    if args.decoys < 0:
+        parser.error("--decoys must be non-negative")
     if args.src_port < 1 or args.src_port > 65535:
         parser.error("--src-port must be 1..65535")
 
@@ -77,8 +85,12 @@ def main():
     sha256_hex = hashlib.sha256(data).hexdigest()
     chunks = [data[i : i + args.chunk_size] for i in range(0, len(data), args.chunk_size)]
     total_chunks = len(chunks)
+    send_chunks = chunks[:args.limit_chunks] if args.limit_chunks else chunks
+    send_chunk_count = len(send_chunks)
     max_synth_frame = synthesized_frame_len(max((len(chunk) for chunk in chunks), default=0))
     conservative_max_chunk = CONSERVATIVE_FPGA_FRAME_LIMIT - SYNTH_ETH_IPV4_UDP_BYTES - FILE_HEADER_BYTES
+    total_datagrams = send_chunk_count * (1 + args.decoys)
+    estimated_duration = total_datagrams * args.interval
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.src_ip, args.src_port))
@@ -87,10 +99,16 @@ def main():
     print(f"sha256={sha256_hex}")
     print(f"src={args.src_ip}:{args.src_port} dst={args.dst_ip}")
     print(f"chunk_size={args.chunk_size} synthesized_frame_max={max_synth_frame} bytes")
+    print(f"send_chunks={send_chunk_count}/{total_chunks} decoys_per_chunk={args.decoys} interval={args.interval:g}s estimated_duration={estimated_duration:.1f}s")
     if max_synth_frame > CONSERVATIVE_FPGA_FRAME_LIMIT:
         print(
             "WARNING: synthesized frames exceed the conservative 512-byte FPGA ingress limit. "
             f"Use --chunk-size {conservative_max_chunk} or smaller if only the final short chunk arrives."
+        )
+    if args.interval < 0.05:
+        print(
+            "WARNING: interval below 0.05s can overrun the two-W5500 hardware path. "
+            "Use --interval 0.10 for bring-up, then reduce only after PC2 is receiving chunks."
         )
     print(f"allowed profile: UDP dst port {args.file_port} with {MAGIC!r} marker")
     print(f"blocked decoys: UDP dst port {args.decoy_port} and FW-BLOCK content override")
@@ -98,9 +116,12 @@ def main():
     for cmd in setup:
         print(f"  {cmd}")
 
+    if args.limit_chunks:
+        print("NOTE: --limit-chunks is a path probe. The receiver will show missing chunks and SHA will not pass until the full file is sent.")
+
     sent_allowed = 0
     sent_decoys = 0
-    for chunk_index, chunk in enumerate(chunks):
+    for chunk_index, chunk in enumerate(send_chunks):
         payload = build_file_payload(args.file_id, chunk_index, total_chunks, len(data), sha256_hex, chunk)
         sock.sendto(payload, (args.dst_ip, args.file_port))
         sent_allowed += 1

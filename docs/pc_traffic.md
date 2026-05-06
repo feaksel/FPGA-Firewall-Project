@@ -144,6 +144,26 @@ therefore becomes a 604-byte internal frame. On any image/path still limited to
 and only the final short chunk reaches PC2. If you override the chunk size on a
 conservative image, stay at `--chunk-size 420` or smaller.
 
+The sender default interval is now `0.10 s` per datagram. The earlier `0.01 s`
+setting can overrun the two-W5500 path during full file+decoy transfers. Use a
+two-stage test:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10
+```
+
+Expected: PC2 shows four chunks and no leaks. SHA will not pass because this is
+only an allow-path probe.
+
+Then run the full proof:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10
+```
+
+Expected: PC2 reconstructs the full file, SHA-256 passes, and UDP/5002 /
+`FW-BLOCK` decoys do not leak.
+
 Receiver on PC2:
 
 ```powershell

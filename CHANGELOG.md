@@ -15,6 +15,9 @@
 - Updated the sine dashboard wording and docs to state explicitly that PC2 plots the received payload sample values only. A square-wave packet stream now renders as a square wave, and missing/dropped packets produce real blank intervals.
 - Diagnosed the file-transfer "only one chunk on PC2" capture (`filesending1chunk.pcapng`): the only forwarded chunk was `41/42`, the final short chunk. Full 512-byte file chunks produce 604-byte FPGA-internal frames (`42` synthesized Ethernet/IP/UDP bytes + `50` file-demo header + `512` data), which are discarded by any image/path still enforcing a 512-byte ingress-frame guard.
 - Changed `scripts/file_sender.py` default `--chunk-size` from `512` to conservative `256` and added a warning when a selected chunk size exceeds the 512-byte synthesized-frame budget.
+- Changed `scripts/file_sender.py` default pacing from `0.01 s` to hardware-safe `0.10 s` per datagram and added `--limit-chunks` for staged PC2 bring-up.
+  - Recommended first probe: `--decoys 0 --limit-chunks 4 --interval 0.10`.
+  - Recommended full proof: `--decoys 1 --interval 0.10`.
 - Fixed the payload waveform dashboard x-axis so the live graph defaults to real packet-arrival time instead of drifting by mismatched payload sample-rate metadata.
   - One vertical waveform grid column is one wall-clock second.
   - Removed the fake green zero line when no samples are visible.

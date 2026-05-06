@@ -279,6 +279,20 @@ becomes a 604-byte internal frame. If the board is running an older image with a
 short chunk appears on PC2. Keep the default, or use `--chunk-size 420` or
 smaller for that conservative image.
 
+The sender default pacing is also intentionally conservative: `--interval 0.10`.
+For bring-up, first prove the allowed path without decoys:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10
+```
+
+PC2 should show four received chunks and many missing chunks because this is only
+a probe. Then run the full proof with decoys:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10
+```
+
 ### PC2: receiver side
 
 Connect W5500 B, the FPGA egress module, to PC2 Ethernet.
