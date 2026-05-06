@@ -271,6 +271,14 @@ What PC1 does:
 - interleaves blocked decoy/error traffic,
 - prints the file SHA-256 and sent counts.
 
+The sender default chunk size is intentionally conservative: `256` file bytes
+per packet. A file packet also carries a 50-byte demo header and the FPGA
+synthesizes another 42 bytes of Ethernet/IP/UDP header, so a 512-byte file chunk
+becomes a 604-byte internal frame. If the board is running an older image with a
+512-byte ingress-frame limit, those full chunks are discarded and only the final
+short chunk appears on PC2. Keep the default, or use `--chunk-size 420` or
+smaller for that conservative image.
+
 ### PC2: receiver side
 
 Connect W5500 B, the FPGA egress module, to PC2 Ethernet.

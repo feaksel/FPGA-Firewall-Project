@@ -120,6 +120,11 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   shows chunk progress/missing chunks/leaks, previews the completed file when the
   browser supports the MIME type, and reports matching SHA-256 while decoys are
   dropped.
+- Use the file sender's default `--chunk-size 256` for the live demo. A 512-byte
+  file chunk becomes a 604-byte FPGA-internal frame after the `FWFILE1` header
+  and synthesized Ethernet/IP/UDP wrapper. If the flashed image/path still has a
+  512-byte frame guard, full chunks are discarded and only the final short chunk
+  reaches PC2.
 - The payload waveform dashboard on `http://127.0.0.1:8090` shows the signed
   int16 sample values carried in UDP/5001 packets as dots on a moving time
   axis; missing packets leave visible blank intervals instead of being

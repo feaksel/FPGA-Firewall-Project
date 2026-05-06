@@ -13,6 +13,8 @@
   - Added `--values` / `--values-file` so the PC1 stream can carry arbitrary signed int16 sample sequences.
   - Kept `--sine-hz` as a compatibility alias for `--wave-hz`.
 - Updated the sine dashboard wording and docs to state explicitly that PC2 plots the received payload sample values only. A square-wave packet stream now renders as a square wave, and missing/dropped packets produce real blank intervals.
+- Diagnosed the file-transfer "only one chunk on PC2" capture (`filesending1chunk.pcapng`): the only forwarded chunk was `41/42`, the final short chunk. Full 512-byte file chunks produce 604-byte FPGA-internal frames (`42` synthesized Ethernet/IP/UDP bytes + `50` file-demo header + `512` data), which are discarded by any image/path still enforcing a 512-byte ingress-frame guard.
+- Changed `scripts/file_sender.py` default `--chunk-size` from `512` to conservative `256` and added a warning when a selected chunk size exceeds the 512-byte synthesized-frame budget.
 - Python compile checks pass for `file_receiver.py`, `sine_receiver_dashboard.py`, `file_sender.py`, and `sine_sender.py`.
 
 ## 2026-05-05 - UDP Policy Gateway Pivot And FPGA Signature Demo

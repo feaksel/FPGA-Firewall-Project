@@ -136,6 +136,14 @@ Sender on PC1:
 py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
 ```
 
+The sender default is `--chunk-size 256`. Keep that default for the live demo.
+The file-demo payload has a 50-byte `FWFILE1` header, and the FPGA creates a
+42-byte Ethernet/IP/UDP wrapper before policy forwarding. A 512-byte file chunk
+therefore becomes a 604-byte internal frame. On any image/path still limited to
+512-byte frames, those full chunks are committed/dropped before the rule engine
+and only the final short chunk reaches PC2. If you override the chunk size on a
+conservative image, stay at `--chunk-size 420` or smaller.
+
 Receiver on PC2:
 
 ```powershell

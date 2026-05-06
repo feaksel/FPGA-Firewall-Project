@@ -2,6 +2,27 @@
 
 ## Open Bugs
 
+- **B-2026-05-06-01: File demo forwards only the final short chunk when using 512-byte file chunks.**
+  - Status: mitigated in scripts/docs; needs hardware re-test with the new safe sender default.
+  - Evidence:
+    - PC1 tcpdump during the transfer showed the sender correctly emitted `84` UDP packets: `63` to UDP/5001 and `21` to UDP/5002.
+    - PC2 capture `C:\Users\furka\Desktop\filesending1chunk.pcapng` contains only one UDP/5001 `FWFILE1\0` packet from the demo path.
+    - Decoding that packet shows `file_id=2`, `chunk=41`, `total=42`, `file_size=21063`, and `data_len=71`, so the only forwarded chunk was the final short chunk.
+  - Root cause:
+    - `scripts/file_sender.py` previously defaulted to `--chunk-size 512`.
+    - Each allowed file datagram carries a 50-byte `FWFILE1` demo header.
+    - W5500 UDP socket ingress synthesizes a 42-byte Ethernet/IPv4/UDP wrapper before the rule engine.
+    - A full file chunk therefore becomes `42 + 50 + 512 = 604` FPGA-internal frame bytes.
+    - Any flashed image or intermediate path still enforcing a conservative 512-byte frame guard treats those full chunks as oversized and commits/discards them before forwarding. The final short chunk is only `42 + 50 + 71 = 163` bytes, so it passes.
+  - Mitigation:
+    - Changed the sender default to `--chunk-size 256`, producing `348`-byte internal frames.
+    - Added a sender warning when the selected chunk size exceeds the conservative 512-byte internal-frame budget.
+    - Documented that `--chunk-size 420` is the largest safe file data size for a 512-byte internal-frame guard (`512 - 42 - 50`).
+  - Next validation:
+    - Re-run PC2 `file_receiver.py`, then PC1 `file_sender.py` with the new default or explicit `--chunk-size 256`.
+    - Expected PC2 result: all chunks arrive, SHA-256 passes, UDP/5002 and `FW-BLOCK` decoys still do not leak.
+    - If 512-byte chunks are desired for the final image, recompile/flash a proven 2048-byte ingress/FIFO/forwarder path and capture SignalTap counters for `last_frame_len`, `rx_commit_count`, `rule_allow5001`, and `b_tx_count`.
+
 - **B-2026-05-03-01: A-triggered W5500 B transmit does not reliably show the intended demo frames on PC2.**
   - Status: resolved for the final demo architecture. MACRAW A ingress is legacy diagnostic evidence; the accepted hardware path is W5500 A UDP sockets -> FPGA policy/signature stream processing -> W5500 B TX. User bench confirmation after round 22 showed the PC2 dashboard and Wireshark receiving forwarded packets.
   - Evidence:
