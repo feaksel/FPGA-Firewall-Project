@@ -128,6 +128,8 @@ class FileReceiverState:
         self.duplicate_chunks = 0
         self.leak_packets = 0
         self.other_packets = 0
+        self.repeated_file_packets = 0
+        self.ignored_repeat_file_ids = set()
         self.bytes_received = 0
         self.sniff_error = ""
         if clear_events or not hasattr(self, "events"):
@@ -160,8 +162,17 @@ class FileReceiverState:
                 self.other_packets += 1
                 return
 
+            if parsed["file_id"] in self.ignored_repeat_file_ids:
+                self.repeated_file_packets += 1
+                return
+
             if self.file_id is not None and parsed["file_id"] != self.file_id:
                 if self.completed_at is not None and self.auto_next:
+                    if self.actual_sha and parsed["sha256"] == self.actual_sha:
+                        self.ignored_repeat_file_ids.add(parsed["file_id"])
+                        self.repeated_file_packets += 1
+                        self.event("REPEAT", f"ignored repeated file_id={parsed['file_id']} with same SHA-256")
+                        return
                     previous = self.output_path
                     self.reset_unlocked(clear_events=False)
                     self.event("NEXT", f"new file_id={parsed['file_id']} after {previous.name}")
@@ -239,6 +250,7 @@ class FileReceiverState:
                 "duplicate_chunks": self.duplicate_chunks,
                 "leak_packets": self.leak_packets,
                 "other_packets": self.other_packets,
+                "repeated_file_packets": self.repeated_file_packets,
                 "elapsed": elapsed,
                 "chunks_per_second": len(self.chunks) / elapsed,
                 "sniff_error": self.sniff_error,
@@ -389,11 +401,11 @@ async function refresh(){
   el.leaks.textContent=d.leak_packets; el.rate.textContent=d.chunks_per_second.toFixed(1);
   el.shaState.innerHTML=d.complete?(d.sha_ok?'<span class="ok">PASS</span>':'<span class="fail">FAIL</span>'):"-";
   el.bar.style.width=pct+"%";
-  el.progressText.textContent=`${pct.toFixed(1)}% | ${d.bytes_received}/${d.file_size||"?"} bytes | duplicates ${d.duplicate_chunks} | other ${d.other_packets}`;
+  el.progressText.textContent=`${pct.toFixed(1)}% | ${d.bytes_received}/${d.file_size||"?"} bytes | duplicates ${d.duplicate_chunks} | repeated ${d.repeated_file_packets||0} | other ${d.other_packets}`;
   el.missingList.textContent=d.missing_preview.length?`missing preview: ${d.missing_preview.join(", ")}`:"";
   el.shaText.textContent=d.expected_sha?`expected ${d.expected_sha}${d.actual_sha?` | actual ${d.actual_sha}`:""}`:"Waiting for transfer metadata...";
   el.outputPath.textContent=d.complete?d.output_path:"";
-  el.status.textContent=`${d.version} | file_id=${d.file_id} | MIME=${d.mime_type}`;
+  el.status.textContent=`${d.version} | file_id=${d.file_id} | MIME=${d.mime_type} | repeated-same-file packets ignored=${d.repeated_file_packets||0}`;
   el.error.textContent=d.sniff_error||"";
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("")||'<p class="note">No packets yet.</p>';
   renderChunks(d); renderPreview(d);

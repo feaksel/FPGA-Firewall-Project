@@ -254,7 +254,8 @@ The PC2 `file_receiver.py` dashboard automatically moves to the next `file_id`
 after each completed image and refreshes the preview. This is a photo-by-photo
 stream over the same UDP/5001 hardware path, not a compressed video codec. Keep
 images small, for example 160x120 or 320x240, if you want the preview to update
-quickly.
+quickly. When a loop repeats the exact same image, the receiver ignores the
+repeated SHA-256 so the browser preview does not restart or flicker.
 
 If another PC1 tool writes camera stills or screenshots into the folder, run:
 

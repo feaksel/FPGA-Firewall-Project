@@ -69,7 +69,9 @@ sudo python3 scripts/media_demo_sender.py --iface en0 --profile images --interva
 ```
 
 `images` sends JPG, PNG, and GIF in sequence. The receiver automatically moves
-to each new `file_id` and refreshes the preview.
+to each new `file_id` and refreshes the preview. If the sender loops the exact
+same image again, the receiver compares the SHA-256 and ignores the repeated
+file instead of restarting the same preview.
 
 ## Exact Original File Proof
 
