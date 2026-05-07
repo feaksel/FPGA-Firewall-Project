@@ -129,11 +129,16 @@ class FileReceiverState:
         self.leak_packets = 0
         self.other_packets = 0
         self.repeated_file_packets = 0
-        self.ignored_repeat_file_ids = set()
         self.bytes_received = 0
         self.sniff_error = ""
         if clear_events or not hasattr(self, "events"):
             self.events = deque(maxlen=90)
+        if clear_events or not hasattr(self, "last_completed"):
+            self.last_completed = None
+        if clear_events or not hasattr(self, "ignored_file_ids"):
+            self.ignored_file_ids = set()
+        if clear_events or not hasattr(self, "abandoned_files"):
+            self.abandoned_files = 0
 
     def reset(self):
         with self.lock:
@@ -162,20 +167,30 @@ class FileReceiverState:
                 self.other_packets += 1
                 return
 
-            if parsed["file_id"] in self.ignored_repeat_file_ids:
+            if parsed["file_id"] in self.ignored_file_ids:
                 self.repeated_file_packets += 1
                 return
 
             if self.file_id is not None and parsed["file_id"] != self.file_id:
                 if self.completed_at is not None and self.auto_next:
                     if self.actual_sha and parsed["sha256"] == self.actual_sha:
-                        self.ignored_repeat_file_ids.add(parsed["file_id"])
+                        self.ignored_file_ids.add(parsed["file_id"])
                         self.repeated_file_packets += 1
                         self.event("REPEAT", f"ignored repeated file_id={parsed['file_id']} with same SHA-256")
                         return
                     previous = self.output_path
                     self.reset_unlocked(clear_events=False)
                     self.event("NEXT", f"new file_id={parsed['file_id']} after {previous.name}")
+                elif self.auto_next:
+                    previous_id = self.file_id
+                    missing_count = len(self.missing_chunks_unlocked())
+                    self.ignored_file_ids.add(previous_id)
+                    self.abandoned_files += 1
+                    self.reset_unlocked(clear_events=False)
+                    self.event(
+                        "SKIP",
+                        f"abandoned incomplete file_id={previous_id} missing={missing_count}; accepting file_id={parsed['file_id']}",
+                    )
                 else:
                     self.other_packets += 1
                     self.event("OLD", f"ignored file_id={parsed['file_id']} while receiving {self.file_id}")
@@ -210,6 +225,12 @@ class FileReceiverState:
         self.output_path.write_bytes(data)
         self.actual_sha = hashlib.sha256(data).hexdigest()
         self.completed_at = time.time()
+        self.last_completed = {
+            "path": str(self.output_path),
+            "sha": self.actual_sha,
+            "mime": detect_mime(self.output_path, True),
+            "file_id": self.file_id,
+        }
         if self.actual_sha == self.expected_sha:
             self.event("PASS", f"wrote {self.output_path} with matching SHA-256")
         else:
@@ -229,6 +250,18 @@ class FileReceiverState:
             elapsed = max(now - self.started_at, 0.001)
             complete = self.completed_at is not None
             mime_type = detect_mime(self.output_path, complete)
+            preview_path = str(self.output_path) if complete else ""
+            preview_sha = self.actual_sha or ""
+            preview_mime = mime_type
+            preview_file_id = self.file_id
+            preview_stale = False
+            if not complete and self.last_completed:
+                preview_path = self.last_completed["path"]
+                preview_sha = self.last_completed["sha"]
+                preview_mime = self.last_completed["mime"]
+                preview_file_id = self.last_completed["file_id"]
+                preview_stale = True
+            preview_available = bool(preview_path and preview_sha)
             return {
                 "version": APP_VERSION,
                 "file_id": "-" if self.file_id is None else self.file_id,
@@ -246,11 +279,19 @@ class FileReceiverState:
                 "output_path": str(self.output_path),
                 "output_url": f"/file?sha={self.actual_sha}" if complete else "",
                 "mime_type": mime_type,
+                "preview_available": preview_available,
+                "preview_stale": preview_stale,
+                "preview_file_id": "-" if preview_file_id is None else preview_file_id,
+                "preview_output_path": preview_path,
+                "preview_output_url": f"/file?sha={preview_sha}" if preview_available else "",
+                "preview_mime_type": preview_mime,
+                "preview_sha": preview_sha,
                 "allowed_packets": self.allowed_packets,
                 "duplicate_chunks": self.duplicate_chunks,
                 "leak_packets": self.leak_packets,
                 "other_packets": self.other_packets,
                 "repeated_file_packets": self.repeated_file_packets,
+                "abandoned_files": self.abandoned_files,
                 "elapsed": elapsed,
                 "chunks_per_second": len(self.chunks) / elapsed,
                 "sniff_error": self.sniff_error,
@@ -359,18 +400,24 @@ const ids=["received","total","missing","leaks","rate","shaState","bar","progres
 const el=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));
 let currentPreviewKey="";
 function renderPreview(d){
-  const key=d.complete ? `${d.output_url}|${d.mime_type}|${d.actual_sha}` : "waiting";
+  const key=d.preview_available ? `${d.preview_output_url}|${d.preview_mime_type}|${d.preview_sha}` : "waiting";
   if(key===currentPreviewKey) return;
   currentPreviewKey=key;
-  if(!d.complete){
+  if(!d.preview_available){
     const missing=d.missing_count||0;
     const detail=missing?`Missing ${missing} chunk${missing===1?"":"s"}; waiting for a complete byte-exact file before writing or previewing.`:"Waiting for completed file...";
     el.preview.innerHTML=`<p class="note">${detail}</p>`;
     return;
   }
-  const url=d.output_url;
-  const mime=d.mime_type||"";
-  if(mime.startsWith("image/")) el.preview.innerHTML=`<img src="${url}" alt="received file">`;
+  const url=d.preview_output_url;
+  const mime=d.preview_mime_type||"";
+  if(mime.startsWith("image/")){
+    const img=new Image();
+    img.alt="received file";
+    img.onload=()=>{ if(currentPreviewKey===key) el.preview.replaceChildren(img); };
+    img.onerror=()=>{ if(currentPreviewKey===key) el.preview.innerHTML='<p class="note">Image preview failed to load.</p>'; };
+    img.src=url;
+  }
   else if(mime.startsWith("video/")) el.preview.innerHTML=`<video src="${url}" controls></video>`;
   else if(mime.startsWith("audio/")) el.preview.innerHTML=`<audio src="${url}" controls></audio>`;
   else if(mime.startsWith("text/")) el.preview.innerHTML=`<iframe src="${url}"></iframe>`;
@@ -401,10 +448,10 @@ async function refresh(){
   el.leaks.textContent=d.leak_packets; el.rate.textContent=d.chunks_per_second.toFixed(1);
   el.shaState.innerHTML=d.complete?(d.sha_ok?'<span class="ok">PASS</span>':'<span class="fail">FAIL</span>'):"-";
   el.bar.style.width=pct+"%";
-  el.progressText.textContent=`${pct.toFixed(1)}% | ${d.bytes_received}/${d.file_size||"?"} bytes | duplicates ${d.duplicate_chunks} | repeated ${d.repeated_file_packets||0} | other ${d.other_packets}`;
+  el.progressText.textContent=`${pct.toFixed(1)}% | ${d.bytes_received}/${d.file_size||"?"} bytes | duplicates ${d.duplicate_chunks} | repeated ${d.repeated_file_packets||0} | abandoned ${d.abandoned_files||0} | other ${d.other_packets}`;
   el.missingList.textContent=d.missing_preview.length?`missing preview: ${d.missing_preview.join(", ")}`:"";
   el.shaText.textContent=d.expected_sha?`expected ${d.expected_sha}${d.actual_sha?` | actual ${d.actual_sha}`:""}`:"Waiting for transfer metadata...";
-  el.outputPath.textContent=d.complete?d.output_path:"";
+  el.outputPath.textContent=d.preview_available?(d.preview_stale?`showing previous file_id=${d.preview_file_id}: ${d.preview_output_path}`:d.preview_output_path):"";
   el.status.textContent=`${d.version} | file_id=${d.file_id} | MIME=${d.mime_type} | repeated-same-file packets ignored=${d.repeated_file_packets||0}`;
   el.error.textContent=d.sniff_error||"";
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("")||'<p class="note">No packets yet.</p>';
@@ -454,13 +501,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_file(self):
         snapshot = self.state.snapshot()
-        path = Path(snapshot["output_path"])
-        if not snapshot["complete"] or not path.exists():
+        path = Path(snapshot["preview_output_path"])
+        if not snapshot["preview_available"] or not path.exists():
             self.send_text(HTTPStatus.NOT_FOUND, "file not complete", "text/plain; charset=utf-8")
             return
         payload = path.read_bytes()
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", snapshot["mime_type"])
+        self.send_header("Content-Type", snapshot["preview_mime_type"])
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Content-Disposition", f'inline; filename="{path.name}"')
         self.send_header("Cache-Control", "no-store")

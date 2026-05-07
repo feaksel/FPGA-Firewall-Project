@@ -16,6 +16,10 @@
   - default resized images target a smaller payload,
   - `--retry-passes N` repeats the same media with the same `file_id` so PC2 can fill missing chunks across passes.
 - Updated the file receiver dashboard preview CSS so small compressed images scale up to fit the preview panel while preserving aspect ratio.
+- Updated `file_receiver.py` to latch the last completed preview while the next `file_id` is still arriving, preventing photo/webcam demos from flickering back to an empty waiting panel between frames.
+- Updated `file_receiver.py` to abandon an incomplete `file_id` when a newer `file_id` arrives in auto-next mode, so webcam/photo streams do not get stuck forever on a frame whose retry passes never filled all chunks.
+- Updated the file receiver image preview to double-buffer image swaps: it now preloads the next JPEG/PNG/GIF off-DOM and replaces the visible preview only after the new image decodes, preventing white flashes between fast webcam frames.
+- Documented the fast webcam stress settings (`--period 0.0167`, `--interval 0.00111`, `--max-side 160`, `--jpeg-quality 80`) and the pacing rule `packet_interval ~= snapshot_period / chunks_per_snapshot`.
 - Added `--retry-passes` to `webcam_photo_sender.py`; each webcam snapshot is resent with the same `file_id` so PC2 can fill missing chunks before the next snapshot advances to the next ID.
 - Refreshed the final project documentation around the accepted UDP policy gateway scope.
   - Updated `README.md`, `TODO.md`, `docs/project_overview.md`, `docs/test_plan.md`, `docs/pc_traffic.md`, `docs/next_bench_session.md`, `docs/de1_soc_w5500_hardware.md`, and `docs/signaltap_debug.md`.

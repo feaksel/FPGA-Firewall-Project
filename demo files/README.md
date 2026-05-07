@@ -51,6 +51,14 @@ The receiver auto-detects completed MP4/JPEG/PNG/GIF/MP3 payloads from bytes. If
 the output path is the default `.bin`, it saves as `.mp4`, `.jpg`, `.png`,
 `.gif`, or `.mp3` after the file completes.
 
+During photo/webcam streams, the dashboard keeps showing the last completed file
+while the next `file_id` is still arriving. That prevents flicker between
+"waiting" and the previous photo when the next frame is incomplete.
+
+If retry passes still cannot complete the current frame and a newer `file_id`
+arrives, the receiver abandons the incomplete frame and moves on. The previous
+completed preview remains visible until a newer frame completes.
+
 ## PC1 Quick Visual Image Demo
 
 Use this first for a fast, visual presentation:
@@ -163,6 +171,33 @@ Tuning options:
 - Clearer image: raise `--max-side` to `240`.
 - More reliable pacing: raise `--period` to `3`.
 - More aggressive recovery: raise `--retry-passes` to `4`.
+
+## Fast Webcam Stress Mode
+
+The webcam demo can be pushed much harder when the snapshots are tiny. The
+working stress setup used:
+
+```bash
+python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 0.0167 --max-side 160 --jpeg-quality 80 --interval 0.00111 --retry-passes 1 --file-id-start 1200
+```
+
+Meaning:
+- `--period 0.0167` captures at roughly 60 snapshots/s.
+- `--interval 0.00111` sends roughly 900 UDP datagrams/s.
+- With about 13-15 chunks per snapshot, packet pacing is around 15x faster than
+  snapshot pacing.
+
+Rule of thumb:
+
+```text
+packet_interval ~= snapshot_period / chunks_per_snapshot
+```
+
+If a snapshot is around 13 chunks and the period is `0.0167 s`,
+`0.0167 / 15 ~= 0.00111 s`, which is close enough for the current demo.
+
+This is a stress/demo mode, not reliable transport. Use small images and expect
+some abandoned frames if the FPGA/W5500/PC capture path cannot keep up.
 
 ## Notes
 

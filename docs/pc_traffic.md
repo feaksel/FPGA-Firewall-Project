@@ -309,6 +309,23 @@ without adding a video codec or changing RTL. `--retry-passes` resends each
 snapshot with the same `file_id` so the receiver can fill missing UDP chunks;
 the next webcam frame still gets a new ID.
 
+Fast webcam stress settings that have worked reasonably well with tiny frames:
+
+```bash
+python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 0.0167 --max-side 160 --jpeg-quality 80 --interval 0.00111 --retry-passes 1 --file-id-start 1200
+```
+
+The useful pacing rule is:
+
+```text
+packet_interval ~= snapshot_period / chunks_per_snapshot
+```
+
+For about 13-15 chunks per snapshot at a `0.0167 s` snapshot period, a
+`0.00111 s` packet interval is roughly the right order of magnitude. This is a
+stress mode; abandoned frames are acceptable as long as the dashboard keeps the
+last completed frame visible and advances when complete frames land.
+
 ## Phase F: Continuous payload-waveform demo
 
 For the live presentation, use the continuous payload-waveform demo before or beside the file-transfer proof.
