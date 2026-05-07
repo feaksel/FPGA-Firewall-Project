@@ -300,12 +300,14 @@ For webcam snapshots from PC1:
 
 ```bash
 python3 -m pip install opencv-python
-sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10
+python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 160 --jpeg-quality 65 --interval 0.10 --retry-passes 3 --file-id-start 600
 ```
 
 This captures repeated JPEG stills and sends each one as a complete `FWFILE1`
 transfer. It is a practical "webcam photo stream" demo on the current hardware
-without adding a video codec or changing RTL.
+without adding a video codec or changing RTL. `--retry-passes` resends each
+snapshot with the same `file_id` so the receiver can fill missing UDP chunks;
+the next webcam frame still gets a new ID.
 
 ## Phase F: Continuous payload-waveform demo
 

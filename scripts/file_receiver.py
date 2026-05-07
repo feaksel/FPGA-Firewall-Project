@@ -305,10 +305,10 @@ h2 { margin:0 0 12px; font-size:16px; }
 .kind { font-weight:800; font-size:12px; }
 .kind.PASS,.kind.START { color:var(--green); } .kind.FAIL,.kind.LEAK { color:var(--red); } .kind.OLD { color:var(--amber); }
 .mono { font-family:Consolas,"Courier New",monospace; word-break:break-all; }
-.preview { min-height:260px; border:1px solid var(--line); border-radius:8px; background:#fbfcfe; display:grid; place-items:center; overflow:hidden; }
-.preview img,.preview video { max-width:100%; max-height:520px; display:block; }
+.preview { min-height:320px; height:min(55vh,560px); border:1px solid var(--line); border-radius:8px; background:#fbfcfe; display:grid; place-items:center; overflow:hidden; }
+.preview img,.preview video { width:100%; height:100%; object-fit:contain; display:block; }
 .preview audio { width:92%; }
-.preview iframe { width:100%; height:520px; border:0; background:white; }
+.preview iframe { width:100%; height:100%; border:0; background:white; }
 .ok { color:var(--green); font-weight:760; } .fail { color:var(--red); font-weight:760; }
 @media (max-width:960px){ .metrics,.grid{grid-template-columns:1fr}.chunk-map{grid-template-columns:repeat(30, minmax(6px,1fr));} }
 </style>

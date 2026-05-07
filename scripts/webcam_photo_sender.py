@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--chunk-size", type=int, default=CONSERVATIVE_CHUNK_SIZE)
     parser.add_argument("--interval", type=float, default=SAFE_INTERVAL_SEC)
     parser.add_argument("--decoys", type=int, default=0, help="Decoys per chunk. Keep 0 for the cleanest visual webcam demo.")
+    parser.add_argument("--retry-passes", type=int, default=3, help="Send each snapshot this many times with the same file_id so PC2 can fill missed chunks.")
     parser.add_argument("--file-id-start", type=int, default=500)
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
@@ -80,6 +81,8 @@ def main():
         parser.error("--interval must be non-negative")
     if args.decoys < 0:
         parser.error("--decoys must be non-negative")
+    if args.retry_passes <= 0:
+        parser.error("--retry-passes must be greater than zero")
     if not 0 <= args.file_id_start <= 65535:
         parser.error("--file-id-start must be 0..65535")
 
@@ -97,7 +100,8 @@ def main():
         print(f"  {line}")
     print(
         f"webcam index={args.camera_index} count={'forever' if args.count == 0 else args.count} "
-        f"period={args.period:g}s max_side={args.max_side} quality={args.jpeg_quality}"
+        f"period={args.period:g}s max_side={args.max_side} quality={args.jpeg_quality} "
+        f"retry_passes={args.retry_passes}"
     )
 
     sent = 0
@@ -106,7 +110,10 @@ def main():
         while args.count == 0 or sent < args.count:
             data = encode_snapshot(args.camera_index, args.max_side, args.jpeg_quality)
             display_name = f"webcam_{sent:04d}.jpg"
-            send_bytes_as_file(sock, args, data, display_name, file_id)
+            for retry_pass in range(args.retry_passes):
+                if args.retry_passes > 1:
+                    print(f"  snapshot {sent} retry pass {retry_pass + 1}/{args.retry_passes} with file_id={file_id}")
+                send_bytes_as_file(sock, args, data, display_name, file_id)
             file_id = (file_id + 1) & 0xFFFF
             sent += 1
             if args.count == 0 or sent < args.count:

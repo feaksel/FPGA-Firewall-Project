@@ -15,6 +15,8 @@
   - fast image mode now requires Pillow instead of silently sending 1-2 MB originals,
   - default resized images target a smaller payload,
   - `--retry-passes N` repeats the same media with the same `file_id` so PC2 can fill missing chunks across passes.
+- Updated the file receiver dashboard preview CSS so small compressed images scale up to fit the preview panel while preserving aspect ratio.
+- Added `--retry-passes` to `webcam_photo_sender.py`; each webcam snapshot is resent with the same `file_id` so PC2 can fill missing chunks before the next snapshot advances to the next ID.
 - Refreshed the final project documentation around the accepted UDP policy gateway scope.
   - Updated `README.md`, `TODO.md`, `docs/project_overview.md`, `docs/test_plan.md`, `docs/pc_traffic.md`, `docs/next_bench_session.md`, `docs/de1_soc_w5500_hardware.md`, and `docs/signaltap_debug.md`.
   - Removed stale "A-triggered TX still blocked" wording from the main docs and kept it only as legacy MACRAW diagnostic history.

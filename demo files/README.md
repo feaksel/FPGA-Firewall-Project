@@ -151,11 +151,18 @@ sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 1 --max-side 320
 For repeated snapshots:
 
 ```bash
-sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10
+python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 160 --jpeg-quality 65 --interval 0.10 --retry-passes 3 --file-id-start 600
 ```
 
 Each webcam snapshot becomes a JPEG file transfer with a new `file_id`, and PC2
-previews the latest completed snapshot.
+previews the latest completed snapshot. `--retry-passes 3` resends each snapshot
+with the same `file_id` so PC2 can fill missed UDP chunks. New frames still get
+new IDs: `600`, `601`, `602`, and so on.
+
+Tuning options:
+- Clearer image: raise `--max-side` to `240`.
+- More reliable pacing: raise `--period` to `3`.
+- More aggressive recovery: raise `--retry-passes` to `4`.
 
 ## Notes
 

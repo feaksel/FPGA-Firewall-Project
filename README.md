@@ -513,11 +513,13 @@ For webcam snapshots from PC1 to PC2:
 
 ```bash
 python3 -m pip install opencv-python
-sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10
+python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 160 --jpeg-quality 65 --interval 0.10 --retry-passes 3 --file-id-start 600
 ```
 
 The webcam demo sends repeated JPEG still frames over the same UDP/5001 policy
-path. It is a still-photo stream, not a compressed live-video codec.
+path. Each snapshot is resent with the same `file_id` so PC2 can fill missed
+chunks; each new frame then advances to the next `file_id`. It is a still-photo
+stream, not a compressed live-video codec.
 
 Optional Wireshark checks on PC2:
 

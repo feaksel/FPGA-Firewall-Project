@@ -60,6 +60,7 @@ Current status note, 2026-05-07 (file-demo hardware fix):
 - Added `media_demo_sender.py` and `demo files/README.md` for the checked-in JPG/PNG/GIF/MP4 demo assets.
 - Added optional `webcam_photo_sender.py` for repeated PC1 webcam snapshots over the same UDP/5001 path.
 - Media demos now use smaller resized-image defaults and `--retry-passes` for lossy UDP fills instead of relying on very fast `0.01 s` bursts.
+- Webcam snapshot demo now uses `--retry-passes` too; the recommended live command is `--max-side 160 --jpeg-quality 65 --period 2 --retry-passes 3 --file-id-start 600`.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
