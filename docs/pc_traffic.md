@@ -278,7 +278,9 @@ sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 -
 
 By default, image profiles are resized to a smaller JPEG payload before sending
 so the visual demo completes quickly. Add `--original` when the goal is
-byte-exact transfer of the checked-in media file.
+byte-exact transfer of the checked-in media file. This matters for GIF:
+`--profile gif` is a quick visual image demo, while `--profile gif --original`
+preserves GIF bytes so PC2 saves/previews it as `.gif`.
 
 For webcam snapshots from PC1:
 

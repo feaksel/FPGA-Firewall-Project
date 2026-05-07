@@ -73,6 +73,10 @@ to each new `file_id` and refreshes the preview. If the sender loops the exact
 same image again, the receiver compares the SHA-256 and ignores the repeated
 file instead of restarting the same preview.
 
+Important: the fast visual image profiles resize JPG/PNG/GIF into a smaller
+JPEG payload when Pillow is installed. That is intentional for speed. If you
+want GIF-in/GIF-out, PNG-in/PNG-out, or exact original bytes, use `--original`.
+
 ## Exact Original File Proof
 
 Use this when you want a byte-exact transfer and SHA-256 proof:
@@ -80,6 +84,7 @@ Use this when you want a byte-exact transfer and SHA-256 proof:
 ```bash
 sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --original --decoys 1 --interval 0.10
 sudo python3 scripts/media_demo_sender.py --iface en0 --profile png --original --decoys 1 --interval 0.10
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile gif --original --decoys 1 --interval 0.10
 sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 --interval 0.10
 ```
 
