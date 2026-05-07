@@ -1,6 +1,20 @@
 # CHANGELOG
 
 ## 2026-05-07
+- Improved the file/image demo UX:
+  - `scripts/file_receiver.py` now auto-detects completed MP4, JPEG, PNG, GIF, and MP3 payloads from file bytes.
+  - Default `.bin` output names are auto-renamed to the detected media suffix, so a received MP4 becomes `.mp4` and a received JPEG/PNG becomes `.jpg`/`.png` without requiring a special `--output`.
+  - Browser previews now fetch `/file?sha=...` with `Cache-Control: no-store`, which keeps repeated image/frame demos from showing a cached previous file.
+  - The receiver can automatically advance to a new `file_id` after completing the current file, enabling still-frame/photo-by-photo demos.
+- Added `scripts/photo_stream_sender.py`, a PC1 helper that sends a directory of JPEG/PNG files as successive `FWFILE1\0` UDP/5001 transfers for a visual photo stream on the existing PC2 file dashboard.
+- Refreshed the final project documentation around the accepted UDP policy gateway scope.
+  - Updated `README.md`, `TODO.md`, `docs/project_overview.md`, `docs/test_plan.md`, `docs/pc_traffic.md`, `docs/next_bench_session.md`, `docs/de1_soc_w5500_hardware.md`, and `docs/signaltap_debug.md`.
+  - Removed stale "A-triggered TX still blocked" wording from the main docs and kept it only as legacy MACRAW diagnostic history.
+  - Documented the no-UART proof path: PC2 dashboard/Wireshark plus HEX pages and SignalTap over USB-Blaster.
+  - Marked `--interval 0.001` file sending as a stress test, not an acceptance run, because the UDP file demo has no retransmission layer.
+- Improved `scripts/file_receiver.py` after the file stress run:
+  - The dashboard now explains that missing chunks prevent file writing/preview instead of silently waiting.
+  - MIME detection now uses the output suffix and, after completion, common magic bytes for MP4, PNG, JPEG, GIF, and MP3 previews.
 - Fixed the file-demo hardware forwarding failure for 348-byte UDP/5001 chunks.
   - SignalTap before the fix showed W5500 A receiving UDP/5001 frames (`last_frame_len=0x015C`) while W5500 B stayed at `0` buffer writes/SENDs after a clean reflash.
   - Root cause was an 8-bit byte index in `rtl/firewall/firewall_forwarder.v`; file-demo frames are longer than 255 bytes, so payload bytes after byte 255 wrapped the index and overwrote the saved Ethernet/IP/UDP header fields before the EOP rule decision.

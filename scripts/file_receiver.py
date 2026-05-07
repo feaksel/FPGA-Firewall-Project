@@ -24,7 +24,56 @@ MAGIC = b"FWFILE1\0"
 HEADER_LEN = len(MAGIC) + 2 + 2 + 2 + 4 + 32
 FILE_UDP_PORT = 5001
 BLOCK_MARKERS = (b"FW-BLOCK", b"FW-DEMO-DROP")
-APP_VERSION = "udp-file-dashboard-2026-05-06"
+APP_VERSION = "udp-file-dashboard-2026-05-07"
+AUTO_EXTENSION_SUFFIXES = {"", ".bin", ".dat", ".payload", ".octet-stream"}
+MIME_EXTENSIONS = {
+    "video/mp4": ".mp4",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "audio/mpeg": ".mp3",
+}
+
+
+def mime_from_header(head: bytes) -> str:
+    if len(head) >= 12 and head[4:8] == b"ftyp":
+        return "video/mp4"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"GIF87a") or head.startswith(b"GIF89a"):
+        return "image/gif"
+    if head.startswith(b"ID3") or head[:2] == b"\xff\xfb":
+        return "audio/mpeg"
+    return ""
+
+
+def detect_mime(path: Path, complete: bool) -> str:
+    if complete and path.exists():
+        try:
+            detected = mime_from_header(path.read_bytes()[:64])
+        except OSError:
+            detected = ""
+        if detected:
+            return detected
+
+    guessed = mimetypes.guess_type(str(path))[0]
+    if guessed and guessed != "application/octet-stream":
+        return guessed
+    return guessed or "application/octet-stream"
+
+
+def auto_output_path(requested_path: Path, data: bytes, enabled: bool) -> Path:
+    if not enabled:
+        return requested_path
+    mime_type = mime_from_header(data[:64])
+    suffix = MIME_EXTENSIONS.get(mime_type)
+    if not suffix:
+        return requested_path
+    if requested_path.suffix.lower() not in AUTO_EXTENSION_SUFFIXES:
+        return requested_path
+    return requested_path.with_suffix(suffix)
 
 
 def parse_payload(payload: bytes):
@@ -55,14 +104,18 @@ def packet_payload(pkt):
 
 
 class FileReceiverState:
-    def __init__(self, output_path, file_port):
-        self.output_path = Path(output_path)
+    def __init__(self, output_path, file_port, auto_extension=True, auto_next=True):
+        self.requested_output_path = Path(output_path)
+        self.output_path = self.requested_output_path
         self.file_port = file_port
+        self.auto_extension = auto_extension
+        self.auto_next = auto_next
         self.lock = threading.Lock()
         self.reset_unlocked()
 
-    def reset_unlocked(self):
+    def reset_unlocked(self, clear_events=True):
         self.started_at = time.time()
+        self.output_path = self.requested_output_path
         self.file_id = None
         self.total_chunks = None
         self.file_size = None
@@ -77,7 +130,8 @@ class FileReceiverState:
         self.other_packets = 0
         self.bytes_received = 0
         self.sniff_error = ""
-        self.events = deque(maxlen=90)
+        if clear_events or not hasattr(self, "events"):
+            self.events = deque(maxlen=90)
 
     def reset(self):
         with self.lock:
@@ -106,6 +160,16 @@ class FileReceiverState:
                 self.other_packets += 1
                 return
 
+            if self.file_id is not None and parsed["file_id"] != self.file_id:
+                if self.completed_at is not None and self.auto_next:
+                    previous = self.output_path
+                    self.reset_unlocked(clear_events=False)
+                    self.event("NEXT", f"new file_id={parsed['file_id']} after {previous.name}")
+                else:
+                    self.other_packets += 1
+                    self.event("OLD", f"ignored file_id={parsed['file_id']} while receiving {self.file_id}")
+                    return
+
             if self.file_id is None:
                 self.file_id = parsed["file_id"]
                 self.total_chunks = parsed["total_chunks"]
@@ -115,11 +179,6 @@ class FileReceiverState:
                     "START",
                     f"file_id={self.file_id} chunks={self.total_chunks} bytes={self.file_size}",
                 )
-
-            if parsed["file_id"] != self.file_id:
-                self.other_packets += 1
-                self.event("OLD", f"ignored file_id={parsed['file_id']} while receiving {self.file_id}")
-                return
 
             chunk_index = parsed["chunk_index"]
             if chunk_index in self.chunks:
@@ -135,6 +194,7 @@ class FileReceiverState:
 
     def finish_unlocked(self):
         data = b"".join(self.chunks[idx] for idx in range(self.total_chunks))[: self.file_size]
+        self.output_path = auto_output_path(self.requested_output_path, data, self.auto_extension)
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.output_path.write_bytes(data)
         self.actual_sha = hashlib.sha256(data).hexdigest()
@@ -157,7 +217,7 @@ class FileReceiverState:
             missing_chunks = self.missing_chunks_unlocked()
             elapsed = max(now - self.started_at, 0.001)
             complete = self.completed_at is not None
-            mime_type = mimetypes.guess_type(str(self.output_path))[0] or "application/octet-stream"
+            mime_type = detect_mime(self.output_path, complete)
             return {
                 "version": APP_VERSION,
                 "file_id": "-" if self.file_id is None else self.file_id,
@@ -173,7 +233,7 @@ class FileReceiverState:
                 "sha_ok": complete and self.actual_sha == self.expected_sha,
                 "complete": complete,
                 "output_path": str(self.output_path),
-                "output_url": "/file" if complete else "",
+                "output_url": f"/file?sha={self.actual_sha}" if complete else "",
                 "mime_type": mime_type,
                 "allowed_packets": self.allowed_packets,
                 "duplicate_chunks": self.duplicate_chunks,
@@ -290,7 +350,12 @@ function renderPreview(d){
   const key=d.complete ? `${d.output_url}|${d.mime_type}|${d.actual_sha}` : "waiting";
   if(key===currentPreviewKey) return;
   currentPreviewKey=key;
-  if(!d.complete){ el.preview.innerHTML='<p class="note">Waiting for completed file...</p>'; return; }
+  if(!d.complete){
+    const missing=d.missing_count||0;
+    const detail=missing?`Missing ${missing} chunk${missing===1?"":"s"}; waiting for a complete byte-exact file before writing or previewing.`:"Waiting for completed file...";
+    el.preview.innerHTML=`<p class="note">${detail}</p>`;
+    return;
+  }
   const url=d.output_url;
   const mime=d.mime_type||"";
   if(mime.startsWith("image/")) el.preview.innerHTML=`<img src="${url}" alt="received file">`;
@@ -386,6 +451,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", snapshot["mime_type"])
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Content-Disposition", f'inline; filename="{path.name}"')
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(payload)
 
@@ -401,15 +467,26 @@ def sniff_worker(state, iface, timeout):
 def main():
     parser = argparse.ArgumentParser(description="Receive, reconstruct, and visualize the FPGA UDP file demo.")
     parser.add_argument("--iface", required=True, help="Scapy interface connected to W5500 B / FPGA egress.")
-    parser.add_argument("--output", default="received_fw_file.bin", help="Reconstructed file path.")
+    parser.add_argument(
+        "--output",
+        default="received_fw_file.bin",
+        help="Reconstructed file path. The default .bin suffix is auto-replaced with .mp4/.jpg/.png when bytes identify a supported type.",
+    )
     parser.add_argument("--file-port", type=int, default=FILE_UDP_PORT)
     parser.add_argument("--timeout", type=int, default=0, help="Sniff timeout in seconds; 0 means run until Ctrl+C.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8092, help="Browser dashboard port.")
     parser.add_argument("--no-dashboard", action="store_true", help="Run terminal-only receiver without the browser dashboard.")
+    parser.add_argument("--no-auto-extension", action="store_true", help="Keep --output exactly as provided instead of replacing .bin with a detected media suffix.")
+    parser.add_argument("--no-auto-next", action="store_true", help="Do not automatically accept a new file_id after the current file completes.")
     args = parser.parse_args()
 
-    state = FileReceiverState(args.output, args.file_port)
+    state = FileReceiverState(
+        args.output,
+        args.file_port,
+        auto_extension=not args.no_auto_extension,
+        auto_next=not args.no_auto_next,
+    )
     print(f"listening on {args.iface} for UDP dst port {args.file_port}")
 
     if args.no_dashboard:

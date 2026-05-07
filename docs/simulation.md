@@ -10,6 +10,9 @@
 7. `spi_master_tb`
 8. `eth_controller_adapter_tb`
 9. `adapter_firewall_integration_tb`
+10. `w5500_udp_rx_adapter_tb`
+11. `firewall_forwarder_tb`
+12. `de1_soc_top_udp_socket_forward_tb`
 
 ## Tooling
 
@@ -98,7 +101,10 @@ Each file is a byte-per-line hex memory file intended for `$readmemh`.
 - RX FIFO preserves byte order and packet markers while backpressure is applied
 - firewall core increments counters exactly once per packet
 - SPI master returns the expected response byte from the testbench slave model
-- the W5500 adapter reaches MACRAW-ready state and streams a frame into the internal firewall interface
+- the legacy W5500 adapter reaches MACRAW-ready state and streams a frame into the internal firewall interface
+- the W5500 UDP socket adapter can synthesize UDP/80 and UDP/5001 frames into the internal firewall interface
+- the forwarder preserves header state for frames longer than 255 bytes
+- the top-level UDP socket path forwards allowed UDP/5001 file-demo chunks to the B-side TX path
 
 ## Current signoff snapshot
 
@@ -106,3 +112,7 @@ Validated on this machine:
 - full `run_xsim_suite.ps1` regression passes,
 - `run_questa.ps1 adapter_firewall_integration_tb` passes as an alternate-simulator smoke check,
 - the integrated adapter bench now runs with the RX FIFO enabled through `firewall_top`.
+- 2026-05-07 Questa focused checks passed after the file-demo byte-index fix:
+  `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`,
+  `firewall_forwarder_tb`, `adapter_firewall_integration_tb`,
+  `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.

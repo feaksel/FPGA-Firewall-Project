@@ -6,16 +6,21 @@ is the in-Quartus equivalent of plugging a logic analyzer onto the FPGA, except
 the probe lives inside the FPGA fabric and the wires come out over the same JTAG
 cable Quartus already uses to program the board.
 
-## Why this is the right tool for the current bug
+## Why this is still the right tool
 
-The current open hardware blocker (B-2026-05-03-01) is "A-triggered W5500 B
-transmit does not appear on PC2." HEX pages on the board now show the *first 16
-bytes* of A RX and B TX input plus B TX progress flags (see
-[SW9 byte/state debug mode](#sw9-quick-reference) below). That tells us *what* the
-chip saw and *which sub-state* it reached. SignalTap goes further: it captures
-the full byte stream and the SPI lines cycle-accurately around a trigger event
-like `frame_eop` or `tx_error_b`, so we can see *how* a bad byte arrived or *why*
-SEND completed but PC2 saw nothing.
+The original open hardware blocker (B-2026-05-03-01) was "A-triggered W5500 B
+transmit does not appear on PC2." That blocker is resolved for the final UDP
+gateway architecture, and the MACRAW investigation is kept here as useful debug
+history. SignalTap is still the best no-UART proof path because it captures the
+full byte stream and the SPI lines cycle-accurately around events such as
+`frame_eop`, W5500 A socket commits, or W5500 B SEND completion.
+
+HEX pages on the board show the *first 16 bytes* of A RX and B TX input plus B
+TX progress flags (see [SW9 byte/state debug mode](#sw9-quick-reference) below).
+That tells us *what* the chip saw and *which sub-state* it reached. SignalTap
+goes further: it lets us see whether a packet reached W5500 A, whether the
+forwarder classified it, whether W5500 B wrote the right packet length, and
+whether SEND cleared with zero timeout.
 
 Use the HEX pages first. Use SignalTap when the HEX pages have narrowed the
 question to "what exactly happened in the window of N clocks around event X?"

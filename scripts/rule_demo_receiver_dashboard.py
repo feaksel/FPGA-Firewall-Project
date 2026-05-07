@@ -389,7 +389,7 @@ async function refresh(){
   el.events.innerHTML=d.events.map(e=>`<div class="event"><div class="note">${e.time}</div><div class="kind ${e.kind}">${e.kind}</div><div>${e.detail}</div></div>`).join("") || '<p class="note">No packets yet.</p>';
   el.error.textContent=[d.sniff_error, d.telemetry_error].filter(Boolean).join(" | ");
   el.sources.textContent=`telemetry: ${d.telemetry_target || "not connected"}${d.fpga_age === null ? "" : `, last ${d.fpga_age.toFixed(1)}s ago`}`;
-  el.fpgaLine.textContent=d.fpga_last_line || "No FPGA UART telemetry yet.";
+  el.fpgaLine.textContent=d.fpga_last_line || "No FPGA UART telemetry. Use HEX pages and SignalTap for FPGA-side proof when no TTL USB-UART adapter is connected.";
   drawHistogram(d.fpga); drawRate(d.rate_history, d.elapsed_sec, d.rate_window_sec);
 }
 async function reset(){ await fetch("/api/reset",{method:"POST"}); await refresh(); }

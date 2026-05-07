@@ -42,10 +42,21 @@ Current status note, 2026-05-05 (final-demo pivot):
 - Stop treating W5500 A MACRAW as the product path. It remains valuable diagnostic history, but the final demo path is W5500 UDP socket ingress, FPGA stream policy/signature classification, and W5500 B transmit.
 - Implemented the A+C capstone direction: UDP/80 allow, UDP/5001 file/sine/data allow, UDP/5002 decoy drop, and content-block override with `FW-BLOCK` / `FW-DEMO-DROP`.
 - Added per-rule counters and UART telemetry fields for dashboard histograms: `U80`, `U51`, `D52`, `SIG`, `DEF`, `FIL`, and `SIN`.
-- Latest image compiled and flashed successfully with SOF checksum `0x085DC65F`.
-- Post-flash idle SignalTap capture confirmed W5500 A UDP socket status `0x22` and zero B SEND timeouts. Next hardware validation needs the final PC1 UDP policy sender active: allowed traffic must appear on PC2, blocked traffic must not leak, and FPGA counters must prove the drops happened.
+- That pivot image compiled and flashed successfully with SOF checksum `0x085DC65F`.
+- Post-flash idle SignalTap capture confirmed W5500 A UDP socket status `0x22` and zero B SEND timeouts.
 - UART dashboard wiring is now documented: `GPIO_0_D6` -> USB-UART `RXD`, ground -> ground, `115200 8N1`, dashboard `--uart COMx`. The dashboard rate graph now uses a wall-clock rolling window so it continues moving when traffic stops.
 - File receiver now has a visual browser dashboard with chunk map, SHA-256 status, leak count, and completed-file preview. Sine dashboard now plots sample dots on a rolling time axis so packet gaps remain visible.
+
+Current status note, 2026-05-07 (file-demo hardware fix):
+- Latest flashed image checksum is `0x085D8724`.
+- Fixed the UDP/5001 file-demo hardware failure by widening `firewall_forwarder` byte-index registers from 8 bits to 16 bits. The old index wrapped after byte 255 in 348-byte synthesized file frames and corrupted the saved header fields before the EOP decision.
+- Questa passed for `w5500_udp_rx_adapter_tb`, `de1_soc_top_udp_socket_forward_tb`, `firewall_forwarder_tb`, `adapter_firewall_integration_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb`.
+- Post-fix SignalTap proved the file path: UDP/5001 observed, `last_frame_len=b_last_pkt_len=0x015C`, `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x7D`, `b_send_timeouts=0`.
+- PC2 Npcap sniff captured UDP/5001 `FWFILE1\0` chunks with 306-byte payloads, so W5500 B visibility is proven for the file-demo frame size.
+- User stress-tested the file sender at `--interval 0.001`; 60 allowed chunks were missed out of 3913, so SHA-256 and preview intentionally did not complete. This is expected for raw UDP under stress and is not a dashboard bug.
+- The final clean proof still needs a safe-rate full transfer (`--decoys 1 --interval 0.10`) with SHA-256 match and no UDP/5002/content-block leaks.
+- File receiver now auto-renames completed media from the default `.bin` path to `.mp4`, `.jpg`, `.png`, `.gif`, or `.mp3` when bytes identify the type, and it can advance through multiple `file_id`s for photo-by-photo demos.
+- Added `photo_stream_sender.py` for a simple JPEG/PNG still-frame stream over the same UDP/5001 FPGA path.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
@@ -90,7 +101,7 @@ Current status note, 2026-05-05 (final-demo pivot):
 - [ ] Make `w5500_tx_engine_tb` pass under XSim
 - [x] Integrate W5500 A RX -> rules -> W5500 B TX in a single hardware top
 - [x] Replace W5500 B byte-at-a-time TX payload writes with burst TX-buffer writes
-- [ ] Use PC2 receiver/Wireshark plus board HEX pages as the first no-UART two-port telemetry path
+- [x] Use PC2 receiver/Wireshark plus board HEX pages as the first no-UART two-port telemetry path
 - [x] Add a PC/dashboard UART reader later as an optional live FPGA counter source
 - [ ] Validate W5500 B alone on hardware: reset, `VERSIONR`, MACRAW init
 - [ ] Prove a fixed test frame transmitted from FPGA to PC2
@@ -120,8 +131,9 @@ Current status note, 2026-05-05 (final-demo pivot):
 - [ ] Re-test `SW5=1` raw ingress after every RX adapter edit as the known-good A-side baseline.
 - [x] Do not continue the file/video or sine-wave demos until a PC1-triggered frame is visible on PC2. Completed after round 22; PC2 dashboard/Wireshark now see forwarded packets.
 - [x] Compile and flash the multi-socket UDP policy/signature image.
-- [ ] Bench-test the multi-socket UDP policy/signature image with active PC1 sender and PC2 dashboard.
+- [x] Bench-test the multi-socket UDP policy/signature image for UDP/80 and UDP/5001 allowed traffic with active PC1 sender and PC2 dashboard/sniff.
 - [ ] Capture final SignalTap/UART evidence for UDP/80 allow, UDP/5001 allow, UDP/5002 drop, content-block drop, and zero B SEND timeouts.
+- [ ] Run the final safe-rate file proof (`--decoys 1 --interval 0.10`) and verify SHA-256 match on PC2.
 
 ## Bench protocol checklist (2026-05-05)
 

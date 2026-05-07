@@ -1,6 +1,19 @@
 # BUGS
 
-## Open Bugs
+## Known Demo Limitations
+
+- **UDP file demo is not reliable-transfer protocol.**
+  - Status: expected limitation, not an RTL bug.
+  - The file sender/receiver deliberately use UDP so the FPGA can demonstrate
+    packet policy without implementing retransmission, ordering repair, or TCP.
+  - A stress run at `--interval 0.001` received 3853 of 3913 chunks and missed
+    60. Because even one missing allowed chunk changes the file SHA-256, the
+    dashboard correctly withholds PASS status and file preview until every
+    chunk is present.
+  - Use `--interval 0.10` for the final acceptance demo. Higher rates are useful
+    as throughput/stress experiments after the safe proof is recorded.
+
+## Tracked Bugs
 
 - **B-2026-05-06-01: File demo forwards only the final short chunk, then no safe-size chunks, before forwarder byte-index fix.**
   - Status: resolved in RTL and hardware on 2026-05-07.

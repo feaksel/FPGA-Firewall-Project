@@ -183,8 +183,8 @@ and `LEDR9` means B TX error.
 Special mode notes:
 - With `SW5=1`, forwarding is intentionally disabled. Pages show raw W5500 A receive/drain diagnostics.
 - With `SW6=1`, the FPGA ignores PC1 and periodically sends a known-good internal test frame from W5500 B. This is the current proven B-side TX baseline.
-- With `SW7=1`, the FPGA attempts direct raw A-to-B streaming. This currently passes simulation but fails hardware visibility on PC2.
-- With `SW8=1`, the FPGA attempts to parse A-side traffic and generate a clean known-good B-side allow frame. This is experimental and currently not hardware-proven.
+- With `SW7=1`, the FPGA attempts direct raw A-to-B streaming. This is retained as a legacy MACRAW diagnostic mode.
+- With `SW8=1`, the FPGA attempts to parse A-side traffic and generate a clean known-good B-side allow frame. This is retained as a legacy debug mode; the final demo uses W5500 A UDP socket ingress.
 
 ## Bring-up notes
 
@@ -198,15 +198,16 @@ Special mode notes:
 
 ## Current hardware evidence
 
-As of 2026-05-03:
+As of 2026-05-07:
 - the board image programs successfully over JTAG,
-- the W5500 `VERSIONR` read works on the physical module,
-- W5500 A MACRAW initialization reaches RX polling,
-- deterministic Scapy packets from PC1 are visible when directly cabled to PC2 and cause board W5500 A receive activity,
+- the W5500 `VERSIONR` read works on the physical modules,
+- W5500 A UDP sockets open and receive PC1 traffic,
 - W5500 B can transmit an internally generated frame to PC2 in `SW6` mode,
-- A-triggered TX modes are not yet working:
-  - `SW7` raw bypass produces no visible demo frames on PC2,
-  - `SW8` generated rule-demo latest report showed TX count page `101 = 0000`.
+- W5500 B can transmit PC1-triggered UDP/80 and UDP/5001 policy-forwarded frames to PC2,
+- SignalTap after the forwarder byte-index fix showed `last_frame_len=b_last_pkt_len=0x015C`, `b_tx_count=0x7D`, and `b_send_timeouts=0` for UDP/5001 file chunks,
+- PC2 Npcap sniff captured UDP/5001 `FWFILE1\0` chunks with 306-byte payloads.
 
-Current hardware blocker:
-- individual A RX and B TX paths work, but the A-triggered B TX path is not proven. Next debugging should add first-byte and TX-progress observability rather than adding more demo layers.
+Current hardware focus:
+- complete the safe-rate file SHA-256 proof,
+- prove UDP/5002 and content-block drops without PC2 leaks,
+- use UART histograms when a 3.3 V TTL USB-UART adapter is available; otherwise use HEX pages and SignalTap over USB-Blaster.

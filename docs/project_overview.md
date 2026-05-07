@@ -12,45 +12,46 @@ This document is for teammates who are not deep FPGA specialists but will be wor
 
 ## The project in one sentence
 
-This project builds a simple FPGA-based Ethernet firewall that reads incoming packets, extracts key header fields, checks them against firewall rules, and decides whether each packet should be allowed or dropped.
+This project builds a W5500-based FPGA UDP packet-policy gateway: PC1 sends UDP traffic into W5500 A, the FPGA reconstructs packet streams, classifies services and payload signatures in hardware, and W5500 B forwards only the allowed traffic to PC2.
 
 ## What we are actually trying to achieve
 
 The main goal is not to build a full commercial firewall in one step.
 
 The main goal is to build a clean, testable MVP that can:
-- receive Ethernet frames,
+- receive real network traffic through the W5500 hardware path,
 - inspect IPv4 TCP/UDP packet headers,
 - apply a small ordered rule set,
 - count allowed and dropped packets,
-- and prove that the exact same firewall logic works first in simulation and then on real hardware.
+- scan a small set of payload signatures,
+- and prove that the same parser/policy/forwarding ideas work first in simulation and then on real hardware.
 
 This is important because hardware projects fail easily when too many things are attempted at once. The repo is intentionally structured so that the core firewall can be developed and verified before the board-level Ethernet path is fully proven.
 
 ## What the system does today
 
-At the current stable stage, the design is a one-port packet receive and inspection pipeline that has been exercised on the physical DE1-SoC + W5500 hardware.
+At the current stable stage, the hardware design is a one-way UDP policy gateway that has been exercised on the physical DE1-SoC + two W5500 modules.
 
 In plain language, the flow is:
 
-1. A packet arrives from either a simulation source or a real Ethernet controller.
+1. A packet arrives from either a simulation source or a W5500 A UDP socket.
 2. The packet can pass through a small RX FIFO so the receive side can tolerate backpressure cleanly.
-3. The packet bytes are presented on a shared internal frame interface.
+3. The W5500 UDP record is reconstructed into an internal Ethernet/IPv4/UDP byte stream.
 4. The parser reads the Ethernet and IPv4 headers.
 5. The parser extracts fields such as protocol, source IP, destination IP, source port, and destination port.
-6. The rule engine compares those fields to the configured firewall rules.
-7. The firewall core records whether the packet was allowed or dropped.
-8. Debug counters and LEDs show what happened.
+6. The policy forwarder compares those fields to service rules and scans payload bytes for small demo signatures.
+7. Allowed packets are handed to W5500 B; blocked packets increment counters and do not appear on PC2.
+8. HEX pages, SignalTap, optional UART telemetry, Wireshark, and browser dashboards show what happened.
 
-Right now, the system is not yet a full inline two-port forwarding firewall.
+The system is not a transparent inline L2/TCP firewall. That was the original target, and the debug history is valuable, but the reliable final hardware path is W5500 UDP socket ingress plus FPGA stream policy logic.
 
-As of 2026-05-03, the repo also contains experimental two-port RTL and debug modes. The important hardware status is:
+As of 2026-05-07, the important hardware status is:
 
-- W5500 A receive works: PC1 traffic reaches the FPGA and raw ingress counters/length pages move.
-- W5500 B direct transmit works: `SW6` sends an internally generated demo frame that PC2 can see.
-- A-triggered transmit does not work yet: `SW7` raw bypass and `SW8` generated rule-demo mode do not currently produce visible demo frames on PC2.
-
-This means the hardware problem is no longer "can we talk to each module?" The problem is specifically the handoff from A-side received traffic into a B-side transmit event/frame.
+- W5500 A UDP socket ingress works for UDP/80 and UDP/5001.
+- W5500 B transmit works for PC1-triggered forwarded packets.
+- PC2 Wireshark/dashboard/sniffing has observed forwarded UDP packets.
+- The 348-byte UDP/5001 file-demo frame bug is fixed by widening the forwarder byte index to 16 bits.
+- A-side MACRAW is retained only as diagnostic history; it did not reliably surface the verified PC1 demo packet on this bench setup.
 
 ## Why the project is organized in stages
 
@@ -82,7 +83,7 @@ The current hardware path is frozen around:
 - FPGA board: `Terasic DE1-SoC`
 - Ethernet controller/module: `W5500` over `SPI + RESET + INT`
 - Clock source: `CLOCK_50`
-- First hardware goal: one-port receive inspection
+- Final hardware goal: one-way UDP policy forwarding from PC1 to PC2
 
 The current recommended module style is a `WIZ850io`-type W5500 module because it already includes the RJ45 connector and is a good fit for the SPI-based approach in this project.
 
@@ -219,19 +220,21 @@ The firewall core ties parser and rule engine together and exposes counters such
 
 This module is the central "decision layer" of the project.
 
-### 6. W5500 adapter
+### 6. W5500 adapters
 
-The adapter is the hardware-facing side.
+The adapters are the hardware-facing side.
 
-Its job is to:
+Their job is to:
 - control reset for the W5500,
 - communicate with the W5500 over SPI,
-- initialize the chip for `MACRAW` receive mode,
-- poll for received packets,
-- read packet bytes from the W5500 receive buffer,
-- and stream those bytes into the internal frame interface.
+- initialize W5500 A UDP sockets for ports `80`, `5001`, and `5002`,
+- poll socket receive buffers round-robin,
+- read UDP socket records from W5500 A,
+- synthesize internal Ethernet/IPv4/UDP bytes for the parser/forwarder,
+- initialize W5500 B for transmit,
+- and write allowed packets into W5500 B's TX buffer before issuing `SEND`.
 
-This is the bridge between real Ethernet hardware and the reusable firewall core.
+This is the bridge between real Ethernet hardware and the reusable parser/policy core. The older MACRAW adapter remains in the repo because it was essential for bring-up and diagnosis, but it is not the final demo ingress path.
 
 ## Development stages
 
@@ -334,6 +337,7 @@ Goal:
 
 Main files:
 - [rtl/eth_if/ethernet_controller_adapter.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/ethernet_controller_adapter.v)
+- [rtl/eth_if/w5500_udp_rx_adapter.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/eth_if/w5500_udp_rx_adapter.v)
 - `tb/models/w5500_macraw_model.sv`
 - `tb/tests/eth_controller_adapter_tb.sv`
 - `tb/tests/adapter_firewall_integration_tb.sv`
@@ -341,7 +345,8 @@ Main files:
 What gets tested:
 - controller reset and initialization sequence
 - register read/write behavior
-- MACRAW receive flow
+- legacy MACRAW receive flow
+- UDP socket receive flow
 - streaming a received frame into the firewall core
 
 Move forward when:
@@ -375,34 +380,38 @@ What gets tested next:
 Move forward when:
 - the board receives real traffic and the firewall counters respond as expected
 
-Current status as of 2026-05-01:
-- W5500 reset, SPI register access, and MACRAW initialization work on real hardware.
-- The adapter reaches RX polling on the DE1-SoC with `init_done` active.
-- Deterministic Scapy packets sent by the PC were captured in Wireshark and observed by the FPGA receive path.
-- Single-bit LED counters show activity, but a clearer debug method is still needed to prove every packet profile maps to the expected allow/drop counter result.
+Current status as of 2026-05-07:
+- W5500 reset and SPI register access work on real hardware.
+- W5500 A UDP sockets open and receive PC1 traffic.
+- W5500 B transmits PC1-triggered allowed frames to PC2.
+- HEX pages, SignalTap, and PC2 dashboards now provide the main no-UART proof path.
 
-### Stage 8: Two-port forwarding/debug work
+### Stage 8: Two-port UDP policy forwarding
 
 Goal:
-- extend the project from receive-side inspection into a more complete forwarding design
+- extend the project from receive-side inspection into a working PC1 -> FPGA -> PC2 UDP policy gateway
 
-This stage is active but blocked on hardware.
+This stage is now proven for the UDP socket path.
 
-What has been implemented experimentally:
+What has been implemented:
 - W5500 B TX adapter and simulation model.
 - `SW6` direct B-side generated-frame TX test.
-- `SW7` raw A-to-B bypass debug path.
-- `SW8` generated rule-demo path that should parse A-side traffic and emit a clean known-good B-side frame for allowed traffic.
-- Top-level tests for bypass and generated rule-demo behavior.
+- W5500 A UDP socket ingress for UDP/80, UDP/5001, and UDP/5002.
+- Internal Ethernet/IPv4/UDP stream synthesis from W5500 UDP records.
+- Stream-level allow/drop forwarder, per-rule counters, and content signature blocking.
+- Top-level tests for UDP socket forwarding, bypass, generated rule-demo behavior, and the long UDP/5001 file-demo frame size.
 
 What hardware says:
 - `SW6` works.
-- `SW5` raw A ingress works.
-- `SW7` and `SW8` do not yet work on the board.
+- W5500 A UDP socket ingress works.
+- PC1-triggered B TX works.
+- PC2 sees forwarded UDP/80 and UDP/5001 packets.
+- The old MACRAW/SW7/SW8 paths are diagnostic modes, not the shipping demo path.
 
 Move forward only when:
-- PC2 Wireshark sees a frame caused by PC1 traffic passing through W5500 A and FPGA logic, not just the periodic SW6 self-test.
-- The FPGA can distinguish an allowed trigger from a dropped trigger on hardware.
+- the final file proof reconstructs byte-exactly on PC2 at safe pacing,
+- UDP/5002 and content-block decoys do not leak to PC2,
+- SignalTap or UART counters prove drops occurred inside FPGA policy logic.
 
 ## How testing works in practice
 
@@ -620,35 +629,28 @@ Already established:
 Already established on hardware:
 - real-board wiring validation for the first GPIO_0_D0 through GPIO_0_D5 W5500 connection,
 - real W5500 `VERSIONR` register access,
-- W5500 MACRAW initialization,
-- real packet receive activity from PC traffic,
-- Wireshark confirmation of deterministic Scapy packets.
+- W5500 A UDP socket receive,
+- real packet receive activity from PC1 traffic,
+- Wireshark/dashboard confirmation of forwarded PC2 traffic,
 - W5500 B can transmit a fixed internally generated frame in `SW6` mode.
+- W5500 B can transmit PC1-triggered UDP/80 and UDP/5001 policy-forwarded frames.
 
-Still considered active bring-up work:
-- A-triggered W5500 B transmission,
-- byte-level proof that the first A-side received bytes match the sender's Ethernet header,
-- byte-level proof that the first B-side TX bytes match the intended egress frame,
-- clean allow/drop counter correlation against deterministic PC traffic,
-- UART, SignalTap, or another readback path for dashboard-visible FPGA counters.
+Still considered active final-demo work:
+- complete full-file SHA-256 proof at safe pacing,
+- prove UDP/5002 and content-block drops without PC2 leaks,
+- add/use UART if a 3.3 V TTL USB-UART adapter becomes available; otherwise continue using HEX pages and SignalTap for FPGA-side truth.
 
-## Real inline firewall target
+## Final UDP policy gateway target
 
-The final project target is now a one-way inline firewall first:
+The final project target is now a one-way UDP policy gateway:
 
 ```text
 PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
 ```
 
-The first real demo is still intended to be a chunked file transfer. PC1 sends allowed file chunks on UDP destination port `5001` and intentionally interleaves blocked decoy/error traffic. The FPGA forwards only allowed chunks. PC2 reconstructs the file and verifies SHA-256.
+The first real demo is a chunked file transfer. PC1 sends allowed file chunks on UDP destination port `5001` and intentionally interleaves blocked decoy/error traffic. The FPGA forwards only allowed chunks. PC2 reconstructs the file and verifies SHA-256.
 
-This demo is deferred until A-triggered transmit is proven. The current demo target is narrower:
-
-```text
-PC1 sender -> W5500 A -> FPGA detects allowed/drop packet -> W5500 B emits visible allowed demo frame -> PC2 dashboard
-```
-
-The key acceptance criterion is not a counter on the board. It is a PC2 capture showing the allowed FPGA-emitted frame and no blocked decoy leak.
+The key acceptance criterion is not a counter on the board by itself. It is PC2 capture/dashboard evidence showing allowed traffic, no blocked decoy leak, plus SignalTap/UART/HEX evidence that the FPGA classified and dropped the blocked profiles.
 
 New implementation pieces for this phase:
 - [rtl/firewall/firewall_forwarder.v](/c:/Users/furka/Projects/ELE432_ethernet/rtl/firewall/firewall_forwarder.v): stream-level allow/drop forwarder around the parser, rule engine, and packet buffer.
@@ -657,7 +659,7 @@ New implementation pieces for this phase:
 - [scripts/file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py): PC1 chunk sender with decoy traffic.
 - [scripts/file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): PC2 chunk receiver and SHA-256 verifier.
 
-The current one-port dashboard remains useful for bring-up, and now includes a visual preview of the planned two-port file demo. The dashboard still needs UART or another FPGA telemetry path before it can show true live FPGA decision counters.
+The legacy one-port dashboard remains useful for old deterministic raw-packet bring-up. The final demo dashboards are `rule_demo_receiver_dashboard.py`, `file_receiver.py`, and `sine_receiver_dashboard.py`; they use PC2 packet evidence, optional UART histograms, and SignalTap/HEX proof when UART hardware is not available.
 
 ## The most important project habits
 
@@ -672,11 +674,11 @@ To keep this project understandable and healthy, the team should keep following 
 
 ## If you only remember five things
 
-1. This is an FPGA firewall MVP, not a full network appliance yet.
-2. The core idea is to reuse the same firewall logic in simulation and on hardware.
-3. The project flows from packet source -> parser -> rule engine -> firewall core -> hardware adapter.
-4. We only move forward when the current stage is proven by tests or bring-up evidence.
-5. Real success for the current phase is now narrower: receive real packets is working; the next proof point is clean, repeatable allow/drop correlation for each deterministic packet type.
+1. This is a UDP packet-policy gateway, not a transparent network appliance.
+2. The core idea is to reuse the same parser/policy/forwarding logic in simulation and on hardware.
+3. The project flows from W5500 UDP socket ingress -> synthesized frame stream -> parser/signature/rules -> W5500 B transmit.
+4. We only move forward when the current stage is proven by tests or bench evidence.
+5. Real success for the current phase is a clean file/waveform demo: allowed UDP/80 and UDP/5001 traffic reaches PC2, UDP/5002 and content-block traffic does not leak, and FPGA-side counters/SignalTap explain the decision.
 
 ## Recommended reading order for a new teammate
 

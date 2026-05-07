@@ -89,20 +89,19 @@ Pass criteria:
 Move on when:
 - one-way `PC1 -> W5500 A -> FPGA -> W5500 B -> PC2` forwarding is repeatable
 
-Current status, 2026-05-03:
-- Fixed B-side generated TX works in hardware through `SW6`.
-- W5500 A raw ingress works in hardware through `SW5`.
-- `SW7` raw bypass is not repeatable on hardware; PC2 does not see demo frames.
-- `SW8` generated rule-demo mode is not working on hardware yet; latest observation showed B TX count page `101` stuck at `0000`.
+Current status, 2026-05-07:
+- The transparent/MACRAW attempt was closed as diagnostic history after extensive SignalTap/tcpdump/readback evidence.
+- The accepted hardware architecture is W5500 A UDP socket ingress -> FPGA parser/policy/signature stream -> W5500 B transmit.
+- UDP/80 forwarding was proven in round 22 with SignalTap and PC2 dashboard/Wireshark visibility.
+- UDP/5001 file-demo forwarding is proven after the 16-bit forwarder byte-index fix; post-fix SignalTap showed `b_tx_count=0x7D`, `b_send_timeouts=0`, and PC2 sniffing captured `FWFILE1\0` chunks.
 
 Important test caveat:
-- `two_port_bypass_tb`, `de1_soc_top_bypass_tb`, and `de1_soc_top_rule_regen_tb` pass, but that does not prove hardware forwarding. These benches currently validate intended RTL sequencing against simplified W5500 models. They must be supplemented with hardware byte/state evidence.
+- `two_port_bypass_tb`, `de1_soc_top_bypass_tb`, `de1_soc_top_rule_regen_tb`, `w5500_udp_rx_adapter_tb`, and `de1_soc_top_udp_socket_forward_tb` validate intended RTL sequencing against simplified W5500 models. They must still be supplemented with hardware byte/state evidence, because the real W5500 modules and PC NICs are part of the system.
 
-Additional pass criteria now required before claiming M8:
-- A hardware HEX/debug page proves the first bytes read from W5500 A match the PC1 demo frame.
-- A hardware HEX/debug page proves the first bytes submitted to W5500 B match the intended egress frame.
-- PC2 Wireshark sees a frame caused by PC1 traffic through W5500 A, not the autonomous `SW6` test.
-- A blocked TCP/23 packet increments a hardware drop indicator and does not cause a PC2-visible generated allow frame.
+M8 acceptance:
+- PC2 Wireshark/dashboard sees frames caused by PC1 traffic through W5500 A, not the autonomous `SW6` test.
+- SignalTap or HEX pages show W5500 A socket receive, parser/forwarder activity, B TX buffer writes, SEND clear, and zero B SEND timeouts.
+- Blocked UDP profiles are absent on PC2.
 
 ## Milestone 9: File/Video Demo
 
@@ -110,7 +109,13 @@ Pass criteria:
 - PC1 sends chunked file/video traffic on UDP destination port `5001`
 - decoy/error frames are interleaved and blocked
 - PC2 reconstructs the file with matching SHA-256
-- UART/dashboard counters agree with observed PC2 packets
+- UART/dashboard counters, or SignalTap/HEX pages when no UART adapter is available, agree with observed PC2 packets
 
 Move on when:
 - the final presentation can show forwarded, dropped, lost/error, throughput, chunk-map, and checksum status clearly
+
+Current status, 2026-05-07:
+- Hardware can forward the safe 348-byte UDP/5001 file chunks.
+- The browser file dashboard reports progress, missing chunks, leaks, SHA-256, MIME type, and completed-file preview.
+- A stress run at `--interval 0.001` missed 60 of 3913 allowed chunks; that is expected for a no-retransmission UDP stress test and intentionally prevents SHA-256/preview completion.
+- The final required run is the safe-rate proof: `file_sender.py --decoys 1 --interval 0.10`, with SHA-256 match and zero UDP/5002/content-block leaks.

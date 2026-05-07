@@ -1,11 +1,13 @@
-# FPGA Firewall Project
+# FPGA Firewall / UDP Policy Gateway Project
 
 This repository is organized so the team can:
 1. build and verify the firewall core before hardware arrives,
 2. isolate hardware-risky parts behind a clean adapter interface,
 3. track bugs, design decisions, and milestone status clearly.
 
-This project began as a simple FPGA-based Ethernet firewall MVP on `DE1-SoC + W5500`. The hardware path has now evolved into a **W5500-based UDP packet-policy gateway** because W5500 UDP sockets are reliable on this bench setup while A-side MACRAW receive was not dependable for the intended PC1 demo traffic. The short version is:
+This project began as a simple FPGA-based Ethernet firewall MVP on `DE1-SoC + W5500`. The hardware path has now evolved into a **W5500-based UDP packet-policy gateway** because W5500 UDP sockets are reliable on this bench setup while A-side MACRAW receive was not dependable for the intended PC1 demo traffic. The project name can stay, but the submission story should be honest: this is a hardware policy engine built around the W5500's useful socket abstraction, not a transparent L2/TCP firewall.
+
+The short version is:
 - UDP datagrams come in from W5500 A sockets or from simulation,
 - the FPGA reconstructs an internal Ethernet/IPv4/UDP byte stream,
 - the parser/forwarder extracts header fields and scans payload markers,
@@ -90,10 +92,11 @@ The current implementation includes:
 The current project phase is:
 - simulation-complete for the original receive/inspect MVP pipeline,
 - two-port UDP policy forwarding is proven through W5500 B SEND completion and PC2 Wireshark/dashboard visibility,
+- UDP/5001 file-demo chunks are proven after the 2026-05-07 forwarder byte-index fix,
 - A-side MACRAW remains a legacy diagnostic path, not the final demo path,
 - the final demo work is now multi-service UDP policy, per-rule telemetry, signature blocking, and file/sine visualization.
 
-### Current hardware truth, 2026-05-05
+### Current hardware truth, 2026-05-07
 
 This is the most important status snapshot:
 
@@ -110,9 +113,13 @@ This is the most important status snapshot:
 - The current working path uses W5500 A UDP socket RX, waits for PHY link, reconstructs an internal Ethernet/IP/UDP stream, and feeds the firewall/forwarder/B-TX path.
 - Round-22 hardware capture proved `S0_SR=0x22`, `PHYCFGR=0xBF`, `frames_udp_dport80=frames_demo_match=0x74`, `b_tx_count=0x74`, and `b_send_timeouts=0`.
 - PC2 Wireshark/dashboard subsequently confirmed forwarded packets arriving.
-- The next image extends W5500 A from one UDP socket to three services: UDP `80` allow, UDP `5001` allow, UDP `5002` drop, plus content-block signature override.
+- The final demo image extends W5500 A from one UDP socket to three services: UDP `80` allow, UDP `5001` allow, UDP `5002` drop, plus content-block signature override.
+- SOF checksum `0x085D8724` includes the 2026-05-07 forwarder fix for long UDP/5001 file frames.
+- Root cause of the file-demo hardware failure was an 8-bit byte index in `rtl/firewall/firewall_forwarder.v`. A 348-byte synthesized file frame wrapped after byte 255 and corrupted saved header fields before the EOP policy decision. The fix widens the forwarder byte index/current index to 16 bits.
+- Post-fix SignalTap proved UDP/5001 forwarding: `stp_last_frame_len=0x015C`, `b_last_pkt_len=0x015C`, `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x7D`, and `b_send_timeouts=0`.
+- PC2 Npcap sniff then captured UDP/5001 packets carrying `FWFILE1\0` with 306-byte payloads, proving the fixed image reaches PC2 rather than only completing W5500 B SEND internally.
 
-The PC1-triggered FPGA/W5500 forwarding path is now proven. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the next-step bench protocol is in `docs/next_bench_session.md`.
+The PC1-triggered FPGA/W5500 forwarding path is now proven. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the current bench/demo protocol is in `docs/next_bench_session.md`.
 
 ## Current verification status
 
@@ -135,7 +142,7 @@ Focused Questa tests added during two-port bring-up:
 - `firewall_forwarder_tb`
 - `de1_soc_top_udp_socket_forward_tb`
 
-These tests prove the intended RTL handshakes against local W5500 models. Hardware acceptance still requires PC2 Wireshark/dashboard visibility plus FPGA counters, because the W5500 modules and direct-link PCs are part of the real system.
+These tests prove the intended RTL handshakes against local W5500 models. Hardware acceptance is defined by PC2 Wireshark/dashboard visibility plus FPGA counters, because the W5500 modules and direct-link PCs are part of the real system.
 
 Run the full suite with:
 - `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1`
@@ -165,13 +172,11 @@ Current hardware evidence:
 - board LEDs and HEX pages show receive activity while traffic is present.
 - direct W5500 B TX test mode works and reaches PC2.
 
-Remaining hardware work:
-- validate the `SW9` byte/state diagnostics for the first bytes received from W5500 A and the first bytes submitted to W5500 B,
-- isolate why A-triggered TX does not emit visible frames even though direct B TX works,
-- only after that, return to real one-way allow/drop forwarding,
-- add UART/SignalTap/HPS readback or another reliable counter path before relying on dashboards for FPGA-internal truth,
-- use the SignalTap guide if HEX/LED diagnostics are not enough to explain the handoff failure,
-- defer the final two-port file/video chunk demo until A-triggered TX is proven.
+Current final-demo work:
+- run the full file/video transfer at the safe `--interval 0.10` pacing until PC2 reconstructs the complete file and SHA-256 passes,
+- keep `--interval 0.001` or other burst settings as stress tests only; dropped UDP chunks are expected there because the demo intentionally has no retransmission protocol,
+- prove UDP/5002 and `FW-BLOCK` / `FW-DEMO-DROP` traffic is classified and dropped with no PC2 leaks,
+- use UART histograms if a 3.3 V TTL USB-UART adapter is available; otherwise use HEX pages plus SignalTap over USB-Blaster for FPGA-side proof.
 
 ## Hardware target
 
@@ -188,7 +193,7 @@ Final demo target:
 PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
 ```
 
-The planned proof is a chunked file transfer. Allowed chunks use UDP destination port `5001`; blocked decoy/error traffic is intentionally interleaved and should not appear on PC2. PC2 verifies the reconstructed file with SHA-256.
+The planned proof is a chunked file transfer. Allowed chunks use UDP destination port `5001`; blocked decoy/error traffic is intentionally interleaved and should not appear on PC2. PC2 verifies the reconstructed file with SHA-256. The waveform demo uses the same UDP/5001 data path and plots only received signed-sample payload values, so packet gaps appear as real missing intervals.
 
 ## Two-PC demo setup
 
@@ -259,7 +264,7 @@ This continuously sends:
 - a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
 - a small default sine-shaped packet stream (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
 
-Put a small test file in the repo folder, for example `demo.mp4` or `demo.bin`, then run:
+Put a small test file in the repo folder, for example `demo.mp4`, `demo.jpg`, `demo.png`, or `demo.bin`, then run:
 
 ```powershell
 py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
@@ -292,6 +297,17 @@ a probe. Then run the full proof with decoys:
 ```bash
 sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10
 ```
+
+The full proof should use the safe default pacing. Very small intervals such as
+`0.001` are stress tests for the two-W5500 path; because the file demo is raw UDP
+with no retransmission, any missed allowed chunk prevents SHA-256 pass and the
+dashboard intentionally waits instead of writing or previewing a corrupt file.
+
+The PC2 receiver auto-detects completed MP4, JPEG, PNG, GIF, and MP3 payloads
+from the reconstructed bytes. If you leave the default `.bin` output, it rewrites
+the suffix after completion, for example `received_fw_file.mp4` or
+`received_fw_file.jpg`, and previews the media inline when the browser supports
+it.
 
 For SignalTap or UART debugging, keep the small probe running continuously:
 
@@ -431,7 +447,7 @@ sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --wave sine --wa
 For the file/video checksum demo, start the receiver before PC1 starts sending:
 
 ```powershell
-py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4 --port 8092
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --port 8092
 ```
 
 Then open:
@@ -449,6 +465,21 @@ What PC2 does:
 - writes the completed file to disk,
 - previews completed images/video/audio/text in the browser when the file type is supported,
 - reports `PASS` when the reconstructed file matches PC1's original file.
+
+For a simple photo-by-photo demo, put small JPEG/PNG frames in a folder on PC1
+and run:
+
+```bash
+sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --loop --interval 0.10
+```
+
+PC2 can use the same `file_receiver.py` dashboard. Each completed image uses a
+new `file_id`, so the receiver automatically advances and previews the latest
+frame. This is a still-frame stream, not compressed live video; use small
+compressed images such as 160x120 or 320x240 for a smoother demo.
+
+If a camera/screenshot tool on PC1 writes new JPEG/PNG files into that folder,
+use `--watch` instead of `--loop` to transmit each new photo as it appears.
 
 Optional Wireshark checks on PC2:
 

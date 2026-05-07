@@ -118,7 +118,7 @@ The dashboard provides:
 
 For the current one-port setup, the dashboard can only compare what the PC sent and captured on its own interface. It cannot directly read the FPGA's internal allow/drop counters yet. Use the board `HEX3..HEX0` pages as the FPGA-side truth.
 
-The dashboard now also includes a two-port file-demo preview panel. It is a UX placeholder until the FPGA can transmit on W5500 B and stream UART telemetry.
+This legacy dashboard predates the final UDP gateway demos. Use it only for old one-PC/raw-packet bring-up. The final PC2 dashboards are `rule_demo_receiver_dashboard.py`, `file_receiver.py`, and `sine_receiver_dashboard.py`.
 
 ## Phase E: Two-port UDP file-transfer demo
 
@@ -143,6 +143,10 @@ therefore becomes a 604-byte internal frame. On any image/path still limited to
 512-byte frames, those full chunks are committed/dropped before the rule engine
 and only the final short chunk reaches PC2. If you override the chunk size on a
 conservative image, stay at `--chunk-size 420` or smaller.
+
+The current `0x085D8724` image fixes the later long-frame forwarder bug for the
+default 348-byte synthesized file chunks. Keep the conservative default anyway:
+it gives the W5500/SPI path enough margin for a clean presentation.
 
 The sender default interval is now `0.10 s` per datagram. The earlier `0.01 s`
 setting can overrun the two-W5500 path during full file+decoy transfers. Use a
@@ -200,10 +204,26 @@ sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --int
 Expected: PC2 reconstructs the full file, SHA-256 passes, and UDP/5002 /
 `FW-BLOCK` decoys do not leak.
 
+The same flow works for JPEG and PNG images:
+
+```bash
+sudo python3 scripts/file_sender.py --iface en0 --file demo.jpg --decoys 1 --interval 0.10
+sudo python3 scripts/file_sender.py --iface en0 --file demo.png --decoys 1 --interval 0.10
+```
+
+The receiver detects completed MP4/JPEG/PNG/GIF/MP3 payloads from the bytes. If
+you use the default `.bin` output name, it automatically saves as
+`received_fw_file.mp4`, `.jpg`, or `.png` after the full file arrives.
+
+Do not use `--interval 0.001` for the final proof. That is a stress test. The
+file demo uses raw UDP with no retransmission, so a missed allowed chunk means
+the dashboard must keep showing missing chunks and must not write or preview a
+corrupt file.
+
 Receiver on PC2:
 
 ```powershell
-py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --output .\received_demo.mp4 --port 8092
+py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --port 8092
 ```
 
 Open:
@@ -223,6 +243,26 @@ The receiver dashboard reports:
 - and a browser preview for completed image/video/audio/text files when the MIME type is supported.
 
 The video version is chunked file transfer, not live streaming. The intentionally dropped frames are decoy/error traffic, not required media chunks, so the received video should play if every allowed chunk arrives.
+
+For a still-frame stream, use a directory of small JPEG/PNG frames on PC1:
+
+```bash
+sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --loop --interval 0.10
+```
+
+The PC2 `file_receiver.py` dashboard automatically moves to the next `file_id`
+after each completed image and refreshes the preview. This is a photo-by-photo
+stream over the same UDP/5001 hardware path, not a compressed video codec. Keep
+images small, for example 160x120 or 320x240, if you want the preview to update
+quickly.
+
+If another PC1 tool writes camera stills or screenshots into the folder, run:
+
+```bash
+sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --watch --interval 0.10
+```
+
+`--watch` sends each new JPEG/PNG once as it appears.
 
 ## Phase F: Continuous payload-waveform demo
 
@@ -282,8 +322,8 @@ If using the latest debug FPGA image, use these switch modes:
 
 - `SW5=1`: raw W5500 A ingress drain. This disables forwarding and proves PC1 -> W5500 A -> FPGA RX.
 - `SW6=1`: direct W5500 B self-test. This ignores PC1 and periodically sends a known-good `FW-DEMO-ALLOW-SSH` frame to PC2.
-- `SW7=1`: raw A-to-B bypass. SignalTap plus `sw7-0004.pcapng` prove this can forward at least some real Mac-origin multicast frames; the rule-demo marker path still needs a clean real-MAC retest.
-- `SW8=1`: generated rule-demo mode. This should use A-side allowed/drop packets as triggers and send a known-good B-side allow frame, but the latest hardware result was `SW[3:1]=101 = 0000`, so it still needs debugging.
+- `SW7=1`: legacy raw A-to-B bypass diagnostic. SignalTap plus `sw7-0004.pcapng` proved it can forward at least some real Mac-origin multicast frames, but it is not the final demo path.
+- `SW8=1`: legacy generated rule-demo diagnostic. It was useful during MACRAW debugging, but the final demo uses W5500 A UDP socket ingress instead.
 
 Only one of `SW5`, `SW6`, `SW7`, and `SW8` should be enabled during a test.
 
@@ -490,6 +530,7 @@ compiled image.
 - [rule_demo_udp_socket_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_udp_socket_sender.py): canonical PC1 final-demo sender. Uses normal UDP sockets plus static ARP and cycles through UDP/80 allow, UDP/5001 allow, UDP/5002 drop, and content-block payload profiles.
 - [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for allowed packets, blocked-packet leak warnings, FPGA UART histograms, and `.pcapng` inspection with `--pcap`.
 - [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with visual browser dashboard, SHA-256 verification, completed-file preview, and interleaved decoys.
+- [photo_stream_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/photo_stream_sender.py): sends a folder of JPEG/PNG images as successive `FWFILE1\0` transfers for a photo-by-photo visual demo on the same receiver dashboard.
 - [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 payload-sample visualization with sine/square/triangle/saw/step/noise/custom-value/text modes, wall-clock sample dots, visible drop gaps, UDP/5002 decoys, and content-block decoys.
 - [pcap_summary.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/pcap_summary.py): current pcap summary tool for UDP gateway markers.
 - [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): older quick pcap summary tool retained for bring-up/debug captures.

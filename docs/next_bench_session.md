@@ -1,4 +1,4 @@
-# Next Bench Session - UDP Policy Gateway (2026-05-05)
+# Next Bench Session - UDP Policy Gateway (2026-05-07)
 
 The project has moved from "make W5500 MACRAW behave like a transparent
 Ethernet firewall" to a shippable W5500 UDP packet-policy gateway. MACRAW is
@@ -36,6 +36,10 @@ The current flashed SOF checksum is `0x085D8724` and includes:
 - Forwarder long-frame fix: the policy byte index is 16 bits wide, so
   file-demo frames longer than 255 bytes no longer corrupt the saved header
   state before the EOP rule decision.
+- File dashboard update: incomplete transfers now explicitly report the missing
+  chunk count and wait for a byte-exact file before writing or previewing. MP4,
+  JPEG, PNG, GIF, and MP3 payloads are detected from completed-file bytes, and
+  the default `.bin` output is auto-renamed to the detected media suffix.
 
 ## Bench Protocol
 
@@ -140,6 +144,10 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   `--decoys 0 --limit-chunks 4` to prove allowed UDP/5001 chunks reach PC2,
   then run the full `--decoys 1` checksum proof. The old `--interval 0.01` burst
   can overrun the two-W5500 path and make PC2 appear silent.
+- `--interval 0.001` is a stress test, not an acceptance run. A recent stress
+  run received 3853 of 3913 chunks and missed 60, so the dashboard correctly
+  withheld SHA-256/pass status and file preview. Use the safe rate for the final
+  proof unless a retransmission layer is added.
 - If the 4-chunk probe shows no PC2 UDP packets, run it continuously with
   `--repeat 0` and capture UART/SignalTap. The key split is whether `rx_commit`
   and `U51`/`FIL` rise while B TX remains zero, or whether socket 1 never
@@ -180,6 +188,13 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   streams. The receiver plots the received payload values only, so a square-wave
   packet stream renders as a square wave and arbitrary values render as
   themselves.
+- For a photo-by-photo visual demo, run PC2 `file_receiver.py` on port `8092`
+  and PC1:
+  `sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --loop --interval 0.10`.
+  Each image is a complete JPEG/PNG file transfer with a new `file_id`; the
+  receiver automatically advances and previews the latest completed frame.
+  Use `--watch` instead of `--loop` if another PC1 tool is dropping fresh camera
+  stills or screenshots into the folder.
 
 ## If Something Fails
 

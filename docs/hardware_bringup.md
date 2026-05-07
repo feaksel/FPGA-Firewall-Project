@@ -28,9 +28,10 @@
 ## Day 3+
 - [x] feed real packet bytes into existing firewall core
 - [x] compare parsed fields against Wireshark capture
-- [ ] verify allow/drop counts
-- [ ] prove A-triggered W5500 B TX
-- [ ] only then start final second-port forwarding/file demo
+- [x] verify allow/drop counts on the UDP socket policy path
+- [x] prove PC1-triggered W5500 B TX on the UDP socket policy path
+- [x] start final second-port forwarding/file demo
+- [ ] complete final safe-rate file SHA-256 proof with decoys and no leaks
 
 ## 2026-05-01 hardware status
 
@@ -61,8 +62,8 @@ Current verified state:
 - Direct PC1-to-PC2 cable test works:
   - direct capture contains frames from source MAC `00:11:22:33:44:55`.
 
-Current blocker:
-- A-triggered transmit is narrowed but not accepted:
+Historical blocker at that time:
+- A-triggered MACRAW transmit was narrowed but not accepted:
   - `SW7=1` raw bypass has produced TX counts such as `0004`/`0006`, but PC2 captures did not show the intended demo markers.
   - `SW8=1` generated rule-demo mode latest report showed `SW[3:1]=101 = 0000`, so no generated B TX was triggered.
   - SignalTap now proves `SW7=1` can reach W5500 B TX for at least one frame: SEND is issued, SEND clears, timeout stays zero, and B TX first bytes are `FFFFFFFFFFFF00112233445508004500`.
@@ -82,10 +83,28 @@ Current rule:
 - Do not treat FPGA TX count alone as proof of forwarding. The acceptance evidence is a PC2 capture containing the expected demo source/payload caused by PC1 traffic.
 
 Next bring-up action:
-1. Re-test PC1 with `sudo python3 scripts/rule_demo_sender.py --iface enX`, using the new real-MAC default.
-2. Compare with PC2 Wireshark using no filter first, then `frame contains "FW-DEMO"`.
-3. Summarize the pcap with `py -3 scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng`.
-4. If demo markers still do not appear, capture `SW7=1` around `stp_tx_b_ctrl[1] = 1` or `stp_b_send_issued[0]` rising while the updated sender is running.
+The 2026-05-03 action list is now historical. The final path moved away from
+A-side MACRAW and uses W5500 UDP sockets.
+
+## 2026-05-07 hardware status
+
+Current verified state:
+- W5500 A UDP socket ingress works for UDP/80 and UDP/5001.
+- W5500 B transmits PC1-triggered allowed frames to PC2.
+- SOF checksum `0x085D8724` includes the forwarder 16-bit byte-index fix.
+- SignalTap proved safe-size file-demo forwarding with `last_frame_len=0x015C`,
+  `b_last_pkt_len=0x015C`, `b_tx_count=0x7D`, and `b_send_timeouts=0`.
+- PC2 Npcap sniff captured UDP/5001 `FWFILE1\0` chunks with 306-byte payloads.
+
+Current bring-up action:
+1. Use normal mode: `SW0=1`, `SW5=0`, `SW7=0`, `SW8=0`, `SW9=0`.
+2. Run the final file receiver on PC2:
+   `py -3 scripts\file_receiver.py --iface Ethernet --output .\received_demo.mp4 --port 8092`.
+3. Run the safe PC1 sender:
+   `sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10`.
+4. Confirm PC2 SHA-256 pass and zero UDP/5002 / `FW-BLOCK` leaks.
+5. If UART is not connected, capture SignalTap force-export and decode it with
+   `scripts/inspect_signaltap_csv.py`.
 
 ## Red flags
 Stop and document before proceeding if:
