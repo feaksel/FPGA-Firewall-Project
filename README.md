@@ -481,6 +481,31 @@ compressed images such as 160x120 or 320x240 for a smoother demo.
 If a camera/screenshot tool on PC1 writes new JPEG/PNG files into that folder,
 use `--watch` instead of `--loop` to transmit each new photo as it appears.
 
+This repo includes a ready-to-use media folder:
+[demo files](/c:/Users/furka/Projects/ELE432_ethernet/demo%20files/README.md).
+For the quickest visual demo from those files:
+
+```bash
+python3 -m pip install pillow
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0
+```
+
+For exact media proof:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 --interval 0.10
+```
+
+For webcam snapshots from PC1 to PC2:
+
+```bash
+python3 -m pip install opencv-python
+sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10
+```
+
+The webcam demo sends repeated JPEG still frames over the same UDP/5001 policy
+path. It is a still-photo stream, not a compressed live-video codec.
+
 Optional Wireshark checks on PC2:
 
 ```text

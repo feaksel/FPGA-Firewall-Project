@@ -264,6 +264,32 @@ sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --watch --i
 
 `--watch` sends each new JPEG/PNG once as it appears.
 
+The repo also includes [demo files](/c:/Users/furka/Projects/ELE432_ethernet/demo%20files/README.md)
+with `demo_jpg.jpg`, `demo_png.png`, `demo_gif.gif`, and `demo_mp4.mp4`.
+Use the media wrapper for named profiles:
+
+```bash
+python3 -m pip install pillow
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile images --interval 0.10 --decoys 0
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 --interval 0.10
+```
+
+By default, image profiles are resized to a smaller JPEG payload before sending
+so the visual demo completes quickly. Add `--original` when the goal is
+byte-exact transfer of the checked-in media file.
+
+For webcam snapshots from PC1:
+
+```bash
+python3 -m pip install opencv-python
+sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10
+```
+
+This captures repeated JPEG stills and sends each one as a complete `FWFILE1`
+transfer. It is a practical "webcam photo stream" demo on the current hardware
+without adding a video codec or changing RTL.
+
 ## Phase F: Continuous payload-waveform demo
 
 For the live presentation, use the continuous payload-waveform demo before or beside the file-transfer proof.
@@ -531,6 +557,8 @@ compiled image.
 - [rule_demo_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_receiver_dashboard.py): PC2 dashboard for allowed packets, blocked-packet leak warnings, FPGA UART histograms, and `.pcapng` inspection with `--pcap`.
 - [file_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_sender.py) and [file_receiver.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/file_receiver.py): chunked UDP/5001 file proof with visual browser dashboard, SHA-256 verification, completed-file preview, and interleaved decoys.
 - [photo_stream_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/photo_stream_sender.py): sends a folder of JPEG/PNG images as successive `FWFILE1\0` transfers for a photo-by-photo visual demo on the same receiver dashboard.
+- [media_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/media_demo_sender.py): convenience sender for the checked-in `demo files` media profiles (`jpg`, `png`, `gif`, `mp4`, `images`, `all`), with optional image resizing for faster presentation.
+- [webcam_photo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/webcam_photo_sender.py): optional OpenCV-based PC1 webcam snapshot sender that streams repeated JPEG still frames through the same UDP/5001 file path.
 - [sine_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_sender.py) and [sine_receiver_dashboard.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/sine_receiver_dashboard.py): live UDP/5001 payload-sample visualization with sine/square/triangle/saw/step/noise/custom-value/text modes, wall-clock sample dots, visible drop gaps, UDP/5002 decoys, and content-block decoys.
 - [pcap_summary.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/pcap_summary.py): current pcap summary tool for UDP gateway markers.
 - [inspect_capture.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/inspect_capture.py): older quick pcap summary tool retained for bring-up/debug captures.

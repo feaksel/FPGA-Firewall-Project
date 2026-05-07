@@ -7,6 +7,9 @@
   - Browser previews now fetch `/file?sha=...` with `Cache-Control: no-store`, which keeps repeated image/frame demos from showing a cached previous file.
   - The receiver can automatically advance to a new `file_id` after completing the current file, enabling still-frame/photo-by-photo demos.
 - Added `scripts/photo_stream_sender.py`, a PC1 helper that sends a directory of JPEG/PNG files as successive `FWFILE1\0` UDP/5001 transfers for a visual photo stream on the existing PC2 file dashboard.
+- Added `scripts/media_demo_sender.py`, a convenience wrapper for the checked-in `demo files` folder. It supports `jpg`, `png`, `gif`, `mp4`, `images`, and `all` profiles, resizes image profiles by default for faster visual demos, and supports `--original` for byte-exact media proof.
+- Added `scripts/webcam_photo_sender.py`, an optional OpenCV-based PC1 webcam snapshot sender. It captures JPEG still frames and sends each one as a complete UDP/5001 file transfer to the existing PC2 dashboard.
+- Added [demo files/README.md](/c:/Users/furka/Projects/ELE432_ethernet/demo%20files/README.md) with media-demo commands, exact-original proof commands, photo-stream commands, and webcam setup notes.
 - Refreshed the final project documentation around the accepted UDP policy gateway scope.
   - Updated `README.md`, `TODO.md`, `docs/project_overview.md`, `docs/test_plan.md`, `docs/pc_traffic.md`, `docs/next_bench_session.md`, `docs/de1_soc_w5500_hardware.md`, and `docs/signaltap_debug.md`.
   - Removed stale "A-triggered TX still blocked" wording from the main docs and kept it only as legacy MACRAW diagnostic history.

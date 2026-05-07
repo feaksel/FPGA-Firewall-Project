@@ -195,6 +195,13 @@ requires saving the `.stp`, recompiling Quartus, and flashing the matching SOF.
   receiver automatically advances and previews the latest completed frame.
   Use `--watch` instead of `--loop` if another PC1 tool is dropping fresh camera
   stills or screenshots into the folder.
+- The checked-in [demo files](/c:/Users/furka/Projects/ELE432_ethernet/demo%20files/README.md)
+  folder has ready media. Quick visual image proof:
+  `sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0`.
+  Exact media proof:
+  `sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 --interval 0.10`.
+- Webcam snapshot proof is possible with OpenCV on PC1:
+  `sudo python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 320 --interval 0.10`.
 
 ## If Something Fails
 

@@ -114,13 +114,13 @@ def main():
 
     directory = Path(args.dir)
     images = collect_images(directory, args.patterns)
-    if not images:
+    if not images and not args.watch:
         parser.error(f"no images found in {directory} matching {args.patterns}")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((args.src_ip, args.src_port))
 
-    print(f"Sending {len(images)} image(s) from {directory}")
+    print(f"Sending {len(images)} image(s) from {directory}" if images else f"Watching {directory} for image files")
     print(f"patterns={args.patterns} chunk_size={args.chunk_size} interval={args.interval:g}s frame_gap={args.frame_gap:g}s decoys={args.decoys}")
     print("Use small compressed images for a fluid demo, for example 160x120 or 320x240 JPEG/PNG.")
     print("PC2 receiver should run: py -3 scripts\\file_receiver.py --iface Ethernet --port 8092")

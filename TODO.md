@@ -57,6 +57,8 @@ Current status note, 2026-05-07 (file-demo hardware fix):
 - The final clean proof still needs a safe-rate full transfer (`--decoys 1 --interval 0.10`) with SHA-256 match and no UDP/5002/content-block leaks.
 - File receiver now auto-renames completed media from the default `.bin` path to `.mp4`, `.jpg`, `.png`, `.gif`, or `.mp3` when bytes identify the type, and it can advance through multiple `file_id`s for photo-by-photo demos.
 - Added `photo_stream_sender.py` for a simple JPEG/PNG still-frame stream over the same UDP/5001 FPGA path.
+- Added `media_demo_sender.py` and `demo files/README.md` for the checked-in JPG/PNG/GIF/MP4 demo assets.
+- Added optional `webcam_photo_sender.py` for repeated PC1 webcam snapshots over the same UDP/5001 path.
 
 ## Immediate Tasks
 - [x] Finalize `docs/interfaces.md`
