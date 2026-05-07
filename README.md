@@ -490,6 +490,19 @@ python3 -m pip install pillow
 sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0
 ```
 
+If chunks are missing, use repeated passes with the same `file_id` instead of
+speeding up the sender:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0 --retry-passes 3
+```
+
+For a smaller payload:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --image-max-side 160 --image-target-kb 24 --interval 0.10 --decoys 0
+```
+
 For exact media proof:
 
 ```bash

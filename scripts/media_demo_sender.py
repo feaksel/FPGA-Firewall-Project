@@ -46,30 +46,45 @@ def expand_profiles(profile):
     return [profile]
 
 
+def encode_resized_image(path: Path, args):
+    from io import BytesIO
+
+    from PIL import Image
+
+    target_bytes = args.image_target_kb * 1024
+    best = None
+    with Image.open(path) as img:
+        img = img.convert("RGB")
+        side = args.image_max_side
+        while side >= 96:
+            candidate = img.copy()
+            candidate.thumbnail((side, side))
+            for quality in (args.jpeg_quality, 60, 50, 40, 32):
+                out = BytesIO()
+                candidate.save(out, format="JPEG", quality=max(1, min(100, quality)), optimize=True)
+                data = out.getvalue()
+                best = data
+                if len(data) <= target_bytes:
+                    return data, side, quality, True
+            side = int(side * 0.75)
+    return best or path.read_bytes(), side, args.jpeg_quality, False
+
+
 def load_media_bytes(path: Path, profile: str, args):
     data = path.read_bytes()
     if args.original or profile not in IMAGE_PROFILES or args.image_max_side <= 0:
         return data, path.name, "original"
 
     try:
-        from PIL import Image
+        resized, side, quality, hit_target = encode_resized_image(path, args)
     except ImportError:
-        print("Pillow is not installed; sending original image bytes. Install with: python3 -m pip install pillow")
-        return data, path.name, "original-no-pillow"
+        raise SystemExit(
+            "Pillow is required for the fast resized image demo. Install with: "
+            "python3 -m pip install pillow, or add --original to send exact original bytes slowly."
+        )
 
-    try:
-        with Image.open(path) as img:
-            img = img.convert("RGB")
-            img.thumbnail((args.image_max_side, args.image_max_side))
-            from io import BytesIO
-
-            out = BytesIO()
-            img.save(out, format="JPEG", quality=args.jpeg_quality, optimize=True)
-            jpeg = out.getvalue()
-            return jpeg, f"{path.stem}_{args.image_max_side}px_q{args.jpeg_quality}.jpg", "resized-jpeg"
-    except Exception as exc:
-        print(f"Image resize failed for {path}: {exc}; sending original bytes.")
-        return data, path.name, "original-resize-failed"
+    status = "target" if hit_target else "best-effort"
+    return resized, f"{path.stem}_{side}px_q{quality}.jpg", f"resized-jpeg-{status}"
 
 
 def send_bytes_as_file(sock, args, data: bytes, display_name: str, file_id: int):
@@ -118,10 +133,12 @@ def main():
     parser.add_argument("--chunk-size", type=int, default=CONSERVATIVE_CHUNK_SIZE)
     parser.add_argument("--interval", type=float, default=SAFE_INTERVAL_SEC)
     parser.add_argument("--decoys", type=int, default=0, help="Decoys per chunk. Use 1 for policy proof, 0 for faster visual media demos.")
+    parser.add_argument("--retry-passes", type=int, default=1, help="Send each selected media item this many times with the same file_id so PC2 can fill missed chunks.")
     parser.add_argument("--file-id-start", type=int, default=200)
     parser.add_argument("--original", action="store_true", help="Send exact image bytes instead of resized JPEG demo bytes.")
-    parser.add_argument("--image-max-side", type=int, default=320, help="Resize JPG/PNG/GIF profiles to this max side before sending. Use 0 with --original behavior.")
-    parser.add_argument("--jpeg-quality", type=int, default=70)
+    parser.add_argument("--image-max-side", type=int, default=240, help="Resize JPG/PNG/GIF profiles to this max side before sending. Use 0 with --original behavior.")
+    parser.add_argument("--image-target-kb", type=int, default=48, help="Best-effort target size for resized image payloads.")
+    parser.add_argument("--jpeg-quality", type=int, default=65)
     parser.add_argument("--src-ip", default=DEFAULT_SRC_IP)
     parser.add_argument("--dst-ip", default=DEFAULT_DST_IP)
     parser.add_argument("--src-port", type=int, default=40020)
@@ -141,10 +158,14 @@ def main():
         parser.error("--repeat-delay must be non-negative")
     if args.decoys < 0:
         parser.error("--decoys must be non-negative")
+    if args.retry_passes <= 0:
+        parser.error("--retry-passes must be greater than zero")
     if not 0 <= args.file_id_start <= 65535:
         parser.error("--file-id-start must be 0..65535")
     if args.image_max_side < 0:
         parser.error("--image-max-side must be non-negative")
+    if args.image_target_kb <= 0:
+        parser.error("--image-target-kb must be greater than zero")
     if not 1 <= args.jpeg_quality <= 100:
         parser.error("--jpeg-quality must be 1..100")
 
@@ -169,7 +190,8 @@ def main():
         print(f"  {line}")
     print(
         f"profile={args.profile} interval={args.interval:g}s chunk_size={args.chunk_size} "
-        f"decoys={args.decoys} image_max_side={args.image_max_side} original={args.original}"
+        f"decoys={args.decoys} retry_passes={args.retry_passes} "
+        f"image_max_side={args.image_max_side} image_target_kb={args.image_target_kb} original={args.original}"
     )
 
     file_id = args.file_id_start
@@ -181,9 +203,12 @@ def main():
             for profile, path in paths:
                 data, display_name, mode = load_media_bytes(path, profile, args)
                 print(f"source={path} mode={mode}")
-                allowed, decoys = send_bytes_as_file(sock, args, data, display_name, file_id)
-                total_allowed += allowed
-                total_decoys += decoys
+                for retry_pass in range(args.retry_passes):
+                    if args.retry_passes > 1:
+                        print(f"  retry pass {retry_pass + 1}/{args.retry_passes} with file_id={file_id}")
+                    allowed, decoys = send_bytes_as_file(sock, args, data, display_name, file_id)
+                    total_allowed += allowed
+                    total_decoys += decoys
                 file_id = (file_id + 1) & 0xFFFF
             pass_index += 1
             if args.repeat == 0 or pass_index < args.repeat:

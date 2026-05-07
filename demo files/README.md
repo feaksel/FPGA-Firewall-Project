@@ -18,13 +18,19 @@ take several minutes. For a faster visual demo, use the media wrapper's default
 image resizing. For checksum proof of the exact original, use `--original` or
 `file_sender.py`.
 
+Why packets get lost: this demo is raw UDP, and the FPGA/W5500 path has no ACK,
+retransmission, or TCP-style congestion control. If the sender pushes hundreds
+of chunks too quickly, W5500/SPI buffering or PC capture can miss some. Missing
+one allowed chunk is enough to prevent SHA-256 PASS and preview completion.
+
 Image resizing in `media_demo_sender.py` uses Pillow when available:
 
 ```bash
 python3 -m pip install pillow
 ```
 
-If Pillow is not installed, the wrapper falls back to sending original image
+If Pillow is not installed, the fast resized-image mode stops and asks you to
+install it. Add `--original` only when you intentionally want exact original
 bytes, which is correct but slower.
 
 ## PC2 Receiver
@@ -76,6 +82,19 @@ file instead of restarting the same preview.
 Important: the fast visual image profiles resize JPG/PNG/GIF into a smaller
 JPEG payload when Pillow is installed. That is intentional for speed. If you
 want GIF-in/GIF-out, PNG-in/PNG-out, or exact original bytes, use `--original`.
+
+If packets are still missing, do not jump to `--interval 0.01`. Use repeated
+passes with the same `file_id` so PC2 can fill holes:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0 --retry-passes 3
+```
+
+For an even smaller/faster image payload:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --image-max-side 160 --image-target-kb 24 --interval 0.10 --decoys 0
+```
 
 ## Exact Original File Proof
 
@@ -144,4 +163,7 @@ previews the latest completed snapshot.
 - Use `--decoys 1` when demonstrating policy enforcement.
 - Use `--interval 0.10` for the stable proof. Smaller intervals are stress
   tests; missing chunks prevent SHA-256 pass and preview completion.
+- Use `--retry-passes 2` or `--retry-passes 3` when random chunks are missing;
+  this repeats the same media with the same `file_id`, allowing PC2 to fill
+  missing chunks without restarting the preview.
 - Use small JPEG images for the smoothest live presentation.

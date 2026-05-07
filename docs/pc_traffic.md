@@ -282,6 +282,20 @@ byte-exact transfer of the checked-in media file. This matters for GIF:
 `--profile gif` is a quick visual image demo, while `--profile gif --original`
 preserves GIF bytes so PC2 saves/previews it as `.gif`.
 
+If the file dashboard shows missing chunks, the first fix is not a smaller
+interval. Use retries with the same `file_id`:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0 --retry-passes 3
+```
+
+The receiver keeps already-arrived chunks and fills holes on later passes. For a
+faster visual demo, reduce the image payload instead:
+
+```bash
+sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --image-max-side 160 --image-target-kb 24 --interval 0.10 --decoys 0
+```
+
 For webcam snapshots from PC1:
 
 ```bash
