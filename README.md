@@ -133,6 +133,12 @@ Compile in Quartus:
 & 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --flow compile de1_soc_w5500 -c de1_soc_w5500
 ```
 
+Program the DE1-SoC over USB-Blaster/JTAG:
+
+```powershell
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_pgm.exe' -m JTAG -c 'DE-SoC [USB-1]' -o 's;SOCVHPS@1' -o 'p;build\quartus\de1_soc_w5500.sof@2'
+```
+
 Start the PC2 file dashboard:
 
 ```powershell

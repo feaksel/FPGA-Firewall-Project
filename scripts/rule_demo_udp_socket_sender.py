@@ -14,7 +14,7 @@ DEFAULT_W5500_A_MAC = "02:00:00:de:ad:0a"
 PROFILES = (
     ("allow80", 80, b"FW-DEMO-ALLOW80"),
     ("allow5001", 5001, b"FWFILE1\x00FW-DEMO-ALLOW5001"),
-    ("drop5002", 5002, b"FW-DEMO-DROP-UDP5002"),
+    ("drop5002", 5002, b"FW-UDP5002-DROP"),
     ("block80", 80, b"FW-BLOCK content-block"),
 )
 

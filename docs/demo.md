@@ -60,6 +60,11 @@ py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7
 Use a 3.3 V TTL USB-UART adapter wired from `GPIO_0_D6` to adapter RX, plus
 ground. Do not connect the adapter 5 V pin.
 
+The dashboard reset button resets the PC-side packet counters and also
+baselines the FPGA UART counters from the latest raw telemetry line. The FPGA
+hardware counters themselves only return to zero after `KEY0`, a reflash, or a
+power cycle. The raw UART line is still shown under the histogram for evidence.
+
 The file/media dashboard is also the webcam receiver. Webcam frames are sent as
 normal JPEG file transfers with new `file_id` values, so no separate webcam
 receiver is needed.
@@ -101,7 +106,7 @@ This cycles through four profiles:
 | --- | --- | --- |
 | allow80 | UDP/80 with `FW-DEMO-ALLOW80` | arrives on PC2 |
 | allow5001 | UDP/5001 with `FWFILE1\0` marker | arrives on PC2 |
-| drop5002 | UDP/5002 with drop marker | blocked |
+| drop5002 | UDP/5002 with `FW-UDP5002-DROP` marker | blocked |
 | block80 | UDP/80 with `FW-BLOCK` marker | blocked by content override |
 
 Expected dashboard result:

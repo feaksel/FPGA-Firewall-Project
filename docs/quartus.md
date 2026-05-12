@@ -55,6 +55,40 @@ Important outputs:
 | `de1_soc_w5500.fit.rpt` | fitter report |
 | `de1_soc_w5500.sta.rpt` | timing analysis report |
 
+## Program the Board
+
+Connect the DE1-SoC USB-Blaster port to the PC and turn the board on. First
+check that Quartus can see the cable and JTAG chain:
+
+```powershell
+& 'C:\altera_lite\25.1std\quartus\bin64\jtagconfig.exe'
+```
+
+On this board the JTAG chain normally appears as:
+
+```text
+1) DE-SoC [USB-1]
+  4BA00477   SOCVHPS
+  02D120DD   5CSE(BA5|MA5)/5CSTFD5D5/..
+```
+
+The first device is the HPS debug TAP, so the FPGA `.sof` must be programmed
+into device index 2:
+
+```powershell
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_pgm.exe' -m JTAG -c 'DE-SoC [USB-1]' -o 's;SOCVHPS@1' -o 'p;build\quartus\de1_soc_w5500.sof@2'
+```
+
+Expected success message:
+
+```text
+Configuration succeeded -- 1 device(s) configured
+```
+
+This is volatile SRAM/JTAG programming. If the DE1-SoC loses power or is
+reconfigured, load the `.sof` again. Do not use configuration-flash programming
+for normal bench work unless the project is intentionally being made persistent.
+
 ## SignalTap
 
 The project can use `quartus/de1_soc_w5500.stp` for SignalTap debug. The `.stp`

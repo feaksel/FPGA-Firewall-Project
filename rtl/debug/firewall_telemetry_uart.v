@@ -211,29 +211,29 @@ module firewall_telemetry_uart #(
         if (!rst_n) begin
             interval_count <= 32'd0;
             sending        <= 1'b0;
-            char_index     <= 6'd0;
+            char_index     <= 8'd0;
             tx_valid       <= 1'b0;
             tx_data        <= 8'd0;
         end else begin
-            tx_valid <= 1'b0;
-
-            if (!sending) begin
+            if (tx_valid && tx_ready) begin
+                tx_valid <= 1'b0;
+                if (char_index == (MSG_LEN - 1)) begin
+                    sending    <= 1'b0;
+                    char_index <= 8'd0;
+                end else begin
+                    char_index <= char_index + 8'd1;
+                end
+            end else if (!sending) begin
                 if (interval_count == (REPORT_INTERVAL_CYCLES - 1)) begin
                     interval_count <= 32'd0;
                     sending        <= 1'b1;
-                    char_index     <= 6'd0;
+                    char_index     <= 8'd0;
                 end else begin
                     interval_count <= interval_count + 32'd1;
                 end
-            end else if (tx_ready) begin
+            end else if (!tx_valid && tx_ready) begin
                 tx_valid <= 1'b1;
                 tx_data  <= message_char(char_index);
-                if (char_index == (MSG_LEN - 1)) begin
-                    sending    <= 1'b0;
-                    char_index <= 6'd0;
-                end else begin
-                    char_index <= char_index + 6'd1;
-                end
             end
         end
     end

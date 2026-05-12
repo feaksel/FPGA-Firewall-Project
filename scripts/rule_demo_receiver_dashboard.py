@@ -19,12 +19,14 @@ except ImportError:
 
 ALLOW80_MARKER = b"FW-DEMO-ALLOW80"
 ALLOW5001_MARKERS = (b"FWFILE1\x00", b"FWSINE2\x00", b"FW-DEMO-ALLOW5001")
+DROP5002_MARKERS = (b"FW-UDP5002-DROP", b"UDP5002")
 BLOCK_MARKERS = (b"FW-BLOCK", b"FW-DEMO-DROP")
 SEQ_RE = re.compile(rb"seq=(\d+)")
 TELEM_RE = re.compile(r"([A-Z0-9]+)=([0-9A-Fa-f]+|[0-9A-Fa-f][AD][E.])")
-APP_VERSION = "udp-policy-gateway-2026-05-05"
+APP_VERSION = "udp-policy-gateway-2026-05-12"
 RATE_SAMPLE_SEC = 0.5
 RATE_WINDOW_SEC = 30.0
+FPGA_COUNTER_KEYS = ("RX", "AL", "DR", "U80", "U51", "D52", "SIG", "DEF", "FIL", "SIN")
 
 
 def parse_seq(payload):
@@ -65,7 +67,28 @@ class DemoState:
         self.lock = threading.Lock()
         self.reset_unlocked()
 
+    def fpga_display_unlocked(self):
+        display = {}
+        for key, value in self.fpga_raw.items():
+            if key in FPGA_COUNTER_KEYS and isinstance(value, int):
+                base = self.fpga_baseline.get(key, value)
+                if value < base:
+                    base = value
+                    self.fpga_baseline[key] = value
+                display[key] = value - base
+            else:
+                display[key] = value
+        return display
+
     def reset_unlocked(self):
+        sniff_error = getattr(self, "sniff_error", "")
+        sniff_target = getattr(self, "sniff_target", "")
+        telemetry_error = getattr(self, "telemetry_error", "")
+        telemetry_target = getattr(self, "telemetry_target", "")
+        fpga_raw = dict(getattr(self, "fpga_raw", {}))
+        fpga_last_line = getattr(self, "fpga_last_line", "")
+        fpga_last_seen = getattr(self, "fpga_last_seen", None)
+
         self.started_at = time.time()
         self.allow80 = 0
         self.allow5001 = 0
@@ -85,13 +108,18 @@ class DemoState:
         self.rate_history = deque(maxlen=int(RATE_WINDOW_SEC / RATE_SAMPLE_SEC) + 8)
         self.events = deque(maxlen=90)
         self.marks = deque(maxlen=140)
-        self.sniff_error = ""
-        self.sniff_target = ""
-        self.telemetry_error = ""
-        self.telemetry_target = ""
-        self.fpga = {}
-        self.fpga_last_line = ""
-        self.fpga_last_seen = None
+        self.sniff_error = sniff_error
+        self.sniff_target = sniff_target
+        self.telemetry_error = telemetry_error
+        self.telemetry_target = telemetry_target
+        self.fpga_raw = fpga_raw
+        self.fpga_baseline = {
+            key: value for key, value in fpga_raw.items()
+            if key in FPGA_COUNTER_KEYS and isinstance(value, int)
+        }
+        self.fpga = self.fpga_display_unlocked()
+        self.fpga_last_line = fpga_last_line
+        self.fpga_last_seen = fpga_last_seen
 
     def reset(self):
         with self.lock:
@@ -122,15 +150,18 @@ class DemoState:
             seq = parse_seq(searchable)
             udp_dport = int(pkt[UDP].dport) if UDP in pkt else None
 
+            if udp_dport == 5002 or any(marker in searchable for marker in DROP5002_MARKERS):
+                self.demo_seen += 1
+                self.leaks += 1
+                self.drop5002_leaks += 1
+                self.event("LEAK", f"UDP/5002 drop leaked seq {seq}", seq)
+                return
+
             if any(marker in searchable for marker in BLOCK_MARKERS):
                 self.demo_seen += 1
                 self.leaks += 1
-                if udp_dport == 5002 or b"UDP5002" in searchable:
-                    self.drop5002_leaks += 1
-                    self.event("LEAK", f"UDP/5002 drop leaked seq {seq}", seq)
-                else:
-                    self.block_leaks += 1
-                    self.event("LEAK", f"content-block leaked on UDP/{udp_dport} seq {seq}", seq)
+                self.block_leaks += 1
+                self.event("LEAK", f"content-block leaked on UDP/{udp_dport} seq {seq}", seq)
                 return
 
             if udp_dport == 80 or ALLOW80_MARKER in searchable:
@@ -164,7 +195,13 @@ class DemoState:
         if not parsed:
             return
         with self.lock:
-            self.fpga.update(parsed)
+            self.fpga_raw.update(parsed)
+            if not self.fpga_baseline:
+                self.fpga_baseline = {
+                    key: value for key, value in self.fpga_raw.items()
+                    if key in FPGA_COUNTER_KEYS and isinstance(value, int)
+                }
+            self.fpga = self.fpga_display_unlocked()
             self.fpga_last_line = line.strip()
             self.fpga_last_seen = time.time()
 
@@ -302,7 +339,7 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
     <div class="metric"><div class="label">UDP/5001</div><div class="value" id="allow5001">0</div></div>
     <div class="metric bad"><div class="label">Leaks</div><div class="value" id="leaks">0</div></div>
     <div class="metric"><div class="label">Allowed/sec</div><div class="value" id="pps">0.0</div></div>
-    <div class="metric"><div class="label">FPGA RX</div><div class="value" id="fpgaRx">-</div></div>
+    <div class="metric"><div class="label">FPGA RX since reset</div><div class="value" id="fpgaRx">-</div></div>
   </section>
   <section class="grid">
     <div class="panel">
