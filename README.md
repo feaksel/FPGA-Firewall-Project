@@ -41,6 +41,16 @@ What is still a project limitation:
 
 The docs have been organized for MkDocs.
 
+Once GitHub Pages is enabled for this repository, the public docs should be
+available here:
+
+```text
+https://feaksel.github.io/ELE432_ethernet/
+```
+
+The workflow in `.github/workflows/pages.yml` builds and publishes the docs
+automatically after pushes to `main`.
+
 To view them locally:
 
 ```powershell

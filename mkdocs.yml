@@ -1,8 +1,27 @@
 site_name: ELE432 FPGA UDP Policy Gateway
 site_description: Documentation for the DE1-SoC and W5500 FPGA UDP policy gateway project.
+site_url: https://feaksel.github.io/ELE432_ethernet/
 repo_name: ELE432_ethernet
 docs_dir: docs
 site_dir: site
+not_in_nav: |
+  archive/BUGS.md
+  archive/CHANGELOG.md
+  archive/CONTRIBUTING.md
+  archive/DECISIONS.md
+  archive/TODO.md
+  archive/de1_soc_w5500_hardware.md
+  archive/hands_on_plan.md
+  archive/hardware_bringup.md
+  archive/next_bench_session.md
+  archive/next_steps.md
+  archive/pc_traffic.md
+  archive/project_overview.md
+  archive/quartus_learning_guide.md
+  archive/session_2026-05-04.md
+  archive/signaltap_debug.md
+  archive/simulation.md
+  archive/test_plan.md
 
 theme:
   name: readthedocs
@@ -19,7 +38,8 @@ nav:
   - Code Map: code-map.md
   - Interfaces: interfaces.md
   - Debugging Notes: debugging.md
-  - Archive: archive/README.md
+  - Archive:
+      - Overview: archive/README.md
 
 markdown_extensions:
   - admonition

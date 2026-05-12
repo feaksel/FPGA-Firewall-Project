@@ -180,7 +180,7 @@ for the round-2 capture/interpret flow.
 ## Adding new probes
 
 Adding a new `(* preserve, noprune *)` register in
-[rtl/top/de1_soc_w5500_top.v](../rtl/top/de1_soc_w5500_top.v) is necessary
+`rtl/top/de1_soc_w5500_top.v` is necessary
 but **not sufficient**. The SignalTap II IP is instrumented at fit time, so:
 
 1. Recompile once (so the new register survives synthesis).
