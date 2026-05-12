@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <title>Page moved</title>
+    <script>
+      (function () {
+        var base = "/FPGA-Firewall-Project/";
+        var path = window.location.pathname;
+        var routes = {
+          "status": "docs/status.html",
+          "architecture": "docs/architecture.html",
+          "rtl-guide": "docs/rtl-guide.html",
+          "hardware": "docs/hardware.html",
+          "demo": "docs/demo.html",
+          "verification": "docs/verification.html",
+          "quartus": "docs/quartus.html",
+          "code-map": "docs/code-map.html",
+          "interfaces": "docs/interfaces.html",
+          "debugging": "docs/debugging.html",
+          "archive": "docs/archive/"
+        };
+
+        if (!path.indexOf(base)) {
+          var slug = path.slice(base.length).replace(/^\/+|\/+$/g, "");
+          if (routes[slug]) {
+            window.location.replace(base + routes[slug] + window.location.search + window.location.hash);
+          }
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <h1>Page moved</h1>
+    <p>The public documentation is available from the docs index:</p>
+    <p><a href="/FPGA-Firewall-Project/docs/">Open the documentation</a></p>
+  </body>
+</html>

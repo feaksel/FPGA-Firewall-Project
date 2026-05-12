@@ -65,6 +65,11 @@ https://github.com/feaksel/FPGA-Firewall-Project/settings/pages
 Then rerun the failed workflow. This setting usually has to be selected once
 for a new Pages site before the workflow can deploy successfully.
 
+If the public homepage opens but looks like GitHub's plain Jekyll rendering of
+this README instead of the MkDocs sidebar site, Pages is still set to
+`Deploy from a branch`. Switch the same setting to `GitHub Actions`; otherwise
+GitHub will serve the repository files directly instead of the MkDocs build.
+
 To view them locally:
 
 ```powershell
