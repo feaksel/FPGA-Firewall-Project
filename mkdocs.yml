@@ -1,7 +1,8 @@
 site_name: ELE432 FPGA UDP Policy Gateway
 site_description: Documentation for the DE1-SoC and W5500 FPGA UDP policy gateway project.
-site_url: https://feaksel.github.io/ELE432_ethernet/
-repo_name: ELE432_ethernet
+site_url: https://feaksel.github.io/FPGA-Firewall-Project/
+repo_name: feaksel/FPGA-Firewall-Project
+repo_url: https://github.com/feaksel/FPGA-Firewall-Project
 docs_dir: docs
 site_dir: site
 not_in_nav: |
