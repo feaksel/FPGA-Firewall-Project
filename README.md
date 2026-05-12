@@ -1,564 +1,119 @@
-# FPGA Firewall / UDP Policy Gateway Project
+# ELE432 FPGA UDP Policy Gateway
 
-This repository is organized so the team can:
-1. build and verify the firewall core before hardware arrives,
-2. isolate hardware-risky parts behind a clean adapter interface,
-3. track bugs, design decisions, and milestone status clearly.
+This repository is my ELE432 FPGA networking project. The original idea was a
+small FPGA firewall, but the version that is actually working on the bench is
+more specific: a W5500-based UDP policy gateway.
 
-This project began as a simple FPGA-based Ethernet firewall MVP on `DE1-SoC + W5500`. The hardware path has now evolved into a **W5500-based UDP packet-policy gateway** because W5500 UDP sockets are reliable on this bench setup while A-side MACRAW receive was not dependable for the intended PC1 demo traffic. The project name can stay, but the submission story should be honest: this is a hardware policy engine built around the W5500's useful socket abstraction, not a transparent L2/TCP firewall.
-
-The short version is:
-- UDP datagrams come in from W5500 A sockets or from simulation,
-- the FPGA reconstructs an internal Ethernet/IPv4/UDP byte stream,
-- the parser/forwarder extracts header fields and scans payload markers,
-- the policy engine decides allow or drop,
-- an RX FIFO can absorb backpressure between the adapter and the firewall core,
-- and the design records aggregate plus per-rule counters for HEX, UART, dashboard, and SignalTap visibility.
-
-If you are new to the repo, start with [project_overview.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/project_overview.md). It explains the goal, architecture, stages, testing flow, deployment path, hardware setup, and which code/files matter at each phase.
-
-## Start here
-
-Recommended reading order for new teammates:
-- [docs/project_overview.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/project_overview.md)
-- [docs/architecture.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/architecture.md)
-- [docs/interfaces.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/interfaces.md)
-- [docs/test_plan.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/test_plan.md)
-- [docs/hands_on_plan.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/hands_on_plan.md)
-- [docs/quartus_learning_guide.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/quartus_learning_guide.md)
-
-## Core philosophy
-
-Do not start with full dual-port inline forwarding.
-
-Build in this order:
-1. simulated packet source
-2. parser
-3. rule engine
-4. firewall core integration
-5. one Ethernet controller hardware bring-up
-6. optional second-port forwarding
-
-## Scope and Hardware Reality
-
-This repository still keeps the original firewall language because that was the design target and the simulation core still covers TCP/UDP packet parsing. The working hardware demo, however, is more precise:
-
-- **What it is:** a one-way UDP policy gateway from PC1 -> W5500 A -> FPGA stream parser/rules/signature matcher -> W5500 B -> PC2.
-- **What the FPGA does:** reconstructs packet-like streams from W5500 UDP records, classifies UDP services, scans payload bytes for block/file/sine signatures, forwards allowed packets, drops blocked packets, and exposes counters.
-- **What the W5500 enables:** simple SPI bring-up, stable direct-cable UDP socket receive, and a practical two-module demo without writing a full Ethernet MAC.
-- **What the W5500 constrains:** the FPGA is not seeing every raw Ethernet frame in UDP-socket mode. TCP/SSH, ARP, ICMP, arbitrary L2 traffic, and transparent bidirectional firewalling are outside the final hardware demo unless the architecture moves to a real FPGA Ethernet MAC/PHY or a TCP proxy design.
-- **Why this is still an FPGA project:** the classification, counters, buffering, streaming payload matching, and deterministic allow/drop datapath are implemented in hardware and are visible through simulations, UART telemetry, PC2 dashboard, Wireshark, and SignalTap.
-
-## Main directories
-
-- `rtl/`      : synthesizable Verilog modules
-- `tb/`       : simulation models and testbenches
-- `docs/`     : overview, architecture, interfaces, test plan, and bring-up plan
-- `scripts/`  : helper scripts
-- `BUGS.md`   : active and resolved bugs
-- `DECISIONS.md` : architectural decisions and rationale
-- `TODO.md`   : current tasks
-- `CHANGELOG.md` : meaningful changes
-
-## Required working order
-
-### Before hardware arrives
-- parser testbench passes
-- rule engine testbench passes
-- firewall core testbench passes
-- packet buffer testbench passes
-- fake packet source drives known packet vectors
-
-### When hardware arrives
-- SPI master verified
-- controller register read/write verified
-- one-port packet receive verified
-- real bytes mapped into internal frame interface
-- firewall core reused without architecture changes
-
-## Repository status
-
-The current implementation includes:
-- packet vectors for UDP allow and TCP drop smoke tests,
-- a parser that handles Ethernet II + IPv4 + TCP/UDP without IPv4 options,
-- a four-rule parameterized rule engine with first-match priority,
-- a single-packet buffer that stores frame bytes and can replay them,
-- a dedicated RX-side frame FIFO between the adapter and firewall core,
-- a W5500 UDP-socket RX adapter that opens UDP services on ports `80`, `5001`, and `5002`,
-- a streaming policy forwarder with per-rule counters and payload signature blocking,
-- a DE1-SoC board wrapper for first hardware bring-up,
-- dedicated testbenches for source, parser, rules, buffer, SPI, adapter, and firewall core.
-
-The current project phase is:
-- simulation-complete for the original receive/inspect MVP pipeline,
-- two-port UDP policy forwarding is proven through W5500 B SEND completion and PC2 Wireshark/dashboard visibility,
-- UDP/5001 file-demo chunks are proven after the 2026-05-07 forwarder byte-index fix,
-- A-side MACRAW remains a legacy diagnostic path, not the final demo path,
-- the final demo work is now multi-service UDP policy, per-rule telemetry, signature blocking, and file/sine visualization.
-
-### Current hardware truth, 2026-05-07
-
-This is the most important status snapshot:
-
-- `SW6=1` direct B transmit test works: PC2/Wireshark sees the FPGA-generated `FW-DEMO-ALLOW-SSH` frame.
-- W5500 A ingress works: with `SW5=1`, raw receive/commit counters rise.
-- A direct cable from PC1 to PC2 works: `wire_rawPc1traffic.pcapng` contains demo frames.
-- `SW7=1` raw A-to-B bypass is proven for real Mac-origin frames: SignalTap shows B TX buffer writes / SEND clears with no timeout, and `sw7-0004.pcapng` contains forwarded Mac-origin multicast frames matching the SignalTap header.
-- `SW9=1` enables the byte/state debug view. Use it to inspect the first bytes seen on W5500 A, the first bytes handed to W5500 B, B TX progress counters, and SW8 parser fields. See `docs/signaltap_debug.md`.
-- W5500 A PHY confirmed at 100 Mbps full-duplex (`stp_phy_cfgr = 0xBF`).
-- PC1's `en0` confirmed putting demo UDP/80 frames on the wire toward W5500 A in both raw Scapy and normal UDP/static-ARP forms.
-- The final PC1 proof was normal unicast Ethernet: `1c:f6:4c:44:ff:46 > 02:00:00:de:ad:0a`, IPv4, `192.168.1.10:4660 > 192.168.1.1:80`, 10/10 tcpdump packets, zero drops.
-- W5500 A hardware readback confirmed the expected identity in MACRAW debug images: `PHYCFGR=0xBF`, `S0_MR=0x84`, `SHAR=02:00:00:DE:AD:0A`, `SIPR=192.168.1.1`.
-- A-side MACRAW never surfaced the demo UDP/80 frame (`frames_udp_dport80=0`) even with the correct PC1 packet and correct W5500 A MAC/IP/readbacks. It only surfaced broadcast/multicast Mac background frames such as mDNS UDP/5353.
-- The current working path uses W5500 A UDP socket RX, waits for PHY link, reconstructs an internal Ethernet/IP/UDP stream, and feeds the firewall/forwarder/B-TX path.
-- Round-22 hardware capture proved `S0_SR=0x22`, `PHYCFGR=0xBF`, `frames_udp_dport80=frames_demo_match=0x74`, `b_tx_count=0x74`, and `b_send_timeouts=0`.
-- PC2 Wireshark/dashboard subsequently confirmed forwarded packets arriving.
-- The final demo image extends W5500 A from one UDP socket to three services: UDP `80` allow, UDP `5001` allow, UDP `5002` drop, plus content-block signature override.
-- SOF checksum `0x085D8724` includes the 2026-05-07 forwarder fix for long UDP/5001 file frames.
-- Root cause of the file-demo hardware failure was an 8-bit byte index in `rtl/firewall/firewall_forwarder.v`. A 348-byte synthesized file frame wrapped after byte 255 and corrupted saved header fields before the EOP policy decision. The fix widens the forwarder byte index/current index to 16 bits.
-- Post-fix SignalTap proved UDP/5001 forwarding: `stp_last_frame_len=0x015C`, `b_last_pkt_len=0x015C`, `b_buf_writes=b_send_issued=b_send_cleared=b_tx_count=0x7D`, and `b_send_timeouts=0`.
-- PC2 Npcap sniff then captured UDP/5001 packets carrying `FWFILE1\0` with 306-byte payloads, proving the fixed image reaches PC2 rather than only completing W5500 B SEND internally.
-
-The PC1-triggered FPGA/W5500 forwarding path is now proven. The full multi-round diagnostic record is in `BUGS.md` and `CHANGELOG.md`; the current bench/demo protocol is in `docs/next_bench_session.md`.
-
-## Current verification status
-
-The original XSim regression suite passes for:
-- `fake_eth_source_tb`
-- `parser_tb`
-- `rule_engine_tb`
-- `packet_buffer_tb`
-- `frame_rx_fifo_tb`
-- `firewall_core_tb`
-- `spi_master_tb`
-- `eth_controller_adapter_tb`
-- `adapter_firewall_integration_tb`
-
-Focused Questa tests added during two-port bring-up:
-- `two_port_bypass_tb`
-- `de1_soc_top_bypass_tb`
-- `de1_soc_top_rule_regen_tb`
-- `w5500_udp_rx_adapter_tb`
-- `firewall_forwarder_tb`
-- `de1_soc_top_udp_socket_forward_tb`
-
-These tests prove the intended RTL handshakes against local W5500 models. Hardware acceptance is defined by PC2 Wireshark/dashboard visibility plus FPGA counters, because the W5500 modules and direct-link PCs are part of the real system.
-
-Run the full suite with:
-- `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1`
-
-Run a single testbench with:
-- `powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim.ps1 <testbench_name>`
-
-Simulation artifacts are written to designated build folders instead of the repo root:
-- `build/xsim/<testbench>/`
-- `build/iverilog/<testbench>/`
-- `build/questa/<testbench>/`
-
-The Quartus flow has also been validated on this machine:
-- recreate the project with `powershell -ExecutionPolicy Bypass -File .\scripts\create_quartus_project.ps1`
-- compile with `& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --flow compile de1_soc_w5500 -c de1_soc_w5500`
-- use `build/quartus/de1_soc_w5500.sof` for JTAG/SRAM programming
-- review `build/quartus/de1_soc_w5500.pin`, `.fit.rpt`, and `.sta.rpt` as the primary hardware handoff artifacts
-
-Current hardware evidence:
-- the DE1-SoC programs successfully over USB-Blaster/JTAG,
-- the W5500 responds to the `VERSIONR` register read after reset,
-- the adapter reaches RX polling with `init_done` active and `init_error` inactive,
-- Wireshark confirmed deterministic Scapy packets on the PC Ethernet interface:
-  - `udp_allow`
-  - `tcp_drop`
-  - `tcp_allow_ssh`
-- board LEDs and HEX pages show receive activity while traffic is present.
-- direct W5500 B TX test mode works and reaches PC2.
-
-Current final-demo work:
-- run the full file/video transfer at the safe `--interval 0.10` pacing until PC2 reconstructs the complete file and SHA-256 passes,
-- keep `--interval 0.001` or other burst settings as stress tests only; dropped UDP chunks are expected there because the demo intentionally has no retransmission protocol,
-- prove UDP/5002 and `FW-BLOCK` / `FW-DEMO-DROP` traffic is classified and dropped with no PC2 leaks,
-- use UART histograms if a 3.3 V TTL USB-UART adapter is available; otherwise use HEX pages plus SignalTap over USB-Blaster for FPGA-side proof.
-
-## Hardware target
-
-The current hardware plan is frozen around:
-- Terasic DE1-SoC
-- W5500 over `SPI + RESET + INT`
-- one proven W5500 RX path on `GPIO_0`
-- a staged second W5500 path on `GPIO_1[0..5]`
-- one-way inline forwarding before bidirectional forwarding
-
-Final demo target:
+The real demo path is:
 
 ```text
-PC1 sender -> W5500 A -> FPGA rules/forwarder -> W5500 B -> PC2 receiver
+PC1 sender -> W5500 A -> FPGA policy logic -> W5500 B -> PC2 receiver
 ```
 
-The planned proof is a chunked file transfer. Allowed chunks use UDP destination port `5001`; blocked decoy/error traffic is intentionally interleaved and should not appear on PC2. PC2 verifies the reconstructed file with SHA-256. The waveform demo uses the same UDP/5001 data path and plots only received signed-sample payload values, so packet gaps appear as real missing intervals.
+PC1 sends UDP packets into the first W5500 module. The FPGA reconstructs an
+internal Ethernet/IPv4/UDP byte stream, checks the packet service and payload
+markers, and forwards only the allowed packets through the second W5500 module.
+PC2 then proves the result with Wireshark or the browser dashboards.
 
-## Two-PC demo setup
+## Current State
 
-This is the handoff checklist for the final inline demo once the FPGA image supports W5500 B transmit.
+The latest recorded hardware status in this repo is from 2026-05-07.
 
-### Both PCs
+What is working:
+- DE1-SoC programming through USB-Blaster/JTAG.
+- W5500 SPI register access and initialization.
+- W5500 A UDP socket receive on the hardware path.
+- W5500 B transmit to PC2.
+- UDP/80 and UDP/5001 forwarding through the FPGA policy path.
+- UDP/5002 and content-marker drop logic in the RTL.
+- Browser dashboards for rule, waveform, and file-transfer demos.
+- Simulation testbenches for the parser, rules, buffers, W5500 models, and top-level paths.
 
-Install:
-- Git
-- Python 3.9 or newer
-- Npcap with WinPcap-compatible mode enabled
-- Wireshark
+What is still a project limitation:
+- This is not a transparent L2/TCP firewall.
+- The old MACRAW path is kept as debug history, not the final demo path.
+- The file demo uses raw UDP, so it has no retransmission. If a chunk is missed,
+  the receiver correctly refuses to mark the file as a SHA-256 pass.
+- The remaining final proof is the full safe-rate file transfer with decoys,
+  no leaks, and a matching SHA-256 on PC2.
 
-Clone and enter the repo:
+## Documentation
+
+The docs have been organized for MkDocs.
+
+To view them locally:
 
 ```powershell
-git clone <repo-url>
-cd ELE432_ethernet
-```
-
-Install Python dependency:
-
-```powershell
-py -3.9 -m pip install scapy
-```
-
-Install `pyserial` too if you want the browser dashboard to read live FPGA UART telemetry:
-
-```powershell
-py -3.9 -m pip install pyserial
-```
-
-Find the Ethernet interface name:
-
-```powershell
-py -3.9 -c "from scapy.all import get_if_list; print('\n'.join(get_if_list()))"
-```
-
-Use the interface name that matches the wired Ethernet adapter. In the examples below it is `"Ethernet"`.
-
-### PC1: sender side
-
-Connect PC1 Ethernet to W5500 A, the FPGA ingress module.
-
-For the simplest continuous rule demo, run this first:
-
-```bash
-sudo python3 scripts/rule_demo_udp_socket_sender.py --iface enX --rate 1 --verbose-each
-```
-
-This sender uses normal UDP sockets plus the static ARP entry `192.168.1.1 -> 02:00:00:de:ad:0a`. It sends four hardware-accurate profiles every cycle:
-- UDP `80` allow (`FW-DEMO-ALLOW80`)
-- UDP `5001` allow with a file marker (`FWFILE1`)
-- UDP `5002` drop (`FW-DEMO-DROP-UDP5002`)
-- UDP `80` content-block override (`FW-BLOCK`)
-
-The legacy raw sender [rule_demo_sender.py](/c:/Users/furka/Projects/ELE432_ethernet/scripts/rule_demo_sender.py) is retained for MACRAW diagnostics and simulation-shaped TCP packet experiments. It is not the final hardware demo path.
-
-For the continuous live demo, run:
-
-```powershell
-py -3.9 .\scripts\sine_sender.py --iface "Ethernet"
-```
-
-This continuously sends:
-- allowed payload-sample packets on UDP destination port `5001`,
-- blocked decoy packets on UDP destination port `5002` and/or `FW-BLOCK` content markers,
-- a persistent stream ID/sequence state file so the live demo can continue across sender restarts,
-- a small default sine-shaped packet stream (`5` packets/sec, `16` samples/packet, `1 Hz`) that is readable for the live demo.
-
-Put a small test file in the repo folder, for example `demo.mp4`, `demo.jpg`, `demo.png`, or `demo.bin`, then run:
-
-```powershell
-py -3.9 .\scripts\file_sender.py --iface "Ethernet" --file .\demo.mp4
-```
-
-What PC1 does:
-- splits the file into numbered chunks,
-- sends real file chunks as UDP destination port `5001`,
-- interleaves blocked decoy/error traffic,
-- prints the file SHA-256 and sent counts.
-
-The sender default chunk size is intentionally conservative: `256` file bytes
-per packet. A file packet also carries a 50-byte demo header and the FPGA
-synthesizes another 42 bytes of Ethernet/IP/UDP header, so a 512-byte file chunk
-becomes a 604-byte internal frame. If the board is running an older image with a
-512-byte ingress-frame limit, those full chunks are discarded and only the final
-short chunk appears on PC2. Keep the default, or use `--chunk-size 420` or
-smaller for that conservative image.
-
-The sender default pacing is also intentionally conservative: `--interval 0.10`.
-For bring-up, first prove the allowed path without decoys:
-
-```bash
-sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10
-```
-
-PC2 should show four received chunks and many missing chunks because this is only
-a probe. Then run the full proof with decoys:
-
-```bash
-sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 1 --interval 0.10
-```
-
-The full proof should use the safe default pacing. Very small intervals such as
-`0.001` are stress tests for the two-W5500 path; because the file demo is raw UDP
-with no retransmission, any missed allowed chunk prevents SHA-256 pass and the
-dashboard intentionally waits instead of writing or previewing a corrupt file.
-
-The PC2 receiver auto-detects completed MP4, JPEG, PNG, GIF, and MP3 payloads
-from the reconstructed bytes. If you leave the default `.bin` output, it rewrites
-the suffix after completion, for example `received_fw_file.mp4` or
-`received_fw_file.jpg`, and previews the media inline when the browser supports
-it.
-
-For SignalTap or UART debugging, keep the small probe running continuously:
-
-```bash
-sudo python3 scripts/file_sender.py --iface en0 --file demo.mp4 --decoys 0 --limit-chunks 4 --interval 0.10 --repeat 0
-```
-
-### PC2: receiver side
-
-Connect W5500 B, the FPGA egress module, to PC2 Ethernet.
-
-For the simplest continuous rule demo, start this browser receiver before PC1 starts sending:
-
-```powershell
-py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
-```
-
-If the FPGA UART is wired to a PC COM port, add it for live rule histograms:
-
-```powershell
-py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM7 --port 8091
-```
-
-UART wiring uses a 3.3 V TTL USB-UART adapter:
-
-```text
-DE1-SoC GPIO_0_D6 / GPIO_0[6]  ->  USB-UART RXD
-DE1-SoC GND                    ->  USB-UART GND
-```
-
-Use `115200 8N1`, no flow control. Do not connect the adapter's `5V` pin and do
-not use an RS-232 serial cable. Windows shows the adapter as a `COM` port in
-Device Manager; replace `COM7` with the actual port. The FPGA sends one compact
-ASCII line about every `0.5 s` with `RX`, `AL`, `DR`, `U80`, `U51`, `D52`,
-`SIG`, `DEF`, `FIL`, and `SIN` fields for the dashboard histogram.
-
-If the dashboard stays empty, first list the exact Npcap interface names:
-
-```powershell
-py -3.9 .\scripts\rule_demo_receiver_dashboard.py --list-ifaces
-```
-
-The dashboard shows PC2-visible allowed packets, leak warnings, and FPGA UART rule counters when `--uart` is provided. Its Live Result rate graph uses a real rolling time window, so the x-axis advances with wall-clock time and decays to zero when packets stop. If the PC2 packet counters stay at `0`, use a different `--iface`. You can also validate a Wireshark capture with:
-
-```powershell
-py -3.9 .\scripts\rule_demo_receiver_dashboard.py --pcap C:\Users\furka\Desktop\wire2.pcapng
+py -3 -m pip install -r requirements-docs.txt
+py -3 -m mkdocs serve
 ```
 
 Then open:
 
 ```text
-http://127.0.0.1:8091
+http://127.0.0.1:8000
 ```
 
-Expected result: UDP `80` and UDP `5001` allowed counts increase, and `Drop leaks` stays `0`. If a TTL USB-UART adapter is connected, the FPGA histogram also shows `U80`, `U51`, `D52`, and `SIG` counts rising according to the sender profiles. Without UART, use the board `HEX3..HEX0` pages plus SignalTap over USB-Blaster for FPGA-side counters.
+Main pages:
+- [Project documentation](docs/index.md)
+- [Current status](docs/status.md)
+- [Architecture](docs/architecture.md)
+- [Hardware setup](docs/hardware.md)
+- [Demo guide](docs/demo.md)
+- [Simulation and tests](docs/verification.md)
+- [Quartus build](docs/quartus.md)
+- [Code map](docs/code-map.md)
+- [Interfaces](docs/interfaces.md)
+- [Debugging notes](docs/debugging.md)
+- [Archived notes](docs/archive/README.md)
 
-If `All frames seen` rises but `Demo frames seen` stays `0`, summarize the capture:
+## Repository Map
+
+- `rtl/` - synthesizable Verilog for the FPGA design.
+- `tb/` - SystemVerilog/Verilog testbenches, W5500 models, and packet vectors.
+- `scripts/` - simulation runners, traffic senders, dashboards, and capture tools.
+- `quartus/` - Quartus project files and pin/constraint setup.
+- `docs/` - the MkDocs documentation source.
+- `docs/archive/` - older logs, plans, decisions, and long debug notes.
+- `demo files/` - media used by the visual file-transfer demo.
+- `captures/` - saved SignalTap and capture evidence from bench work.
+
+## Common Commands
+
+Run the main simulation suite:
 
 ```powershell
-py -3 .\scripts\pcap_summary.py C:\Users\furka\Desktop\capture.pcapng
+powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim_suite.ps1
 ```
 
-If the pcap shows only PC2 background traffic, restart PC1 with the UDP-socket sender and re-check the static ARP entry. Older raw/MAC spoofing commands are now diagnostics, not the main demo path.
-
-If packets arrive for a while and then stop, stop the PC1 sender, press reset/start on the FPGA, keep `SW5=0`, and restart the safe sender command above. Avoid burst mode during the reliable demo path; `--burst` is only for short ingress bring-up tests with `SW5=1`.
-
-If `SW[3:1]=001` is stuck, set `SW5=1` while keeping `SW[3:1]=001`. That page then shows raw W5500 A ingress-drain count instead of firewall RX count. If it increases, ingress wiring/sending works and the downstream forwarding/TX path is the problem. Set `SW5=0` for normal firewall behavior.
-
-For the continuous live demo, start the browser receiver before PC1 starts sending:
+Run one testbench:
 
 ```powershell
-py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090
+powershell -ExecutionPolicy Bypass -File .\scripts\run_xsim.ps1 parser_tb
 ```
 
-Then open:
-
-```text
-http://127.0.0.1:8090
-```
-
-The dashboard shows:
-- received signed int16 payload samples as dots on a rolling wall-clock time axis,
-- packet-by-packet decision strip,
-- allowed packet count,
-- expected drop count,
-- missing sequence count,
-- packets per second,
-- run ID and ignored stale packet count,
-- decoy leak count.
-
-The expected result is a constantly moving time window with green sample dots,
-green allowed packet marks, faded red expected-drop marks, visible blank gaps if
-allowed packets are missing, and `Leaks = 0`. The graph does not connect across
-missing packets, so dropped/missed intervals stay visually empty until the next
-allowed packet arrives at its later timestamp.
-
-The graph is payload-driven. The PC2 dashboard does not synthesize a sine wave;
-it decodes the signed 16-bit sample values carried inside each forwarded UDP
-`5001` packet and plots those values. That means the same dashboard can show a
-sine, square, triangle, saw, step pattern, noise, a custom value sequence, or
-5x7 text encoded as sample positions:
-
-```bash
-sudo python3 scripts/sine_sender.py --iface enX --wave sine --wave-hz 1 --packets-per-second 5
-sudo python3 scripts/sine_sender.py --iface enX --wave square --wave-hz 1 --packets-per-second 5
-sudo python3 scripts/sine_sender.py --iface enX --wave values --values "-28000 -28000 28000 28000 0 12000 24000 12000" --packets-per-second 5
-sudo python3 scripts/sine_sender.py --iface enX --wave text --text "FPGA UDP" --sample-rate 210 --samples-per-packet 21 --packets-per-second 10
-```
-
-The waveform x-axis defaults to real wall-clock packet cadence. One vertical
-grid column is one second, and the sender now defaults its payload sample rate
-to `packets-per-second * samples-per-packet` so the payload metadata also
-matches real time. The receiver no longer draws a fake green zero line when no
-samples are visible.
-
-This is also the right foundation for a future FPGA value-threshold rule: the
-hardware can scan these sample bytes before forwarding and drop whole packets
-whose payload samples exceed a configured limit. PC2 would then show real blank
-intervals where those packets were cut by the FPGA policy engine.
-
-Use **Restart dashboard** to clear the PC2 counters, waveform, packet strip, event log, and rate graph without restarting the receiver process.
-
-If the button is not visible, stop and restart `sine_receiver_dashboard.py` once. The dashboard HTML is embedded in the Python process, so an already-running dashboard will keep serving the old page until the process restarts.
-
-Before a clean demo take, stop old sender processes on PC1 and start only one new sender. The sender saves `.sine_sender_state.json` by default, so restarting it continues the same run ID and sequence. Use `--fresh-run` only when you intentionally want a new demo run. The dashboard locks onto the first new-format `FWSINE2` run it sees and ignores legacy or different-run packets, but a single sender gives the cleanest waveform and packet strip. W5500 B TX now uses burst TX-buffer writes in RTL, so higher sender rates are more realistic, but increase `--packets-per-second` gradually while watching PC2 packet gaps and leaks.
-
-For a hard-locked presentation stream, use the same explicit run ID on both PCs:
+Refresh the Quartus project:
 
 ```powershell
-py -3.9 .\scripts\sine_receiver_dashboard.py --iface "Ethernet" --port 8090 --lock-run-id 0x4321
+powershell -ExecutionPolicy Bypass -File .\scripts\create_quartus_project.ps1
 ```
 
-```bash
-sudo python3 scripts/sine_sender.py --iface enX --run-id 0x4321 --wave sine --wave-hz 1 --packets-per-second 5 --samples-per-packet 16
-```
-
-For the file/video checksum demo, start the receiver before PC1 starts sending:
+Compile in Quartus:
 
 ```powershell
-py -3.9 .\scripts\file_receiver.py --iface "Ethernet" --port 8092
+& 'C:\altera_lite\25.1std\quartus\bin64\quartus_sh.exe' --flow compile de1_soc_w5500 -c de1_soc_w5500
 ```
 
-Then open:
+Start the PC2 file dashboard:
 
-```text
-http://127.0.0.1:8092
+```powershell
+py -3 scripts\file_receiver.py --iface Ethernet --port 8092
 ```
 
-What PC2 does:
-- listens for forwarded UDP port `5001` chunks,
-- reconstructs the file,
-- shows a live chunk map and progress bar,
-- reports missing chunks and decoy leaks,
-- verifies SHA-256,
-- writes the completed file to disk,
-- previews completed images/video/audio/text in the browser when the file type is supported,
-- reports `PASS` when the reconstructed file matches PC1's original file.
-
-For a simple photo-by-photo demo, put small JPEG/PNG frames in a folder on PC1
-and run:
+Send a quick media demo from PC1:
 
 ```bash
-sudo python3 scripts/photo_stream_sender.py --iface en0 --dir photos --loop --interval 0.10
-```
-
-PC2 can use the same `file_receiver.py` dashboard. Each completed image uses a
-new `file_id`, so the receiver automatically advances and previews the latest
-frame. This is a still-frame stream, not compressed live video; use small
-compressed images such as 160x120 or 320x240 for a smoother demo.
-
-If a camera/screenshot tool on PC1 writes new JPEG/PNG files into that folder,
-use `--watch` instead of `--loop` to transmit each new photo as it appears.
-
-This repo includes a ready-to-use media folder:
-[demo files](/c:/Users/furka/Projects/ELE432_ethernet/demo%20files/README.md).
-For the quickest visual demo from those files:
-
-```bash
-python3 -m pip install pillow
 sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0
 ```
 
-If chunks are missing, use repeated passes with the same `file_id` instead of
-speeding up the sender:
-
-```bash
-sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --interval 0.10 --decoys 0 --retry-passes 3
-```
-
-For a smaller payload:
-
-```bash
-sudo python3 scripts/media_demo_sender.py --iface en0 --profile jpg --image-max-side 160 --image-target-kb 24 --interval 0.10 --decoys 0
-```
-
-For exact media proof:
-
-```bash
-sudo python3 scripts/media_demo_sender.py --iface en0 --profile mp4 --decoys 1 --interval 0.10
-```
-
-For webcam snapshots from PC1 to PC2:
-
-```bash
-python3 -m pip install opencv-python
-python3 scripts/webcam_photo_sender.py --iface en0 --count 0 --period 2 --max-side 160 --jpeg-quality 65 --interval 0.10 --retry-passes 3 --file-id-start 600
-```
-
-The webcam demo sends repeated JPEG still frames over the same UDP/5001 policy
-path. Each snapshot is resent with the same `file_id` so PC2 can fill missed
-chunks; each new frame then advances to the next `file_id`. It is a still-photo
-stream, not a compressed live-video codec.
-
-Optional Wireshark checks on PC2:
-
-```text
-udp.port == 80 || udp.port == 5001 || udp.port == 5002
-```
-
-Blocked traffic should not show up on PC2:
-
-```text
-udp.port == 5002
-```
-
-```text
-frame contains "FW-BLOCK" || frame contains "FW-DEMO-DROP"
-```
-
-For the no-UART version of the demo, PC1 sender output, PC2 receiver output, PC2 Wireshark, and the DE1-SoC HEX/LED counters are the proof sources.
-
-For the full newcomer-friendly explanation, see [project_overview.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/project_overview.md).
-See [de1_soc_w5500_hardware.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/de1_soc_w5500_hardware.md) for the board-facing contract.
-See [hands_on_plan.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/hands_on_plan.md) for the step-by-step buy, wire, compile, program, and bring-up flow.
-See [quartus_learning_guide.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/quartus_learning_guide.md) for a beginner-friendly explanation of the Quartus project files and compile/program flow in this repo.
-See [simulation.md](/c:/Users/furka/Projects/ELE432_ethernet/docs/simulation.md) for the validated regression order and simulator commands.
-
-## Language policy
-
-Use a mixed-language approach:
-- synthesizable RTL should stay conservative and Vivado-friendly,
-- SystemVerilog is encouraged for testbenches, packages, assertions, and reusable verification helpers,
-- any synthesizable SystemVerilog should stay within a simple subset that maps cleanly to the FPGA flow.
-
-## Rules for contributors
-
-Every significant change must update:
-- `CHANGELOG.md`
-- `DECISIONS.md` if architecture changed
-- `BUGS.md` if a bug was found or fixed
-- `TODO.md` milestone status
-
-Do not silently change interfaces.
-Do not add complexity before the previous milestone passes.
+For the checked-in media files, see [demo files/README.md](demo%20files/README.md).

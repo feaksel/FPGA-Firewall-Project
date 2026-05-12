@@ -1,93 +1,103 @@
 # Interfaces
 
-## Global assumptions
-- Ethernet II framing
-- IPv4 inspection only for MVP
-- No IPv4 options in MVP
-- TCP/UDP header basic field extraction
-- Default policy = DROP
-- First matching rule wins
+This page records the project boundaries that matter most when reading or
+changing the RTL.
 
-## Internal frame stream interface
+## Internal Frame Stream
 
-This interface is used between:
-- fake packet source
-- future Ethernet RX adapter
-- packet buffer
-- firewall core
+The shared packet interface is a byte stream:
 
-Signals:
-- `frame_valid` : current byte valid
-- `frame_data[7:0]` : current byte
-- `frame_sop` : start of packet
-- `frame_eop` : end of packet
-- `frame_ready` : sink ready for the current byte
-- `frame_src_port[0:0]` : source port id for future dual-port extension
+| Signal | Meaning |
+| --- | --- |
+| `frame_valid` | current byte is valid |
+| `frame_data[7:0]` | current packet byte |
+| `frame_sop` | first byte of a packet |
+| `frame_eop` | last byte of a packet |
+| `frame_ready` | downstream block can accept this byte |
+| `frame_src_port` | source-side tag for future multi-port logic |
 
-Current baseline:
-- the firewall core is always ready,
-- the packet buffer can apply backpressure when full,
-- the adapter shell keeps the same interface even before real RX logic exists.
+This interface is used by the simulation sources, the W5500 receive adapter,
+the RX FIFO, the parser, and the forwarder. Keeping this boundary stable is what
+lets the same policy logic run in simulation and on the real board path.
 
-## Parser output interface
+## Parser Output
 
-- `hdr_valid`
-- `is_ipv4`
-- `protocol[7:0]`
-- `src_ip[31:0]`
-- `dst_ip[31:0]`
-- `src_port[15:0]`
-- `dst_port[15:0]`
-- `parse_error`
+`eth_ipv4_parser.v` extracts the fields needed by the simple firewall policy:
 
-Notes:
-- `hdr_valid` pulses when the minimum supported header fields are available.
-- `parse_error` pulses on short frames or unsupported header forms.
+| Signal | Meaning |
+| --- | --- |
+| `hdr_valid` | parsed fields are available |
+| `is_ipv4` | packet is Ethernet II IPv4 |
+| `protocol[7:0]` | IPv4 protocol value |
+| `src_ip[31:0]` | source IPv4 address |
+| `dst_ip[31:0]` | destination IPv4 address |
+| `src_port[15:0]` | TCP/UDP source port |
+| `dst_port[15:0]` | TCP/UDP destination port |
+| `parse_error` | unsupported or too-short packet |
 
-## Rule format
+Current parser assumptions:
+- Ethernet II framing.
+- IPv4 only.
+- TCP and UDP port extraction.
+- No IPv4 options in the MVP path.
 
-Per rule:
-- valid
-- src_ip
-- src_mask
-- dst_ip
-- dst_mask
+## Rule Engine
+
+Each rule contains:
+- valid bit
+- source IP and mask
+- destination IP and mask
 - protocol
-- src_port_min
-- src_port_max
-- dst_port_min
-- dst_port_max
-- action
+- source port range
+- destination port range
+- allow/drop action
 
 Conventions:
-- `protocol == 8'h00` means wildcard
-- all-zero masks mean wildcard IP match
 - first matching rule wins
+- all-zero IP mask means wildcard
+- protocol `8'h00` means wildcard
+- no match means default drop
 
-## Rule engine outputs
-- `decision_valid`
-- `action_allow`
-- `matched_rule_id`
+The main outputs are `decision_valid`, `action_allow`, and `matched_rule_id`.
 
-## Counter visibility
+## W5500 A Receive Boundary
 
-The top-level integration must expose:
-- `rx_count`
-- `allow_count`
-- `drop_count`
-- `adapter_debug_state`
-- `init_done`
-- `init_error`
-- `rx_packet_seen`
+The current final ingress path is `w5500_udp_rx_adapter.v`.
 
-These counters are intended for debug and bring-up before optional forwarding is added.
+It opens and polls UDP services used by the demo:
 
-## Board-facing hardware signals
+| Socket profile | UDP port | Use |
+| --- | --- | --- |
+| service 0 | `80` | basic allow profile |
+| service 1 | `5001` | file/waveform data |
+| service 2 | `5002` | blocked decoy traffic |
 
-For the DE1-SoC + W5500 path, the external interface must include:
-- `w5500_reset_n`
-- `w5500_int_n`
-- `spi_sclk`
-- `spi_mosi`
-- `spi_miso`
-- `spi_cs_n`
+The adapter synthesizes a normal Ethernet/IPv4/UDP-looking stream before handing
+the packet to the policy path.
+
+## W5500 B Transmit Boundary
+
+The TX side receives allowed packet bytes, writes them into the W5500 B TX
+buffer, updates the write pointer, and issues SEND.
+
+The proof that this boundary worked is not only an FPGA counter. For acceptance,
+PC2 must also see the forwarded UDP packet in Wireshark or one of the receiver
+dashboards.
+
+## Telemetry
+
+The board and dashboards use these main counters:
+
+| Counter | Meaning |
+| --- | --- |
+| `rx_count` | packets entering the policy path |
+| `allow_count` | packets allowed by policy |
+| `drop_count` | packets dropped by policy |
+| `rule_allow80_count` | UDP/80 allow hits |
+| `rule_allow5001_count` | UDP/5001 allow hits |
+| `rule_drop5002_count` | UDP/5002 drop hits |
+| `signature_block_count` | payload signature drops |
+| `file_marker_count` | `FWFILE1\0` payload hits |
+| `sine_marker_count` | `FWSINE2\0` payload hits |
+
+Optional UART telemetry is transmit-only from FPGA to PC2 at `115200 8N1`.
