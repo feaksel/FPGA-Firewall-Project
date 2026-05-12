@@ -31,6 +31,7 @@ nav:
   - Home: index.md
   - Current Status: status.md
   - Architecture: architecture.md
+  - RTL Guide: rtl-guide.md
   - Hardware Setup: hardware.md
   - Demo Guide: demo.md
   - Simulation and Tests: verification.md

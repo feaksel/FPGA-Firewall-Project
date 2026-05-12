@@ -51,6 +51,14 @@ https://feaksel.github.io/ELE432_ethernet/
 The workflow in `.github/workflows/pages.yml` builds and publishes the docs
 automatically after pushes to `main`.
 
+If the workflow fails at `Configure GitHub Pages` with a `Not Found` error,
+open the repository on GitHub and go to:
+
+`Settings` -> `Pages` -> `Build and deployment` -> `Source` -> `GitHub Actions`
+
+Then rerun the failed workflow. This setting usually has to be selected once
+for a new Pages site before the workflow can deploy successfully.
+
 To view them locally:
 
 ```powershell

@@ -34,6 +34,7 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build --strict
 
+      # The repository must have Settings -> Pages -> Source set to GitHub Actions.
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 

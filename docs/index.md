@@ -35,13 +35,14 @@ show.
 
 1. [Current status](status.md)
 2. [Architecture](architecture.md)
-3. [Hardware setup](hardware.md)
-4. [Demo guide](demo.md)
-5. [Simulation and tests](verification.md)
-6. [Quartus build](quartus.md)
-7. [Code map](code-map.md)
-8. [Interfaces](interfaces.md)
-9. [Debugging notes](debugging.md)
+3. [RTL Guide](rtl-guide.md)
+4. [Hardware setup](hardware.md)
+5. [Demo guide](demo.md)
+6. [Simulation and tests](verification.md)
+7. [Quartus build](quartus.md)
+8. [Code map](code-map.md)
+9. [Interfaces](interfaces.md)
+10. [Debugging notes](debugging.md)
 
 The older long-form notes, debug logs, contribution rules, and session plans are
 kept in [the archive](archive/README.md).

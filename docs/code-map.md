@@ -1,6 +1,8 @@
 # Code Map
 
-This page is a practical map of the source tree.
+This page is a practical map of the source tree. For a more detailed explanation
+of each Verilog module and whether it is current or legacy, see
+[RTL Guide](rtl-guide.md).
 
 ## Top-Level RTL
 
