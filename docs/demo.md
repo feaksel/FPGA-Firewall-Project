@@ -88,6 +88,22 @@ Start PC2:
 py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --port 8091
 ```
 
+If the FPGA UART telemetry adapter is connected, start the same dashboard with
+`--uart` and the COM port Windows assigned to the USB-UART adapter:
+
+```powershell
+py -3.9 .\scripts\rule_demo_receiver_dashboard.py --iface "Ethernet" --uart COM3 --baud 115200 --port 8091
+```
+
+Replace `COM3` with your actual port, for example `COM7`. The baud rate defaults
+to `115200`, so `--baud 115200` is optional but useful when writing the command
+down for a demo. If the dashboard says `pyserial is required for --uart`, install
+it on PC2:
+
+```powershell
+py -3.9 -m pip install pyserial
+```
+
 Open:
 
 ```text
@@ -114,6 +130,23 @@ Expected dashboard result:
 - `Drop leaks` stays `0`
 - FPGA UART histogram rises if UART is connected
 - HEX receive/allow/drop pages move on the board
+
+The FPGA rule counter meanings are:
+
+| Field | Meaning | When it rises |
+| --- | --- | --- |
+| `U80` | UDP/80 allow rule | `allow80` sender profile |
+| `U51` | UDP/5001 allow rule | file/media/sine/data profile |
+| `D52` | UDP/5002 port-drop rule | UDP/5002 sender profile |
+| `SIG` | content-block drop | payload contains `FW-BLOCK` or `FW-DEMO-DROP` |
+| `DEF` | default drop | valid packet reaches the FPGA but matches none of the explicit rules |
+| `FIL` | file marker seen | payload contains `FWFILE1\0` |
+| `SIN` | sine marker seen | payload contains `FWSINE2\0` |
+
+`DEF` is not expected to rise in the normal rule demo, because all default
+profiles intentionally hit one of the explicit rules. It is useful when testing
+unknown UDP ports or malformed/unsupported traffic. `SIN` only rises during the
+waveform demo.
 
 Use this demo first when the bench setup feels uncertain.
 

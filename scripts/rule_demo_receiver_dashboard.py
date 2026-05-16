@@ -310,12 +310,14 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
 .ok { color:var(--green); font-weight:750; }
 .fail { color:var(--red); font-weight:750; }
 .hist { display:grid; gap:9px; }
-.barrow { display:grid; grid-template-columns:86px minmax(0,1fr) 80px; gap:8px; align-items:center; }
+.barrow { display:grid; grid-template-columns:124px minmax(0,1fr) 74px 62px; gap:8px; align-items:center; }
+.barrow.head { color:var(--muted); font-size:11px; text-transform:uppercase; }
 .barbox { height:18px; border-radius:5px; background:#e6ebf2; overflow:hidden; }
 .bar { height:100%; width:0%; background:var(--blue); }
 .bar.allow { background:var(--green); }
 .bar.drop { background:var(--red); }
 .bar.sig { background:var(--violet); }
+.histHint { margin:10px 0 0; }
 .mono { font-family:Consolas, "Courier New", monospace; }
 @media (max-width:960px){ .flow,.metrics,.grid{grid-template-columns:1fr}.link{height:20px;width:2px;justify-self:center} }
 </style>
@@ -350,8 +352,9 @@ canvas { width:100%; height:145px; display:block; border:1px solid var(--line); 
       <p class="note" id="runtimeInfo"></p>
     </div>
     <div class="panel">
-      <h2>FPGA Rule Histogram</h2>
+      <h2>FPGA Rule Counters</h2>
       <div class="hist" id="hist"></div>
+      <p class="note histHint">Bars show share of FPGA RX since dashboard restart. Marker rows can overlap with allow/drop rows.</p>
       <p class="note mono" id="fpgaLine"></p>
     </div>
   </section>
@@ -401,20 +404,22 @@ function drawRate(samples, elapsed, windowSec) {
 function hexOrDash(value){ return value === undefined ? "-" : value.toString(); }
 function drawHistogram(fpga){
   const rows = [
-    ["U80", "UDP/80 allow", "allow"],
-    ["U51", "UDP/5001 allow", "allow"],
-    ["D52", "UDP/5002 drop", "drop"],
-    ["SIG", "content block", "sig"],
-    ["DEF", "default drop", "drop"],
-    ["FIL", "file marker", "sig"],
-    ["SIN", "sine marker", "sig"],
+    ["U80", "UDP/80 allow", "allow", "Allowed UDP/80 packets"],
+    ["U51", "UDP/5001 allow", "allow", "Allowed UDP/5001 packets"],
+    ["D52", "UDP/5002 drop", "drop", "Blocked by UDP destination port 5002"],
+    ["SIG", "content block", "sig", "Blocked by FW-BLOCK or FW-DEMO-DROP payload signature"],
+    ["DEF", "default drop", "drop", "Valid packet with no configured allow/drop rule"],
+    ["FIL", "file marker", "sig", "Payload contained FWFILE1 marker"],
+    ["SIN", "sine marker", "sig", "Payload contained FWSINE2 marker"],
   ];
-  const max = Math.max(1, ...rows.map(([key]) => fpga[key] || 0));
-  el.hist.innerHTML = rows.map(([key,label,cls]) => {
+  const rx = Math.max(1, fpga.RX || 0);
+  const body = rows.map(([key,label,cls,title]) => {
     const value = fpga[key] || 0;
-    const pct = Math.max(2, (value / max) * 100);
-    return `<div class="barrow"><div class="label">${label}</div><div class="barbox"><div class="bar ${cls}" style="width:${pct}%"></div></div><div class="mono">${value}</div></div>`;
+    const pct = Math.min(100, (value / rx) * 100);
+    const width = value === 0 ? 0 : Math.max(2, pct);
+    return `<div class="barrow" title="${title}"><div class="label">${label}</div><div class="barbox"><div class="bar ${cls}" style="width:${width}%"></div></div><div class="mono">${value}</div><div class="mono">${pct.toFixed(0)}%</div></div>`;
   }).join("");
+  el.hist.innerHTML = `<div class="barrow head"><div>Counter</div><div>Share of RX</div><div>Count</div><div>%</div></div>${body}`;
 }
 async function refresh(){
   const r=await fetch("/api/state",{cache:"no-store"}); const d=await r.json();
